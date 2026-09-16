@@ -102,7 +102,7 @@ const Login = () => {
                   textAlign: 'center',
                 }}
               >
-                <h2 className="fw-bold mb-2">Princess Salon POS</h2>
+                <h2 className="fw-bold mb-2">Glamour Unisex Salon</h2>
 
                 <p className="mb-0">Salon Management System</p>
               </div>
