@@ -121,13 +121,17 @@ const BusinessHours = () => {
     try {
       setSaving(true)
   
-      const response = await axios.put(
+      const payload = {
+        businessHours: [formData],
+      }
+  
+      console.log('Business hours payload:', payload)
+  
+      await axios.put(
         `${API_URL}api/v1/business-hours`,
-        formData,
+        payload,
         authConfig
       )
-  
-      console.log('Business hours saved:', response.data)
   
       setVisible(false)
       await getBusinessHours()
@@ -141,7 +145,10 @@ const BusinessHours = () => {
         confirmButtonColor: '#321fdb',
       })
     } catch (error) {
-      console.error('Business hours error:', error.response?.data || error)
+      console.error(
+        'Business hours error:',
+        error.response?.data || error
+      )
   
       Swal.fire({
         icon: 'error',
