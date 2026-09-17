@@ -169,10 +169,10 @@ const ReceiptModal = ({ show, onHide, sale }) => {
     settings?.companyEmail || ''
 
   const companyAddress =
-    settings?.companyAddress || ''
+    settings.companyAddress || ''
 
   const currencySymbol =
-    settings?.currencySymbol || '₦'
+    settings.currencySymbol || '₦'
 
   const receiptFooter =
     settings?.receiptFooter ||
