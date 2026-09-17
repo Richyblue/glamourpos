@@ -34,7 +34,7 @@ const ReceiptModal = ({ show, onHide, sale }) => {
           `${API_URL}api/v1/settings`
         )
 
-        setSettings(response.data.settings || {})
+        setSettings(response.data?.settings || {})
       } catch (error) {
         console.error(
           'Failed to load company settings:',
