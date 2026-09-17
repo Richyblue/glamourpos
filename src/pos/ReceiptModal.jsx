@@ -85,7 +85,7 @@ const ReceiptModal = ({ show, onHide, sale }) => {
               }}
             >
               <div style={{ textAlign: 'center' }}>
-                <h3 style={{ margin: '2px 0' }}>PRINCESS SALON</h3>
+                <h3 style={{ margin: '2px 0' }}>GLAMOUR UNISEX SALON</h3>
 
                 <p style={{ margin: '2px 0' }}>Beauty & Wellness Center</p>
 
