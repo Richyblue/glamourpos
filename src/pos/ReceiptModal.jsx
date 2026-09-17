@@ -25,32 +25,59 @@ const ReceiptModal = ({ show, onHide, sale }) => {
   ==========================================
   */
 
+  const fetchSettings = async () => {
+    try {
+      const token = localStorage.getItem('token')
+
+      const response = await axios.get(
+        `${API_URL}api/v1/settings`,
+
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      setStaffs(response.data.settings)
+    } catch (error) {
+      console.error(error)
+    }
+  }
   useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        setLoadingSettings(true)
-
-        const response = await axios.get(
-          `${API_URL}api/v1/settings`
-        )
-
-        setSettings(response.data?.settings || {})
-      } catch (error) {
-        console.error(
-          'Failed to load company settings:',
-          error
-        )
-
-        setSettings({})
-      } finally {
-        setLoadingSettings(false)
-      }
+    const fetchData = async () => {
+      await fetchSettings()
     }
 
-    if (show) {
-      fetchSettings()
-    }
-  }, [show, API_URL])
+    fetchData()
+  }, [])
+
+  // useEffect(() => {
+  //   const fetchSettings = async () => {
+  //     try {
+  //       setLoadingSettings(true)
+
+  //       const response = await axios.get(
+  //         `${API_URL}api/v1/settings`
+  //       )
+
+  //       setSettings(response.data?.settings || {})
+  //     } catch (error) {
+  //       console.error(
+  //         'Failed to load company settings:',
+  //         error
+  //       )
+
+  //       setSettings({})
+  //     } finally {
+  //       setLoadingSettings(false)
+  //     }
+  //   }
+
+  //   if (show) {
+  //     fetchSettings()
+  //   }
+  // }, [show, API_URL])
 
   /*
   ==========================================
