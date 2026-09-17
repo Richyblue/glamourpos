@@ -122,7 +122,7 @@ const BusinessHours = () => {
       setSaving(true)
   
       const response = await axios.put(
-        `${API_URL}/api/v1/business-hours`,
+        `${API_URL}api/v1/business-hours`,
         formData,
         authConfig
       )
