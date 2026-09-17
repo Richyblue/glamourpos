@@ -9,15 +9,18 @@ import {
   CCardBody,
   CButton,
   CSpinner,
+  CAlert,
 } from '@coreui/react'
 
 const ReceiptModal = ({ show, onHide, sale }) => {
-  const receiptRef = useRef()
+  const receiptRef = useRef(null)
 
   const API_URL = import.meta.env.VITE_BACKEND_URL
 
-  const [settings, setSettings] = useState(null)
+  const [settings, setSettings] = useState({})
   const [loadingSettings, setLoadingSettings] = useState(false)
+  const [settingsError, setSettingsError] = useState('')
+  const [printing, setPrinting] = useState(false)
 
   /*
   ==========================================
@@ -25,139 +28,67 @@ const ReceiptModal = ({ show, onHide, sale }) => {
   ==========================================
   */
 
-  const fetchSettings = async () => {
-    try {
-      const token = localStorage.getItem('token')
-
-      const response = await axios.get(
-        `${API_URL}api/v1/settings`,
-
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
-
-      setSettings(response.data.settings)
-    } catch (error) {
-      console.error(error)
-    }
-  }
   useEffect(() => {
-    const fetchData = async () => {
-      await fetchSettings()
+    let mounted = true
+
+    const fetchSettings = async () => {
+      try {
+        setLoadingSettings(true)
+        setSettingsError('')
+
+        const token = localStorage.getItem('token')
+
+        const response = await axios.get(
+          `${API_URL}api/v1/settings`,
+          {
+            headers: token
+              ? {
+                  Authorization: `Bearer ${token}`,
+                }
+              : {},
+          },
+        )
+
+        console.log('Settings API response:', response.data)
+
+        if (mounted) {
+          setSettings(response.data?.settings || {})
+        }
+      } catch (error) {
+        console.error(
+          'Failed to fetch settings:',
+          error.response?.data || error.message,
+        )
+
+        if (mounted) {
+          setSettingsError(
+            error.response?.data?.message ||
+              'Unable to load company settings.',
+          )
+
+          setSettings({})
+        }
+      } finally {
+        if (mounted) {
+          setLoadingSettings(false)
+        }
+      }
     }
 
-    fetchData()
-  }, [])
+    if (show) {
+      fetchSettings()
+    }
 
-  // useEffect(() => {
-  //   const fetchSettings = async () => {
-  //     try {
-  //       setLoadingSettings(true)
-
-  //       const response = await axios.get(
-  //         `${API_URL}api/v1/settings`
-  //       )
-
-  //       setSettings(response.data?.settings || {})
-  //     } catch (error) {
-  //       console.error(
-  //         'Failed to load company settings:',
-  //         error
-  //       )
-
-  //       setSettings({})
-  //     } finally {
-  //       setLoadingSettings(false)
-  //     }
-  //   }
-
-  //   if (show) {
-  //     fetchSettings()
-  //   }
-  // }, [show, API_URL])
+    return () => {
+      mounted = false
+    }
+  }, [show, API_URL])
 
   /*
   ==========================================
-  THERMAL PRINTER
+  SETTINGS VALUES
   ==========================================
   */
-
-  const handlePrint = async () => {
-    try {
-      if (!window.electronAPI) {
-        alert('Electron printing not available')
-        return
-      }
-
-      const html = `
-        <html>
-          <head>
-            <style>
-              @page {
-                size: 60mm auto;
-                margin: 0;
-              }
-
-              body {
-                width: 60mm;
-                margin: 0;
-                padding: 5px;
-                font-family: monospace;
-                font-size: 8px;
-                color: #000;
-              }
-
-              table {
-                width: 100%;
-                border-collapse: collapse;
-              }
-
-              th,
-              td {
-                padding: 2px;
-              }
-
-              .text-center {
-                text-align: center;
-              }
-
-              .text-right {
-                text-align: right;
-              }
-
-              .line {
-                border-top: 1px dashed #000;
-                margin: 8px 0;
-              }
-
-              .row {
-                display: flex;
-                justify-content: space-between;
-                gap: 10px;
-              }
-            </style>
-          </head>
-
-          <body>
-            ${receiptRef.current?.innerHTML || ''}
-          </body>
-        </html>
-      `
-
-      await window.electronAPI.printReceipt(html)
-
-      alert('Receipt Printed Successfully')
-    } catch (error) {
-      console.error('Printer Error:', error)
-
-      alert('Printer Error')
-    }
-  }
-
-  if (!sale) return null
 
   const companyName =
     settings?.companyName || 'GLAMOUR UNISEX SALON'
@@ -169,42 +100,362 @@ const ReceiptModal = ({ show, onHide, sale }) => {
     settings?.companyEmail || ''
 
   const companyAddress =
-    settings.companyAddress || ''
+    settings?.companyAddress || ''
 
   const currencySymbol =
-    settings.currencySymbol || '₦'
+    settings?.currencySymbol || '₦'
 
   const receiptFooter =
     settings?.receiptFooter ||
     'Thank You For Your Patronage'
 
+  /*
+  ==========================================
+  FORMAT MONEY
+  ==========================================
+  */
+
   const formatAmount = (amount) => {
     return `${currencySymbol}${Number(
-      amount || 0
+      amount || 0,
     ).toLocaleString()}`
   }
+
+  /*
+  ==========================================
+  GENERATE RECEIPT CONTENT
+  ==========================================
+  */
+
+  const generateReceiptContent = (copyType) => {
+    const items = sale?.items || []
+
+    return `
+      <div class="receipt">
+        <div class="company-header">
+          <h2>${companyName}</h2>
+
+          ${
+            companyAddress
+              ? `<p class="address">${companyAddress}</p>`
+              : ''
+          }
+
+          ${
+            companyPhone
+              ? `<p>Tel: ${companyPhone}</p>`
+              : ''
+          }
+
+          ${
+            companyEmail
+              ? `<p>${companyEmail}</p>`
+              : ''
+          }
+        </div>
+
+        <div class="separator"></div>
+
+        <p>
+          <strong>Receipt No:</strong>
+          ${sale?.receiptNumber || sale?.id || '-'}
+        </p>
+
+        <p>
+          <strong>Customer:</strong>
+          ${sale?.customer || 'Walk-in Customer'}
+        </p>
+
+        <p>
+          <strong>Date:</strong>
+          ${
+            sale?.createdAt
+              ? new Date(
+                  sale.createdAt,
+                ).toLocaleString()
+              : '-'
+          }
+        </p>
+
+        <p>
+          <strong>Cashier:</strong>
+          ${sale?.recordedBy || 'Admin'}
+        </p>
+
+        <div class="separator"></div>
+
+        <table>
+          <thead>
+            <tr>
+              <th align="left">Item</th>
+              <th align="center">Qty</th>
+              <th align="right">Amount</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${items
+              .map((item) => {
+                const quantity =
+                  item.quantity || item.qty || 1
+
+                const amount =
+                  item.subtotal || 0
+
+                return `
+                  <tr>
+                    <td>${item.name || '-'}</td>
+                    <td align="center">${quantity}</td>
+                    <td align="right">
+                      ${formatAmount(amount)}
+                    </td>
+                  </tr>
+                `
+              })
+              .join('')}
+          </tbody>
+        </table>
+
+        <div class="separator"></div>
+
+        <div class="total-row">
+          <span>Subtotal:</span>
+          <strong>
+            ${formatAmount(
+              sale?.subtotal || sale?.totalAmount,
+            )}
+          </strong>
+        </div>
+
+        <div class="total-row">
+          <span>Discount:</span>
+          <strong>
+            ${formatAmount(sale?.discount)}
+          </strong>
+        </div>
+
+        <div class="total-row grand-total">
+          <span>TOTAL:</span>
+          <strong>
+            ${formatAmount(sale?.totalAmount)}
+          </strong>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="receipt-footer">
+          <p>${receiptFooter}</p>
+          <p>Please Visit Again</p>
+        </div>
+
+        <div class="copy-label">
+          ${copyType}
+        </div>
+      </div>
+    `
+  }
+
+  /*
+  ==========================================
+  PRINT TWO RECEIPTS
+  ==========================================
+  */
+
+  const handlePrint = async () => {
+    if (printing) return
+
+    try {
+      if (!window.electronAPI?.printReceipt) {
+        alert('Electron printing is not available.')
+        return
+      }
+
+      setPrinting(true)
+
+      const customerReceipt =
+        generateReceiptContent('CUSTOMER COPY')
+
+      const cashierReceipt =
+        generateReceiptContent('CASHIER COPY')
+
+      const html = `
+        <html>
+          <head>
+            <style>
+              @page {
+                size: 60mm auto;
+                margin: 0;
+              }
+
+              * {
+                box-sizing: border-box;
+              }
+
+              body {
+                width: 60mm;
+                margin: 0;
+                padding: 0;
+                font-family: monospace;
+                font-size: 8px;
+                color: #000;
+              }
+
+              .receipt {
+                width: 60mm;
+                padding: 5px;
+                page-break-after: always;
+              }
+
+              .receipt:last-child {
+                page-break-after: auto;
+              }
+
+              .company-header {
+                text-align: center;
+              }
+
+              .company-header h2 {
+                font-size: 13px;
+                margin: 2px 0;
+                font-weight: bold;
+              }
+
+              .company-header p {
+                margin: 2px 0;
+              }
+
+              .address {
+                white-space: pre-line;
+              }
+
+              .separator {
+                border-top: 1px dashed #000;
+                margin: 8px 0;
+              }
+
+              p {
+                margin: 4px 0;
+              }
+
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                table-layout: fixed;
+                font-size: 8px;
+              }
+
+              th,
+              td {
+                padding: 2px 0;
+                word-break: break-word;
+              }
+
+              th:first-child,
+              td:first-child {
+                width: 50%;
+              }
+
+              th:nth-child(2),
+              td:nth-child(2) {
+                width: 15%;
+              }
+
+              th:last-child,
+              td:last-child {
+                width: 35%;
+              }
+
+              .total-row {
+                display: flex;
+                justify-content: space-between;
+                gap: 8px;
+                margin: 5px 0;
+              }
+
+              .grand-total {
+                font-size: 11px;
+                font-weight: bold;
+              }
+
+              .receipt-footer {
+                text-align: center;
+                margin-top: 10px;
+              }
+
+              .receipt-footer p {
+                margin: 3px 0;
+                white-space: pre-line;
+              }
+
+              .copy-label {
+                text-align: center;
+                font-weight: bold;
+                margin-top: 12px;
+                font-size: 9px;
+              }
+            </style>
+          </head>
+
+          <body>
+            ${customerReceipt}
+            ${cashierReceipt}
+          </body>
+        </html>
+      `
+
+      const result =
+        await window.electronAPI.printReceipt(html)
+
+      if (result?.success === false) {
+        throw new Error(
+          result.message || 'Printing failed',
+        )
+      }
+
+      alert(
+        'Customer and cashier receipts printed successfully.',
+      )
+    } catch (error) {
+      console.error('Printer Error:', error)
+
+      alert(
+        error.message ||
+          'Unable to print customer and cashier receipts.',
+      )
+    } finally {
+      setPrinting(false)
+    }
+  }
+
+  if (!sale) return null
 
   return (
     <CModal
       visible={show}
-      onClose={onHide}
+      onClose={printing ? undefined : onHide}
       alignment="center"
       size="lg"
     >
       <CModalHeader>
-        <CModalTitle>Receipt</CModalTitle>
+        <CModalTitle>Receipt Preview</CModalTitle>
       </CModalHeader>
 
       <CModalBody>
         {loadingSettings ? (
           <div className="text-center py-4">
             <CSpinner />
-            <p className="mt-2">
+            <p className="mt-2 mb-0">
               Loading company information...
             </p>
           </div>
         ) : (
           <>
+            {settingsError && (
+              <CAlert color="warning">
+                {settingsError}
+              </CAlert>
+            )}
+
             <CCard>
               <CCardBody>
                 <div
@@ -218,7 +469,6 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                     color: '#000',
                   }}
                 >
-                  {/* COMPANY INFORMATION */}
                   <div
                     style={{
                       textAlign: 'center',
@@ -235,7 +485,12 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                     </h3>
 
                     {companyAddress && (
-                      <p style={{ margin: '2px 0' }}>
+                      <p
+                        style={{
+                          margin: '2px 0',
+                          whiteSpace: 'pre-line',
+                        }}
+                      >
                         {companyAddress}
                       </p>
                     )}
@@ -259,7 +514,6 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                     }}
                   />
 
-                  {/* SALE INFORMATION */}
                   <p>
                     <strong>Receipt No:</strong>{' '}
                     {sale.receiptNumber || sale.id}
@@ -267,14 +521,15 @@ const ReceiptModal = ({ show, onHide, sale }) => {
 
                   <p>
                     <strong>Customer:</strong>{' '}
-                    {sale.customer || 'Walk-in Customer'}
+                    {sale.customer ||
+                      'Walk-in Customer'}
                   </p>
 
                   <p>
                     <strong>Date:</strong>{' '}
                     {sale.createdAt
                       ? new Date(
-                          sale.createdAt
+                          sale.createdAt,
                         ).toLocaleString()
                       : '-'}
                   </p>
@@ -290,7 +545,6 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                     }}
                   />
 
-                  {/* ITEMS */}
                   <table
                     style={{
                       width: '100%',
@@ -320,7 +574,7 @@ const ReceiptModal = ({ show, onHide, sale }) => {
 
                           <td align="right">
                             {formatAmount(
-                              item.subtotal || 0
+                              item.subtotal,
                             )}
                           </td>
                         </tr>
@@ -334,7 +588,6 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                     }}
                   />
 
-                  {/* TOTALS */}
                   <div>
                     <p
                       style={{
@@ -349,7 +602,7 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                       <strong>
                         {formatAmount(
                           sale.subtotal ||
-                            sale.totalAmount
+                            sale.totalAmount,
                         )}
                       </strong>
                     </p>
@@ -366,7 +619,7 @@ const ReceiptModal = ({ show, onHide, sale }) => {
 
                       <strong>
                         {formatAmount(
-                          sale.discount || 0
+                          sale.discount,
                         )}
                       </strong>
                     </p>
@@ -384,7 +637,7 @@ const ReceiptModal = ({ show, onHide, sale }) => {
 
                       <strong>
                         {formatAmount(
-                          sale.totalAmount || 0
+                          sale.totalAmount,
                         )}
                       </strong>
                     </p>
@@ -396,7 +649,6 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                     }}
                   />
 
-                  {/* FOOTER */}
                   <div
                     style={{
                       textAlign: 'center',
@@ -424,8 +676,19 @@ const ReceiptModal = ({ show, onHide, sale }) => {
               <CButton
                 color="primary"
                 onClick={handlePrint}
+                disabled={printing || loadingSettings}
               >
-                Print Receipt
+                {printing ? (
+                  <>
+                    <CSpinner
+                      size="sm"
+                      className="me-2"
+                    />
+                    Printing Two Receipts...
+                  </>
+                ) : (
+                  'Print Customer & Cashier Receipts'
+                )}
               </CButton>
             </div>
           </>
