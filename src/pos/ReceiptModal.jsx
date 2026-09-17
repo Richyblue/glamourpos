@@ -39,7 +39,7 @@ const ReceiptModal = ({ show, onHide, sale }) => {
         },
       )
 
-      setStaffs(response.data.settings)
+      setSettings(response.data.settings)
     } catch (error) {
       console.error(error)
     }
