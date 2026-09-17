@@ -117,40 +117,44 @@ const BusinessHours = () => {
 
   const saveBusinessHour = async (e) => {
     e.preventDefault()
-
+  
     try {
       setSaving(true)
-
-      if (editingHour) {
-        await axios.put(`${API_URL}api/v1/business-hours/${editingHour.id}`, formData, authConfig)
-      } else {
-        await axios.post(`${API_URL}api/v1/business-hours`, formData, authConfig)
-      }
-
+  
+      const response = await axios.put(
+        `${API_URL}/api/v1/business-hours`,
+        formData,
+        authConfig
+      )
+  
+      console.log('Business hours saved:', response.data)
+  
       setVisible(false)
       await getBusinessHours()
-
+  
       Swal.fire({
         icon: 'success',
         title: 'Success',
         text: editingHour
           ? 'Business hours updated successfully.'
-          : 'Business hours created successfully.',
+          : 'Business hours saved successfully.',
         confirmButtonColor: '#321fdb',
       })
     } catch (error) {
-      console.error(error)
-
+      console.error('Business hours error:', error.response?.data || error)
+  
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: error.response?.data?.message || 'Unable to save business hours.',
+        text:
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          'Unable to save business hours.',
       })
     } finally {
       setSaving(false)
     }
   }
-
   const deleteBusinessHour = async (id) => {
     const result = await Swal.fire({
       icon: 'warning',
