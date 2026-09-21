@@ -29,7 +29,6 @@ import {
   cilReload,
   cilFilter,
   cilCloudDownload,
-  cilReceipt,
   cilMoney,
   cilPeople,
   cilCart,
@@ -325,14 +324,14 @@ const MySales = () => {
                     height: '54px',
                   }}
                 >
-                  <CIcon icon={cilReceipt} size="xl" className="text-primary" />
+                  <CIcon icon={cilCart} size="xl" className="text-primary" />
                 </div>
 
                 <div>
                   <h3 className="fw-bold mb-1">My Sales Dashboard</h3>
 
                   <div className="text-body-secondary">
-                    View and track your sales, payments.
+                    View and track your sales, payments, customers and returns.
                   </div>
                 </div>
               </div>
@@ -514,7 +513,7 @@ const MySales = () => {
                     height: 46,
                   }}
                 >
-                  <CIcon icon={cilReceipt} className="text-primary" />
+                  <CIcon icon={cilCart} className="text-primary" />
                 </div>
               </div>
             </CCardBody>
@@ -544,7 +543,7 @@ const MySales = () => {
                     height: 46,
                   }}
                 >
-                  <CIcon icon={cilReceipt} className="text-info" />
+                  <CIcon icon={cilCart} className="text-info" />
                 </div>
               </div>
             </CCardBody>
@@ -800,7 +799,7 @@ const MySales = () => {
                   height: 70,
                 }}
               >
-                <CIcon icon={cilReceipt} size="xl" className="text-body-secondary" />
+                <CIcon icon={cilCart} size="xl" className="text-body-secondary" />
               </div>
 
               <h5 className="fw-bold">No Sales Found</h5>
@@ -867,7 +866,7 @@ const MySales = () => {
                                 height: 36,
                               }}
                             >
-                              <CIcon icon={cilReceipt} size="sm" />
+                              <CIcon icon={cilCart} size="sm" />
                             </div>
 
                             <div>
