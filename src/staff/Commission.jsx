@@ -15,34 +15,52 @@ import {
   CFormInput,
   CFormSelect,
   CSpinner,
+  CInputGroup,
+  CInputGroupText,
 } from '@coreui/react'
 
-import { useState, useEffect } from 'react'
-
+import { useState, useEffect, useMemo } from 'react'
 import axios from 'axios'
-
 import Swal from 'sweetalert2'
-
 import * as XLSX from 'xlsx'
+
+import CIcon from '@coreui/icons-react'
+import {
+  cilSearch,
+  cilReload,
+  cilFilter,
+  cilCloudDownload,
+  cilCheckCircle,
+  cilClock,
+  cilMoney,
+  cilLoopCircular,
+  cilUser,
+  cilCalendar,
+  cilX,
+} from '@coreui/icons'
 
 const Commission = () => {
   const API_URL = import.meta.env.VITE_BACKEND_URL
 
   const [commissions, setCommissions] = useState([])
-
   const [loading, setLoading] = useState(false)
-
   const [search, setSearch] = useState('')
-
   const [statusFilter, setStatusFilter] = useState('')
-
   const [monthFilter, setMonthFilter] = useState('')
-
   const [yearFilter, setYearFilter] = useState('')
-
   const [selectedStaff, setSelectedStaff] = useState('')
-
   const [staffs, setStaffs] = useState([])
+
+  // =========================================================
+  // FORMAT CURRENCY
+  // =========================================================
+
+  const formatCurrency = (amount) => {
+    return `₦${Number(amount || 0).toLocaleString('en-NG', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`
+  }
 
   // =========================================================
   // GET COMMISSIONS
@@ -63,6 +81,12 @@ const Commission = () => {
       setCommissions(response.data.commissions || [])
     } catch (error) {
       console.error('Commission Error:', error)
+
+      Swal.fire({
+        icon: 'error',
+        title: 'Unable to Load Commissions',
+        text: error?.response?.data?.message || 'There was a problem loading commission records.',
+      })
     } finally {
       setLoading(false)
     }
@@ -94,39 +118,48 @@ const Commission = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      await getCommissions()
-      await getStaffs()
+      await Promise.all([getCommissions(), getStaffs()])
     }
 
     fetchData()
   }, [])
 
   // =========================================================
-  // RETURN STATUS
+  // COMMISSION HELPERS
   // =========================================================
 
+  const getOriginalCommission = (item) => {
+    if (item.originalCommissionAmount !== undefined && item.originalCommissionAmount !== null) {
+      return Number(item.originalCommissionAmount)
+    }
+
+    return Number(item.commissionAmount || 0)
+  }
+
+  const getCurrentCommission = (item) => {
+    return Number(item.commissionAmount || 0)
+  }
+
+  const getReturnedCommission = (item) => {
+    if (item.returnedCommissionAmount !== undefined && item.returnedCommissionAmount !== null) {
+      return Number(item.returnedCommissionAmount)
+    }
+
+    const original = getOriginalCommission(item)
+    const current = getCurrentCommission(item)
+
+    return Math.max(original - current, 0)
+  }
+
   const isReturned = (item) => {
-    /*
-     * The backend should return a value such as:
-     *
-     * item.returned
-     *
-     * or:
-     *
-     * item.Sale.status === "refunded"
-     *
-     * We support both.
-     */
+    if (item.returned === true) return true
+    if (item.isReturned === true) return true
 
-    if (item.returned === true) {
+    if (Number(item.returnedServiceTotal || 0) > 0) {
       return true
     }
 
-    if (item.isReturned === true) {
-      return true
-    }
-
-    if (item.Sale?.status === 'refunded') {
+    if (item.Sale?.status === 'refunded' || item.Sale?.status === 'voided') {
       return true
     }
 
@@ -134,70 +167,40 @@ const Commission = () => {
   }
 
   // =========================================================
-  // ORIGINAL COMMISSION
+  // FILTERED COMMISSIONS
   // =========================================================
 
-  const getOriginalCommission = (item) => {
-    /*
-     * If backend provides originalCommissionAmount,
-     * use it.
-     *
-     * Otherwise use current commission amount.
-     */
+  const filteredCommissions = useMemo(() => {
+    return commissions.filter((commission) => {
+      const staffName =
+        commission.Staff?.User?.fullname ||
+        commission.Staff?.User?.name ||
+        commission.Staff?.name ||
+        ''
 
-    if (item.originalCommissionAmount !== undefined) {
-      return Number(item.originalCommissionAmount || 0)
-    }
+      const receiptNumber = commission.Sale?.receiptNumber || commission.Sale?.ReceiptNumber || ''
 
-    return Number(item.commissionAmount || 0)
-  }
+      const searchText = `${staffName} ${receiptNumber}`.toLowerCase()
 
-  // =========================================================
-  // CURRENT COMMISSION
-  // =========================================================
+      const searchMatch = searchText.includes(search.toLowerCase())
 
-  const getCurrentCommission = (item) => {
-    return Number(item.commissionAmount || 0)
-  }
+      const staffMatch =
+        selectedStaff === '' || String(commission.StaffId) === String(selectedStaff)
 
-  // =========================================================
-  // RETURNED COMMISSION
-  // =========================================================
+      const statusMatch = statusFilter === '' || commission.status === statusFilter
 
-  const getReturnedCommission = (item) => {
-    const original = getOriginalCommission(item)
+      const date = commission.commissionDate ? new Date(commission.commissionDate) : null
 
-    const current = getCurrentCommission(item)
+      const monthMatch = monthFilter === '' || (date && date.getMonth() + 1 === Number(monthFilter))
 
-    return Math.max(original - current, 0)
-  }
+      const yearMatch = yearFilter === '' || (date && date.getFullYear() === Number(yearFilter))
+
+      return searchMatch && staffMatch && statusMatch && monthMatch && yearMatch
+    })
+  }, [commissions, search, selectedStaff, statusFilter, monthFilter, yearFilter])
 
   // =========================================================
-  // FILTER COMMISSIONS
-  // =========================================================
-
-  const filteredCommissions = commissions.filter((commission) => {
-    const staffName = commission.Staff?.User?.fullname || ''
-
-    const staffId = commission.StaffId
-
-    const searchMatch = staffName.toLowerCase().includes(search.toLowerCase())
-
-    const staffMatch = selectedStaff === '' ? true : Number(staffId) === Number(selectedStaff)
-
-    const statusMatch = statusFilter === '' ? true : commission.status === statusFilter
-
-    const date = new Date(commission.commissionDate)
-
-    const monthMatch = monthFilter === '' ? true : date.getMonth() + 1 === Number(monthFilter)
-
-    const yearMatch = yearFilter === '' ? true : date.getFullYear() === Number(yearFilter)
-
-    return searchMatch && staffMatch && statusMatch && monthMatch && yearMatch
-  })
-
-  // =========================================================
-  // KPI
+  // KPI CALCULATIONS
   // =========================================================
 
   const totalCommission = filteredCommissions.reduce(
@@ -221,44 +224,45 @@ const Commission = () => {
   )
 
   // =========================================================
-  // MARK PAID
+  // RESET FILTERS
   // =========================================================
 
-  const markPaid = async (id) => {
-    const commission = commissions.find((item) => Number(item.id) === Number(id))
+  const resetFilters = () => {
+    setSearch('')
+    setStatusFilter('')
+    setMonthFilter('')
+    setYearFilter('')
+    setSelectedStaff('')
+  }
 
-    if (!commission) {
-      return
-    }
+  const hasFilters = search || statusFilter || monthFilter || yearFilter || selectedStaff
 
-    const currentAmount = getCurrentCommission(commission)
+  // =========================================================
+  // MARK COMMISSION AS PAID
+  // =========================================================
 
-    // -------------------------------------------------------
-    // DO NOT PAY ZERO COMMISSION
-    // -------------------------------------------------------
-
-    if (currentAmount <= 0) {
-      Swal.fire(
-        'Cannot Pay',
-        'This commission has been fully returned and the payable amount is ₦0.',
-        'warning',
-      )
+  const markPaid = async (id, amount) => {
+    if (Number(amount || 0) <= 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'No Commission Due',
+        text: 'This commission has no outstanding amount to pay.',
+      })
 
       return
     }
 
     const result = await Swal.fire({
-      title: 'Mark as Paid?',
-      text: `Commission amount: ₦${currentAmount.toLocaleString()}`,
+      title: 'Mark Commission as Paid?',
+      text: `You are about to mark ${formatCurrency(amount)} as paid.`,
       icon: 'question',
       showCancelButton: true,
-      confirmButtonText: 'Yes, Mark Paid',
+      confirmButtonText: 'Yes, Mark as Paid',
       cancelButtonText: 'Cancel',
+      confirmButtonColor: '#198754',
     })
 
-    if (!result.isConfirmed) {
-      return
-    }
+    if (!result.isConfirmed) return
 
     try {
       const token = localStorage.getItem('token')
@@ -273,13 +277,23 @@ const Commission = () => {
         },
       )
 
-      Swal.fire('Success', 'Commission paid', 'success')
+      await Swal.fire({
+        icon: 'success',
+        title: 'Payment Recorded',
+        text: 'Commission has been marked as paid.',
+        timer: 1800,
+        showConfirmButton: false,
+      })
 
       getCommissions()
     } catch (error) {
       console.error(error)
 
-      Swal.fire('Error', 'Failed to mark commission as paid', 'error')
+      Swal.fire({
+        icon: 'error',
+        title: 'Payment Failed',
+        text: error?.response?.data?.message || 'Unable to mark commission as paid.',
+      })
     }
   }
 
@@ -288,25 +302,37 @@ const Commission = () => {
   // =========================================================
 
   const exportExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(
-      filteredCommissions.map((item) => ({
-        Staff: item.Staff?.User?.fullname || '-',
+    if (!filteredCommissions.length) {
+      Swal.fire({
+        icon: 'info',
+        title: 'Nothing to Export',
+        text: 'There are no commission records matching your filters.',
+      })
 
-        'Original Commission': getOriginalCommission(item),
+      return
+    }
 
-        'Current Commission': getCurrentCommission(item),
+    const worksheetData = filteredCommissions.map((item) => ({
+      Staff: item.Staff?.User?.fullname || item.Staff?.name || 'Unknown',
 
-        'Returned Commission': getReturnedCommission(item),
+      Receipt: item.Sale?.receiptNumber || item.Sale?.ReceiptNumber || '-',
 
-        Rate: item.commissionRate,
+      OriginalCommission: getOriginalCommission(item),
 
-        Date: item.commissionDate,
+      ReturnedCommission: getReturnedCommission(item),
 
-        Status: item.status,
+      CurrentCommission: getCurrentCommission(item),
 
-        Returned: isReturned(item) ? 'YES' : 'NO',
-      })),
-    )
+      Rate: `${Number(item.commissionRate || 0)}%`,
+
+      Date: item.commissionDate,
+
+      Status: item.status?.toUpperCase() || '',
+
+      Returned: isReturned(item) ? 'YES' : 'NO',
+    }))
+
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData)
 
     const workbook = XLSX.utils.book_new()
 
@@ -316,321 +342,582 @@ const Commission = () => {
   }
 
   // =========================================================
-  // UI
+  // STATUS BADGE
+  // =========================================================
+
+  const renderStatus = (status) => {
+    if (status === 'paid') {
+      return (
+        <CBadge color="success" className="px-3 py-2">
+          <CIcon icon={cilCheckCircle} size="sm" className="me-1" />
+          PAID
+        </CBadge>
+      )
+    }
+
+    return (
+      <CBadge color="warning" className="px-3 py-2">
+        <CIcon icon={cilClock} size="sm" className="me-1" />
+        PENDING
+      </CBadge>
+    )
+  }
+
+  // =========================================================
+  // RENDER
   // =========================================================
 
   return (
-    <>
+    <div className="commission-page">
+      {/* =====================================================
+          PAGE HEADER
+      ====================================================== */}
+
+      <CCard className="border-0 shadow-sm mb-4">
+        <CCardBody className="p-4">
+          <CRow className="align-items-center">
+            <CCol md={7}>
+              <div className="d-flex align-items-center">
+                <div
+                  className="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center me-3"
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                  }}
+                >
+                  <CIcon icon={cilMoney} size="xl" className="text-primary" />
+                </div>
+
+                <div>
+                  <h3 className="fw-bold mb-1">Staff Commission</h3>
+
+                  <div className="text-body-secondary">
+                    Track staff earnings, payments, adjustments and returned services.
+                  </div>
+                </div>
+              </div>
+            </CCol>
+
+            <CCol md={5} className="text-md-end mt-3 mt-md-0">
+              <CButton
+                color="light"
+                className="me-2 border"
+                onClick={getCommissions}
+                disabled={loading}
+              >
+                <CIcon icon={cilReload} className="me-2" />
+                Refresh
+              </CButton>
+
+              <CButton color="primary" onClick={exportExcel} disabled={!filteredCommissions.length}>
+                <CIcon icon={cilCloudDownload} className="me-2" />
+                Export Excel
+              </CButton>
+            </CCol>
+          </CRow>
+        </CCardBody>
+      </CCard>
+
       {/* =====================================================
           KPI CARDS
-      ===================================================== */}
+      ====================================================== */}
 
       <CRow className="mb-4">
         {/* TOTAL */}
 
-        <CCol md={3}>
-          <CCard>
+        <CCol sm={6} xl={3} className="mb-3 mb-xl-0">
+          <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <h6>Total Commission</h6>
+              <div className="d-flex justify-content-between">
+                <div>
+                  <div className="text-body-secondary small fw-semibold mb-2">
+                    CURRENT COMMISSION
+                  </div>
 
-              <h3>₦{totalCommission.toLocaleString()}</h3>
+                  <h4 className="fw-bold mb-1">{formatCurrency(totalCommission)}</h4>
+
+                  <small className="text-body-secondary">
+                    {filteredCommissions.length} record
+                    {filteredCommissions.length !== 1 ? 's' : ''}
+                  </small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: 45,
+                    height: 45,
+                  }}
+                >
+                  <CIcon icon={cilMoney} className="text-primary" />
+                </div>
+              </div>
             </CCardBody>
           </CCard>
         </CCol>
 
         {/* PENDING */}
 
-        <CCol md={3}>
-          <CCard>
+        <CCol sm={6} xl={3} className="mb-3 mb-xl-0">
+          <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <h6>Pending</h6>
+              <div className="d-flex justify-content-between">
+                <div>
+                  <div className="text-body-secondary small fw-semibold mb-2">PENDING</div>
 
-              <h3>₦{pendingCommission.toLocaleString()}</h3>
+                  <h4 className="fw-bold mb-1 text-warning">{formatCurrency(pendingCommission)}</h4>
+
+                  <small className="text-body-secondary">Awaiting payment</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-warning bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: 45,
+                    height: 45,
+                  }}
+                >
+                  <CIcon icon={cilClock} className="text-warning" />
+                </div>
+              </div>
             </CCardBody>
           </CCard>
         </CCol>
 
         {/* PAID */}
 
-        <CCol md={3}>
-          <CCard>
+        <CCol sm={6} xl={3} className="mb-3 mb-xl-0">
+          <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <h6>Paid</h6>
+              <div className="d-flex justify-content-between">
+                <div>
+                  <div className="text-body-secondary small fw-semibold mb-2">PAID</div>
 
-              <h3>₦{paidCommission.toLocaleString()}</h3>
+                  <h4 className="fw-bold mb-1 text-success">{formatCurrency(paidCommission)}</h4>
+
+                  <small className="text-body-secondary">Completed payments</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: 45,
+                    height: 45,
+                  }}
+                >
+                  <CIcon icon={cilCheckCircle} className="text-success" />
+                </div>
+              </div>
             </CCardBody>
           </CCard>
         </CCol>
 
         {/* RETURNED */}
 
-        <CCol md={3}>
-          <CCard>
+        <CCol sm={6} xl={3}>
+          <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <h6>Returned Commission</h6>
+              <div className="d-flex justify-content-between">
+                <div>
+                  <div className="text-body-secondary small fw-semibold mb-2">
+                    RETURN ADJUSTMENTS
+                  </div>
 
-              <h3 className="text-danger">₦{returnedCommission.toLocaleString()}</h3>
+                  <h4 className="fw-bold mb-1 text-danger">{formatCurrency(returnedCommission)}</h4>
 
-              <small className="text-medium-emphasis">Commission removed because of returns</small>
+                  <small className="text-body-secondary">Commission removed</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-danger bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: 45,
+                    height: 45,
+                  }}
+                >
+                  <CIcon icon={cilLoopCircular} className="text-danger" />
+                </div>
+              </div>
             </CCardBody>
           </CCard>
         </CCol>
       </CRow>
 
       {/* =====================================================
-          COMMISSION CARD
-      ===================================================== */}
+          FILTERS
+      ====================================================== */}
 
-      <CCard>
-        <CCardHeader>Staff Commissions</CCardHeader>
+      <CCard className="border-0 shadow-sm mb-4">
+        <CCardHeader className="bg-white border-0 pt-4 px-4">
+          <div className="d-flex justify-content-between align-items-center">
+            <div className="d-flex align-items-center">
+              <CIcon icon={cilFilter} className="me-2 text-primary" />
 
-        <CCardBody>
-          {/* =================================================
-              FILTERS
-          ================================================= */}
+              <strong>Commission Filters</strong>
+            </div>
 
-          <div className="d-flex gap-2 mb-3 flex-wrap">
+            {hasFilters && (
+              <CButton color="light" size="sm" className="border" onClick={resetFilters}>
+                <CIcon icon={cilX} className="me-1" />
+                Clear Filters
+              </CButton>
+            )}
+          </div>
+        </CCardHeader>
+
+        <CCardBody className="px-4 pb-4">
+          <CRow className="g-3">
+            {/* SEARCH */}
+
+            <CCol xs={12} lg={4}>
+              <label className="form-label small fw-semibold">Search</label>
+
+              <CInputGroup>
+                <CInputGroupText>
+                  <CIcon icon={cilSearch} />
+                </CInputGroupText>
+
+                <CFormInput
+                  placeholder="Staff name or receipt number..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </CInputGroup>
+            </CCol>
+
             {/* STAFF */}
 
-            <CFormSelect
-              value={selectedStaff}
-              onChange={(e) => setSelectedStaff(e.target.value)}
-              style={{
-                minWidth: '180px',
-              }}
-            >
-              <option value="">All Staff</option>
+            <CCol xs={12} sm={6} lg={2}>
+              <label className="form-label small fw-semibold">Staff</label>
 
-              {staffs.map((staff) => (
-                <option key={staff.id} value={staff.id}>
-                  {staff.User?.fullname}
-                </option>
-              ))}
-            </CFormSelect>
+              <CFormSelect value={selectedStaff} onChange={(e) => setSelectedStaff(e.target.value)}>
+                <option value="">All Staff</option>
+
+                {staffs.map((staff) => (
+                  <option key={staff.id} value={staff.id}>
+                    {staff.User?.fullname || staff.User?.name || staff.name || `Staff #${staff.id}`}
+                  </option>
+                ))}
+              </CFormSelect>
+            </CCol>
 
             {/* STATUS */}
 
-            <CFormSelect
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{
-                minWidth: '150px',
-              }}
-            >
-              <option value="">All Status</option>
+            <CCol xs={12} sm={6} lg={2}>
+              <label className="form-label small fw-semibold">Status</label>
 
-              <option value="pending">Pending</option>
+              <CFormSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="">All Status</option>
 
-              <option value="paid">Paid</option>
-            </CFormSelect>
+                <option value="pending">Pending</option>
+
+                <option value="paid">Paid</option>
+              </CFormSelect>
+            </CCol>
 
             {/* MONTH */}
 
-            <CFormSelect
-              value={monthFilter}
-              onChange={(e) => setMonthFilter(e.target.value)}
-              style={{
-                minWidth: '150px',
-              }}
-            >
-              <option value="">All Months</option>
+            <CCol xs={12} sm={6} lg={2}>
+              <label className="form-label small fw-semibold">Month</label>
 
-              <option value="1">January</option>
+              <CFormSelect value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}>
+                <option value="">All Months</option>
 
-              <option value="2">February</option>
-
-              <option value="3">March</option>
-
-              <option value="4">April</option>
-
-              <option value="5">May</option>
-
-              <option value="6">June</option>
-
-              <option value="7">July</option>
-
-              <option value="8">August</option>
-
-              <option value="9">September</option>
-
-              <option value="10">October</option>
-
-              <option value="11">November</option>
-
-              <option value="12">December</option>
-            </CFormSelect>
+                {[
+                  'January',
+                  'February',
+                  'March',
+                  'April',
+                  'May',
+                  'June',
+                  'July',
+                  'August',
+                  'September',
+                  'October',
+                  'November',
+                  'December',
+                ].map((month, index) => (
+                  <option key={month} value={index + 1}>
+                    {month}
+                  </option>
+                ))}
+              </CFormSelect>
+            </CCol>
 
             {/* YEAR */}
 
-            <CFormInput
-              type="number"
-              placeholder="Year"
-              value={yearFilter}
-              onChange={(e) => setYearFilter(e.target.value)}
-              style={{
-                maxWidth: '120px',
-              }}
-            />
+            <CCol xs={12} sm={6} lg={2}>
+              <label className="form-label small fw-semibold">Year</label>
 
-            {/* SEARCH */}
+              <CFormSelect value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+                <option value="">All Years</option>
 
-            <CFormInput
-              placeholder="Search staff..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                minWidth: '180px',
-              }}
-            />
+                {Array.from(
+                  {
+                    length: 7,
+                  },
+                  (_, index) => new Date().getFullYear() - index,
+                ).map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </CFormSelect>
+            </CCol>
+          </CRow>
+        </CCardBody>
+      </CCard>
 
-            {/* EXPORT */}
+      {/* =====================================================
+          TABLE
+      ====================================================== */}
 
-            <CButton onClick={exportExcel} color="success">
-              Export Excel
-            </CButton>
-          </div>
+      <CCard className="border-0 shadow-sm">
+        <CCardHeader className="bg-white border-0 p-4">
+          <CRow className="align-items-center">
+            <CCol md={6}>
+              <h5 className="fw-bold mb-1">Commission Records</h5>
 
-          {/* =================================================
-              TABLE
-          ================================================= */}
+              <div className="text-body-secondary small">
+                Showing <strong>{filteredCommissions.length}</strong> of{' '}
+                <strong>{commissions.length}</strong> commission records
+              </div>
+            </CCol>
 
+            <CCol md={6} className="text-md-end mt-3 mt-md-0">
+              {selectedStaff && (
+                <CBadge color="primary" className="px-3 py-2">
+                  <CIcon icon={cilUser} className="me-1" />
+                  Staff Filter Applied
+                </CBadge>
+              )}
+            </CCol>
+          </CRow>
+        </CCardHeader>
+
+        <CCardBody className="p-0">
           {loading ? (
             <div className="text-center py-5">
-              <CSpinner />
+              <CSpinner color="primary" />
 
-              <div className="mt-2 text-medium-emphasis">Loading commissions...</div>
+              <div className="text-body-secondary mt-3">Loading commission records...</div>
+            </div>
+          ) : filteredCommissions.length === 0 ? (
+            <div className="text-center py-5 px-3">
+              <div
+                className="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-3"
+                style={{
+                  width: 70,
+                  height: 70,
+                }}
+              >
+                <CIcon icon={cilMoney} size="xl" className="text-body-secondary" />
+              </div>
+
+              <h5 className="fw-bold">No Commission Records</h5>
+
+              <p className="text-body-secondary mb-3">
+                No commission records match the selected filters.
+              </p>
+
+              {hasFilters && (
+                <CButton color="primary" variant="outline" onClick={resetFilters}>
+                  Clear Filters
+                </CButton>
+              )}
             </div>
           ) : (
-            <CTable hover responsive bordered>
-              <CTableHead>
-                <CTableRow>
-                  <CTableHeaderCell>Staff</CTableHeaderCell>
+            <div className="table-responsive">
+              <CTable hover align="middle" className="mb-0">
+                <CTableHead>
+                  <CTableRow>
+                    <CTableHeaderCell className="px-4">#</CTableHeaderCell>
 
-                  <CTableHeaderCell>Rate %</CTableHeaderCell>
+                    <CTableHeaderCell>Staff</CTableHeaderCell>
 
-                  <CTableHeaderCell>Original</CTableHeaderCell>
+                    <CTableHeaderCell>Receipt</CTableHeaderCell>
 
-                  <CTableHeaderCell>Returned</CTableHeaderCell>
+                    <CTableHeaderCell>Rate</CTableHeaderCell>
 
-                  <CTableHeaderCell>Current Amount</CTableHeaderCell>
+                    <CTableHeaderCell className="text-end">Original</CTableHeaderCell>
 
-                  <CTableHeaderCell>Date</CTableHeaderCell>
+                    <CTableHeaderCell className="text-end">Returned</CTableHeaderCell>
 
-                  <CTableHeaderCell>Status</CTableHeaderCell>
+                    <CTableHeaderCell className="text-end">Current</CTableHeaderCell>
 
-                  <CTableHeaderCell>Return</CTableHeaderCell>
+                    <CTableHeaderCell>Date</CTableHeaderCell>
 
-                  <CTableHeaderCell>Action</CTableHeaderCell>
-                </CTableRow>
-              </CTableHead>
+                    <CTableHeaderCell>Status</CTableHeaderCell>
 
-              <CTableBody>
-                {filteredCommissions.length > 0 ? (
-                  filteredCommissions.map((item) => {
-                    const originalAmount = getOriginalCommission(item)
+                    <CTableHeaderCell className="text-end px-4">Action</CTableHeaderCell>
+                  </CTableRow>
+                </CTableHead>
 
-                    const currentAmount = getCurrentCommission(item)
+                <CTableBody>
+                  {filteredCommissions.map((item, index) => {
+                    const original = getOriginalCommission(item)
 
-                    const returnedAmount = getReturnedCommission(item)
+                    const returned = getReturnedCommission(item)
 
-                    const returned = isReturned(item)
+                    const current = getCurrentCommission(item)
+
+                    const returnedRecord = isReturned(item)
 
                     return (
                       <CTableRow key={item.id}>
+                        <CTableDataCell className="px-4 text-body-secondary">
+                          {index + 1}
+                        </CTableDataCell>
+
                         {/* STAFF */}
 
-                        <CTableDataCell>{item.Staff?.User?.fullname}</CTableDataCell>
+                        <CTableDataCell>
+                          <div className="d-flex align-items-center">
+                            <div
+                              className="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center me-2 fw-bold"
+                              style={{
+                                width: 38,
+                                height: 38,
+                              }}
+                            >
+                              {(item.Staff?.User?.fullname || item.Staff?.name || 'S')
+                                .charAt(0)
+                                .toUpperCase()}
+                            </div>
+
+                            <div>
+                              <div className="fw-semibold">
+                                {item.Staff?.User?.fullname ||
+                                  item.Staff?.User?.name ||
+                                  item.Staff?.name ||
+                                  'Unknown Staff'}
+                              </div>
+
+                              {returnedRecord && (
+                                <small className="text-danger">
+                                  <CIcon icon={cilLoopCircular} size="sm" className="me-1" />
+                                  Return adjustment
+                                </small>
+                              )}
+                            </div>
+                          </div>
+                        </CTableDataCell>
+
+                        {/* RECEIPT */}
+
+                        <CTableDataCell>
+                          <span className="fw-semibold">
+                            {item.Sale?.receiptNumber || item.Sale?.ReceiptNumber || '-'}
+                          </span>
+                        </CTableDataCell>
 
                         {/* RATE */}
 
-                        <CTableDataCell>{item.commissionRate}%</CTableDataCell>
+                        <CTableDataCell>
+                          <CBadge color="secondary" className="px-2 py-1">
+                            {Number(item.commissionRate || 0)}%
+                          </CBadge>
+                        </CTableDataCell>
 
                         {/* ORIGINAL */}
 
-                        <CTableDataCell>₦{originalAmount.toLocaleString()}</CTableDataCell>
+                        <CTableDataCell className="text-end">
+                          <span className="text-body-secondary">{formatCurrency(original)}</span>
+                        </CTableDataCell>
 
                         {/* RETURNED */}
 
-                        <CTableDataCell>
-                          {returnedAmount > 0 ? (
+                        <CTableDataCell className="text-end">
+                          {returned > 0 ? (
                             <span className="text-danger fw-semibold">
-                              -₦
-                              {returnedAmount.toLocaleString()}
+                              - {formatCurrency(returned)}
                             </span>
                           ) : (
-                            '-'
+                            <span className="text-body-secondary">—</span>
                           )}
                         </CTableDataCell>
 
                         {/* CURRENT */}
 
-                        <CTableDataCell>
-                          <strong className={currentAmount <= 0 ? 'text-danger' : ''}>
-                            ₦{currentAmount.toLocaleString()}
-                          </strong>
+                        <CTableDataCell className="text-end">
+                          <span
+                            className={`fw-bold ${
+                              current > 0 ? 'text-success' : 'text-body-secondary'
+                            }`}
+                          >
+                            {formatCurrency(current)}
+                          </span>
                         </CTableDataCell>
 
                         {/* DATE */}
 
-                        <CTableDataCell>{item.commissionDate}</CTableDataCell>
+                        <CTableDataCell>
+                          <div className="d-flex align-items-center">
+                            <CIcon
+                              icon={cilCalendar}
+                              size="sm"
+                              className="me-2 text-body-secondary"
+                            />
+
+                            {item.commissionDate
+                              ? new Date(item.commissionDate).toLocaleDateString('en-NG', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })
+                              : '-'}
+                          </div>
+                        </CTableDataCell>
 
                         {/* STATUS */}
 
-                        <CTableDataCell>
-                          <CBadge
-                            color={
-                              item.status === 'paid'
-                                ? 'success'
-                                : currentAmount <= 0
-                                  ? 'danger'
-                                  : 'warning'
-                            }
-                          >
-                            {currentAmount <= 0 && item.status === 'pending'
-                              ? 'returned'
-                              : item.status}
-                          </CBadge>
-                        </CTableDataCell>
-
-                        {/* RETURN */}
-
-                        <CTableDataCell>
-                          {returnedAmount > 0 ? (
-                            <CBadge color="danger">Returned</CBadge>
-                          ) : (
-                            <CBadge color="success">No Return</CBadge>
-                          )}
-                        </CTableDataCell>
+                        <CTableDataCell>{renderStatus(item.status)}</CTableDataCell>
 
                         {/* ACTION */}
 
-                        <CTableDataCell>
-                          {item.status === 'pending' && currentAmount > 0 ? (
-                            <CButton size="sm" color="success" onClick={() => markPaid(item.id)}>
-                              Mark Paid
+                        <CTableDataCell className="text-end px-4">
+                          {item.status === 'pending' ? (
+                            <CButton
+                              size="sm"
+                              color="success"
+                              variant="outline"
+                              disabled={current <= 0}
+                              onClick={() => markPaid(item.id, current)}
+                            >
+                              <CIcon icon={cilCheckCircle} className="me-1" />
+                              Pay
                             </CButton>
-                          ) : item.status === 'pending' && currentAmount <= 0 ? (
-                            <CBadge color="danger">No Payment</CBadge>
                           ) : (
-                            <CBadge color="secondary">Paid</CBadge>
+                            <span className="text-success small fw-semibold">
+                              <CIcon icon={cilCheckCircle} size="sm" className="me-1" />
+                              Paid
+                            </span>
                           )}
                         </CTableDataCell>
                       </CTableRow>
                     )
-                  })
-                ) : (
-                  <CTableRow>
-                    <CTableDataCell colSpan="9" className="text-center py-5">
-                      No commissions found.
-                    </CTableDataCell>
-                  </CTableRow>
-                )}
-              </CTableBody>
-            </CTable>
+                  })}
+                </CTableBody>
+              </CTable>
+            </div>
           )}
         </CCardBody>
       </CCard>
-    </>
+
+      {/* =====================================================
+          SMALL FOOTER SUMMARY
+      ====================================================== */}
+
+      {!loading && filteredCommissions.length > 0 && (
+        <div className="d-flex justify-content-between align-items-center mt-3 px-1">
+          <small className="text-body-secondary">
+            Commission figures are based on the currently selected filters.
+          </small>
+
+          <strong className="text-primary">Total: {formatCurrency(totalCommission)}</strong>
+        </div>
+      )}
+    </div>
   )
 }
 
