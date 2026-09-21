@@ -37,6 +37,7 @@ import {
   CInputGroupText,
   CSpinner,
 } from '@coreui/react'
+
 import {
   ResponsiveContainer,
   LineChart,
@@ -55,6 +56,10 @@ import {
 
 const Report = () => {
   const API_URL = import.meta.env.VITE_BACKEND_URL
+
+  // =========================================================
+  // STATE
+  // =========================================================
 
   const [loading, setLoading] = useState(false)
 
@@ -90,17 +95,9 @@ const Report = () => {
     return sale.Customer?.fullname || '-'
   }
 
-  // const getServiceItems = (sale) => {
-  //   return (
-  //     sale.items?.filter(
-  //       (item) =>
-  //         item.itemType === 'service' ||
-  //         item.saleType === 'service' ||
-  //         item.Service ||
-  //         item.service,
-  //     ) || []
-  //   )
-  // }
+  // =========================================================
+  // SALE ITEMS
+  // =========================================================
 
   const getServiceItems = (sale) => {
     return (
@@ -135,26 +132,18 @@ const Report = () => {
   }
 
   // =========================================================
-  // GET COMMISSION FOR SALE
-  // =========================================================
-  //
-  // Your backend should return Commission with every sale.
-  //
-  // We support both:
-  // sale.Commission
-  // sale.commission
-  //
+  // COMMISSION
   // =========================================================
 
   const getCommission = (sale) => {
     return sale.Commission || sale.commission || null
   }
 
+  // ONLY PENDING COMMISSION COUNTS AS CURRENT STAFF SHARE
   const getStaffShare = (sale) => {
     const commission = getCommission(sale)
 
-    // Only pending commissions count as current staff share
-    if (commission && commission.status === 'pending') {
+    if (commission?.status === 'pending') {
       return Number(commission.commissionAmount || 0)
     }
 
@@ -171,19 +160,20 @@ const Report = () => {
     return 0
   }
 
-  const getServiceType = (sale) => {
-    /*
-     * If you later add serviceType directly to Sale,
-     * this will automatically use it.
-     *
-     * For the current commission system, the Commission
-     * record is the source of truth for the rate.
-     */
+  // =========================================================
+  // SERVICE TYPE
+  // =========================================================
 
+  const getServiceType = (sale) => {
+    // If Sale eventually stores serviceType directly,
+    // this will use it automatically.
     if (sale.serviceType) {
       return sale.serviceType
     }
 
+    // Current system:
+    // 50% = Home Service
+    // 30% = In-Salon
     const rate = getCommissionRate(sale)
 
     if (rate === 50) {
@@ -197,9 +187,12 @@ const Report = () => {
     return null
   }
 
+  // =========================================================
+  // OWNER SERVICE PROFIT
+  // =========================================================
+
   const getOwnerServiceProfit = (sale) => {
     const serviceRevenue = getServiceTotal(sale)
-
     const commission = getCommission(sale)
 
     const pendingCommission =
@@ -258,23 +251,11 @@ const Report = () => {
   }, [sales, search, providerFilter])
 
   // =========================================================
-  // REPORT KPIs
-  // =========================================================
-  //
-  // IMPORTANT:
-  // These are calculated from filteredSales.
-  //
-  // Therefore:
-  // Search staff -> KPIs change
-  // Search service -> KPIs change
-  // Select provider -> KPIs change
-  //
+  // KPI CALCULATIONS
   // =========================================================
 
   const kpis = useMemo(() => {
     let grossSales = 0
-    let totalReturns = 0
-    let netSales = 0
     let totalServiceSales = 0
     let totalProductSales = 0
     let productProfit = 0
@@ -288,18 +269,21 @@ const Report = () => {
 
       grossSales += saleAmount
 
+      // Service
       const serviceTotal = getServiceTotal(sale)
-      const productTotal = getProductTotal(sale)
-
       totalServiceSales += serviceTotal
+
+      // Products
+      const productTotal = getProductTotal(sale)
       totalProductSales += productTotal
 
-      const commission = getStaffShare(sale)
+      // Pending staff commission only
+      staffShare += getStaffShare(sale)
 
-      staffShare += commission
-
+      // Owner service profit
       ownerServiceProfit += getOwnerServiceProfit(sale)
 
+      // Service type
       const serviceType = getServiceType(sale)
 
       if (serviceType === 'home_service') {
@@ -310,31 +294,20 @@ const Report = () => {
         inSalonServiceSales += serviceTotal
       }
 
-      /*
-       * If your sale response contains a product profit field,
-       * use it here.
-       *
-       * Otherwise product profit can still be supplied by the
-       * backend report.
-       */
+      // Product profit if included in sale
       if (sale.productProfit !== undefined) {
         productProfit += Number(sale.productProfit || 0)
       }
     })
 
-    /*
-     * If the backend supplies returns, use the backend value
-     * when there is no per-sale return information.
-     */
-    totalReturns = Number(report.totalReturns || 0)
+    // Returns from backend
+    const totalReturns = Number(report.totalReturns || 0)
 
-    netSales = grossSales - totalReturns
+    const netSales = grossSales - totalReturns
 
-    /*
-     * If product profit wasn't included per sale,
-     * fall back to backend product profit.
-     */
-    if (filteredSales.length > 0 && productProfit === 0 && Number(report.productProfit || 0) > 0) {
+    // If individual sales do not contain productProfit,
+    // use backend product profit.
+    if (productProfit === 0 && Number(report.productProfit || 0) > 0) {
       productProfit = Number(report.productProfit || 0)
     }
 
@@ -346,66 +319,6 @@ const Report = () => {
 
     const averageSale = totalTransactions > 0 ? netSales / totalTransactions : 0
 
-    const salesTrendData = useMemo(() => {
-      const grouped = {}
-
-      filteredSales.forEach((sale) => {
-        const date = sale.createdAt
-          ? new Date(sale.createdAt).toLocaleDateString('en-NG', {
-              day: '2-digit',
-              month: 'short',
-            })
-          : 'Unknown'
-
-        if (!grouped[date]) {
-          grouped[date] = {
-            date,
-            sales: 0,
-            transactions: 0,
-          }
-        }
-
-        grouped[date].sales += Number(sale.totalAmount || 0)
-
-        grouped[date].transactions += 1
-      })
-
-      return Object.values(grouped)
-    }, [filteredSales])
-
-    const profitChartData = useMemo(() => {
-      return [
-        {
-          name: 'Service Revenue',
-          amount: Number(kpis.totalServiceSales || 0),
-        },
-        {
-          name: 'Staff Share',
-          amount: Number(kpis.staffShare || 0),
-        },
-        {
-          name: 'Owner Service Profit',
-          amount: Number(kpis.ownerServiceProfit || 0),
-        },
-      ]
-    }, [kpis])
-
-    const revenueBreakdownData = useMemo(() => {
-      return [
-        {
-          name: 'In-Salon',
-          value: Number(kpis.inSalonServiceSales || 0),
-        },
-        {
-          name: 'Home Service',
-          value: Number(kpis.homeServiceSales || 0),
-        },
-        {
-          name: 'Products',
-          value: Number(kpis.totalProductSales || 0),
-        },
-      ].filter((item) => item.value > 0)
-    }, [kpis])
     return {
       grossSales,
       totalReturns,
@@ -423,6 +336,76 @@ const Report = () => {
       inSalonServiceSales,
     }
   }, [filteredSales, report])
+
+  // =========================================================
+  // SALES TREND CHART
+  // =========================================================
+
+  const salesTrendData = useMemo(() => {
+    const grouped = {}
+
+    filteredSales.forEach((sale) => {
+      const date = sale.createdAt
+        ? new Date(sale.createdAt).toLocaleDateString('en-NG', {
+            day: '2-digit',
+            month: 'short',
+          })
+        : 'Unknown'
+
+      if (!grouped[date]) {
+        grouped[date] = {
+          date,
+          sales: 0,
+        }
+      }
+
+      grouped[date].sales += Number(sale.totalAmount || 0)
+    })
+
+    return Object.values(grouped)
+  }, [filteredSales])
+
+  // =========================================================
+  // PROFIT CHART
+  // =========================================================
+
+  const profitChartData = useMemo(() => {
+    return [
+      {
+        name: 'Service Revenue',
+        amount: Number(kpis.totalServiceSales || 0),
+      },
+      {
+        name: 'Staff Share',
+        amount: Number(kpis.staffShare || 0),
+      },
+      {
+        name: 'Owner Service Profit',
+        amount: Number(kpis.ownerServiceProfit || 0),
+      },
+    ]
+  }, [kpis])
+
+  // =========================================================
+  // REVENUE BREAKDOWN CHART
+  // =========================================================
+
+  const revenueBreakdownData = useMemo(() => {
+    return [
+      {
+        name: 'In-Salon',
+        value: Number(kpis.inSalonServiceSales || 0),
+      },
+      {
+        name: 'Home Service',
+        value: Number(kpis.homeServiceSales || 0),
+      },
+      {
+        name: 'Products',
+        value: Number(kpis.totalProductSales || 0),
+      },
+    ].filter((item) => item.value > 0)
+  }, [kpis])
 
   // =========================================================
   // GET SALES REPORT
@@ -453,6 +436,10 @@ const Report = () => {
       setLoading(false)
     }
   }
+
+  // =========================================================
+  // INITIAL LOAD
+  // =========================================================
 
   useEffect(() => {
     getSalesReport()
@@ -535,28 +522,8 @@ const Report = () => {
   }
 
   // =========================================================
-  // KPI CARD
+  // UI
   // =========================================================
-
-  const KpiCard = ({ title, value, icon, color, subtitle }) => (
-    <CCard className="border-0 shadow-sm h-100">
-      <CCardBody>
-        <div className="d-flex justify-content-between align-items-start">
-          <div>
-            <div className="text-medium-emphasis small mb-2">{title}</div>
-
-            <h3 className={`fw-bold mb-1 text-${color}`}>{value}</h3>
-
-            {subtitle && <small className="text-medium-emphasis">{subtitle}</small>}
-          </div>
-
-          <div className={`rounded-circle bg-${color} bg-opacity-10 p-3`}>
-            <CIcon icon={icon} className={`text-${color}`} size="xl" />
-          </div>
-        </div>
-      </CCardBody>
-    </CCard>
-  )
 
   return (
     <>
@@ -584,8 +551,8 @@ const Report = () => {
       </CCard>
 
       {/* =====================================================
-    KPI SECTION 1 - SALES
-===================================================== */}
+          KPI SECTION 1
+      ===================================================== */}
 
       <CRow className="g-3 mb-3">
         {/* GROSS SALES */}
@@ -596,9 +563,7 @@ const Report = () => {
                 <div>
                   <div className="text-medium-emphasis small mb-2">Gross Sales</div>
 
-                  <h3 className="fw-bold text-success mb-1">
-                    ₦{Number(kpis.grossSales || 0).toLocaleString()}
-                  </h3>
+                  <h3 className="fw-bold text-success mb-1">{money(kpis.grossSales)}</h3>
 
                   <small className="text-medium-emphasis">
                     {kpis.totalTransactions} transactions
@@ -621,12 +586,10 @@ const Report = () => {
                 <div>
                   <div className="text-medium-emphasis small mb-2">Net Sales</div>
 
-                  <h3 className="fw-bold text-primary mb-1">
-                    ₦{Number(kpis.netSales || 0).toLocaleString()}
-                  </h3>
+                  <h3 className="fw-bold text-primary mb-1">{money(kpis.netSales)}</h3>
 
                   <small className="text-medium-emphasis">
-                    Average sale: ₦{Number(kpis.averageSale || 0).toLocaleString()}
+                    Average sale: {money(kpis.averageSale)}
                   </small>
                 </div>
 
@@ -646,12 +609,10 @@ const Report = () => {
                 <div>
                   <div className="text-medium-emphasis small mb-2">Service Revenue</div>
 
-                  <h3 className="fw-bold text-info mb-1">
-                    ₦{Number(kpis.totalServiceSales || 0).toLocaleString()}
-                  </h3>
+                  <h3 className="fw-bold text-info mb-1">{money(kpis.totalServiceSales)}</h3>
 
                   <small className="text-medium-emphasis">
-                    In-Salon: ₦{Number(kpis.inSalonServiceSales || 0).toLocaleString()}
+                    In-Salon: {money(kpis.inSalonServiceSales)}
                   </small>
                 </div>
 
@@ -671,9 +632,7 @@ const Report = () => {
                 <div>
                   <div className="text-medium-emphasis small mb-2">Product Sales</div>
 
-                  <h3 className="fw-bold text-secondary mb-1">
-                    ₦{Number(kpis.totalProductSales || 0).toLocaleString()}
-                  </h3>
+                  <h3 className="fw-bold text-secondary mb-1">{money(kpis.totalProductSales)}</h3>
 
                   <small className="text-medium-emphasis">Product revenue</small>
                 </div>
@@ -688,8 +647,8 @@ const Report = () => {
       </CRow>
 
       {/* =====================================================
-  KPI SECTION 2 - PROFIT
-===================================================== */}
+          KPI SECTION 2
+      ===================================================== */}
 
       <CRow className="g-3 mb-4">
         {/* STAFF SHARE */}
@@ -700,11 +659,9 @@ const Report = () => {
                 <div>
                   <div className="text-medium-emphasis small mb-2">Staff Share</div>
 
-                  <h3 className="fw-bold text-warning mb-1">
-                    ₦{Number(kpis.staffShare || 0).toLocaleString()}
-                  </h3>
+                  <h3 className="fw-bold text-warning mb-1">{money(kpis.staffShare)}</h3>
 
-                  <small className="text-medium-emphasis">Actual service commission</small>
+                  <small className="text-medium-emphasis">Pending service commission</small>
                 </div>
 
                 <div className="rounded-circle bg-warning bg-opacity-10 p-3">
@@ -723,11 +680,11 @@ const Report = () => {
                 <div>
                   <div className="text-medium-emphasis small mb-2">Owner Service Profit</div>
 
-                  <h3 className="fw-bold text-success mb-1">
-                    ₦{Number(kpis.ownerServiceProfit || 0).toLocaleString()}
-                  </h3>
+                  <h3 className="fw-bold text-success mb-1">{money(kpis.ownerServiceProfit)}</h3>
 
-                  <small className="text-medium-emphasis">Service revenue − staff share</small>
+                  <small className="text-medium-emphasis">
+                    Service revenue − pending staff share
+                  </small>
                 </div>
 
                 <div className="rounded-circle bg-success bg-opacity-10 p-3">
@@ -746,9 +703,7 @@ const Report = () => {
                 <div>
                   <div className="text-medium-emphasis small mb-2">Owner Profit</div>
 
-                  <h3 className="fw-bold text-success mb-1">
-                    ₦{Number(kpis.ownerProfit || 0).toLocaleString()}
-                  </h3>
+                  <h3 className="fw-bold text-success mb-1">{money(kpis.ownerProfit)}</h3>
 
                   <small className="text-medium-emphasis">Product + service profit</small>
                 </div>
@@ -769,9 +724,7 @@ const Report = () => {
                 <div>
                   <div className="text-medium-emphasis small mb-2">Home Service</div>
 
-                  <h3 className="fw-bold text-dark mb-1">
-                    ₦{Number(kpis.homeServiceSales || 0).toLocaleString()}
-                  </h3>
+                  <h3 className="fw-bold text-dark mb-1">{money(kpis.homeServiceSales)}</h3>
 
                   <small className="text-medium-emphasis">50% staff share where applicable</small>
                 </div>
@@ -786,24 +739,19 @@ const Report = () => {
       </CRow>
 
       {/* =====================================================
-    REPORT ANALYTICS
-===================================================== */}
+          ANALYTICS
+      ===================================================== */}
 
       <CRow className="g-3 mb-4">
-        {/* ===================================================
-    SALES TREND
-=================================================== */}
-
+        {/* SALES TREND */}
         <CCol xs={12} lg={8}>
           <CCard className="border-0 shadow-sm h-100">
             <CCardHeader className="bg-transparent border-0 pt-4 px-4">
-              <div>
-                <h5 className="fw-bold mb-1">Sales Performance</h5>
+              <h5 className="fw-bold mb-1">Sales Performance</h5>
 
-                <small className="text-medium-emphasis">
-                  Sales revenue and transaction activity for the current report.
-                </small>
-              </div>
+              <small className="text-medium-emphasis">
+                Sales revenue for the current filtered report.
+              </small>
             </CCardHeader>
 
             <CCardBody>
@@ -828,12 +776,7 @@ const Report = () => {
                       tickFormatter={(value) => `₦${Number(value).toLocaleString()}`}
                     />
 
-                    <Tooltip
-                      formatter={(value, name) => [
-                        name === 'sales' ? `₦${Number(value).toLocaleString()}` : value,
-                        name === 'sales' ? 'Sales' : 'Transactions',
-                      ]}
-                    />
+                    <Tooltip formatter={(value) => `₦${Number(value).toLocaleString()}`} />
 
                     <Legend />
 
@@ -844,14 +787,6 @@ const Report = () => {
                       strokeWidth={3}
                       dot={{ r: 4 }}
                       activeDot={{ r: 6 }}
-                    />
-
-                    <Line
-                      type="monotone"
-                      dataKey="transactions"
-                      name="Transactions"
-                      strokeWidth={2}
-                      yAxisId={0}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -864,18 +799,13 @@ const Report = () => {
           </CCard>
         </CCol>
 
-        {/* ===================================================
-    REVENUE BREAKDOWN
-=================================================== */}
-
+        {/* REVENUE BREAKDOWN */}
         <CCol xs={12} lg={4}>
           <CCard className="border-0 shadow-sm h-100">
             <CCardHeader className="bg-transparent border-0 pt-4 px-4">
-              <div>
-                <h5 className="fw-bold mb-1">Revenue Breakdown</h5>
+              <h5 className="fw-bold mb-1">Revenue Breakdown</h5>
 
-                <small className="text-medium-emphasis">Services and product revenue</small>
-              </div>
+              <small className="text-medium-emphasis">Services and product revenue</small>
             </CCardHeader>
 
             <CCardBody>
@@ -914,48 +844,52 @@ const Report = () => {
       </CRow>
 
       {/* =====================================================
-  SERVICE / PROFIT ANALYSIS
-===================================================== */}
+          SERVICE / PROFIT ANALYSIS
+      ===================================================== */}
 
       <CRow className="mb-4">
         <CCol xs={12}>
           <CCard className="border-0 shadow-sm">
             <CCardHeader className="bg-transparent border-0 pt-4 px-4">
-              <div>
-                <h5 className="fw-bold mb-1">Service Revenue & Profit Analysis</h5>
+              <h5 className="fw-bold mb-1">Service Revenue & Profit Analysis</h5>
 
-                <small className="text-medium-emphasis">
-                  Compare service revenue, current pending staff share and owner service profit.
-                </small>
-              </div>
+              <small className="text-medium-emphasis">
+                Compare service revenue, current pending staff share and owner service profit.
+              </small>
             </CCardHeader>
 
             <CCardBody>
-              <ResponsiveContainer width="100%" height={330}>
-                <BarChart
-                  data={profitChartData}
-                  margin={{
-                    top: 10,
-                    right: 20,
-                    left: 10,
-                    bottom: 10,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              {profitChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={330}>
+                  <BarChart
+                    data={profitChartData}
+                    margin={{
+                      top: 10,
+                      right: 20,
+                      left: 10,
+                      bottom: 10,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
 
-                  <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                    <XAxis dataKey="name" tickLine={false} axisLine={false} />
 
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => `₦${Number(value).toLocaleString()}`}
-                  />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => `₦${Number(value).toLocaleString()}`}
+                    />
 
-                  <Tooltip formatter={(value) => `₦${Number(value).toLocaleString()}`} />
+                    <Tooltip formatter={(value) => `₦${Number(value).toLocaleString()}`} />
 
-                  <Bar dataKey="amount" name="Amount" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+                    <Bar dataKey="amount" name="Amount" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-center text-medium-emphasis py-5">
+                  No profit data available.
+                </div>
+              )}
             </CCardBody>
           </CCard>
         </CCol>
@@ -976,6 +910,7 @@ const Report = () => {
 
         <CCardBody>
           <CRow className="g-3">
+            {/* START DATE */}
             <CCol xs={12} md={2}>
               <label className="small fw-semibold mb-1">Start Date</label>
 
@@ -986,6 +921,7 @@ const Report = () => {
               />
             </CCol>
 
+            {/* END DATE */}
             <CCol xs={12} md={2}>
               <label className="small fw-semibold mb-1">End Date</label>
 
@@ -996,17 +932,22 @@ const Report = () => {
               />
             </CCol>
 
+            {/* STATUS */}
             <CCol xs={12} md={2}>
               <label className="small fw-semibold mb-1">Status</label>
 
               <CFormSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                 <option value="">All Status</option>
+
                 <option value="approved">Approved</option>
+
                 <option value="pending">Pending</option>
+
                 <option value="cancelled">Cancelled</option>
               </CFormSelect>
             </CCol>
 
+            {/* SERVICE PROVIDER */}
             <CCol xs={12} md={3}>
               <label className="small fw-semibold mb-1">Service Provider</label>
 
@@ -1024,6 +965,7 @@ const Report = () => {
               </CFormSelect>
             </CCol>
 
+            {/* SEARCH */}
             <CCol xs={12} md={3}>
               <label className="small fw-semibold mb-1">Search</label>
 
@@ -1170,6 +1112,8 @@ const Report = () => {
 
                   const staffShare = getStaffShare(sale)
 
+                  const commission = getCommission(sale)
+
                   const commissionRate = getCommissionRate(sale)
 
                   const ownerServiceProfit = getOwnerServiceProfit(sale)
@@ -1177,6 +1121,14 @@ const Report = () => {
                   const serviceType = getServiceType(sale)
 
                   const isHomeService = serviceType === 'home_service'
+
+                  const commissionIsPending = commission?.status === 'pending'
+
+                  const commissionIsPaid = commission?.status === 'paid'
+
+                  const paidCommission = commissionIsPaid
+                    ? Number(commission?.commissionAmount || 0)
+                    : 0
 
                   return (
                     <CTableRow key={sale.id}>
@@ -1191,12 +1143,12 @@ const Report = () => {
                       {/* CASHIER */}
                       <CTableDataCell>{getCashierName(sale)}</CTableDataCell>
 
-                      {/* SERVICE PROVIDER */}
+                      {/* PROVIDER */}
                       <CTableDataCell>
                         {provider !== '-' ? <CBadge color="info">{provider}</CBadge> : '-'}
                       </CTableDataCell>
 
-                      {/* SERVICE RENDERED */}
+                      {/* SERVICE */}
                       <CTableDataCell>
                         {services.length > 0 ? (
                           services.map((item, index) => {
@@ -1246,7 +1198,7 @@ const Report = () => {
 
                       {/* REVENUE */}
                       <CTableDataCell>
-                        <div className="fw-bold">{money(Number(sale.totalAmount || 0))}</div>
+                        <div className="fw-bold">{money(sale.totalAmount)}</div>
 
                         {serviceTotal > 0 && (
                           <small className="text-info">Service: {money(serviceTotal)}</small>
@@ -1255,11 +1207,21 @@ const Report = () => {
 
                       {/* STAFF SHARE */}
                       <CTableDataCell>
-                        {staffShare > 0 ? (
+                        {commissionIsPending && staffShare > 0 ? (
                           <>
                             <div className="fw-bold text-warning">{money(staffShare)}</div>
 
-                            <small className="text-medium-emphasis">{commissionRate}%</small>
+                            <small className="text-medium-emphasis">
+                              {commissionRate}% Pending
+                            </small>
+                          </>
+                        ) : commissionIsPaid && paidCommission > 0 ? (
+                          <>
+                            <div className="text-medium-emphasis">{money(paidCommission)}</div>
+
+                            <CBadge color="secondary" className="mt-1">
+                              Paid
+                            </CBadge>
                           </>
                         ) : (
                           '-'
