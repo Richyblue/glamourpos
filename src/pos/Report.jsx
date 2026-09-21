@@ -75,9 +75,21 @@ const Report = () => {
     return sale.Customer?.fullname || '-'
   }
 
+  // const getServiceItems = (sale) => {
+  //   return (
+  //     sale.items?.filter(
+  //       (item) =>
+  //         item.itemType === 'service' ||
+  //         item.saleType === 'service' ||
+  //         item.Service ||
+  //         item.service,
+  //     ) || []
+  //   )
+  // }
+
   const getServiceItems = (sale) => {
     return (
-      sale.items?.filter(
+      sale.SaleItems?.filter(
         (item) =>
           item.itemType === 'service' ||
           item.saleType === 'service' ||
@@ -89,7 +101,7 @@ const Report = () => {
 
   const getProductItems = (sale) => {
     return (
-      sale.items?.filter(
+      sale.SaleItems?.filter(
         (item) =>
           item.itemType === 'product' ||
           item.saleType === 'product' ||
