@@ -658,7 +658,7 @@ const POSPage = () => {
 
       const token = localStorage.getItem('token')
 
-      const response = await axios.get(`${API_URL}api/v1/sales/${saleId}`, {
+      const response = await axios.get(`${API_URL}api/v1/reprint/${saleId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
