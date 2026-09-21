@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import {
   CModal,
@@ -24,42 +24,23 @@ export default function PaymentModal({
   processing,
   staff = [],
   currentUser,
-  cartItems = [],
 }) {
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [serviceProviderId, setServiceProviderId] = useState('')
+  const [serviceType, setServiceType] = useState('in_salon')
   const [note, setNote] = useState('')
   const [standTag, setStandTag] = useState('')
   const [cardNumber, setCardNumber] = useState('')
 
   // =========================================================
-  // DETERMINE SERVICE TYPE FROM CART
-  // =========================================================
-
-  const serviceType = useMemo(() => {
-    const services = cartItems.filter((item) => item.type === 'service')
-
-    if (services.length === 0) {
-      return 'in_salon'
-    }
-
-    const hasHomeService = services.some((item) => item.serviceType === 'home_service')
-
-    if (hasHomeService) {
-      return 'home_service'
-    }
-
-    return 'in_salon'
-  }, [cartItems])
-
-  // =========================================================
-  // HOME SERVICE?
+  // DETERMINE IF HOME SERVICE
   // =========================================================
 
   const isHomeService = serviceType === 'home_service'
 
   // =========================================================
-  // RESET STAND/CARD WHEN HOME SERVICE
+  // WHEN HOME SERVICE IS SELECTED
+  // CLEAR STAND + CARD
   // =========================================================
 
   useEffect(() => {
@@ -77,6 +58,7 @@ export default function PaymentModal({
     if (show) {
       setPaymentMethod('cash')
       setServiceProviderId('')
+      setServiceType('in_salon')
       setNote('')
       setStandTag('')
       setCardNumber('')
@@ -91,11 +73,14 @@ export default function PaymentModal({
     onSubmit({
       paymentMethod,
       serviceProviderId,
+
+      // Home service automatically sends empty values
       standTag: isHomeService ? '' : standTag,
       cardNumber: isHomeService ? '' : cardNumber,
+
       note,
 
-      // Send service type to backend
+      // VERY IMPORTANT
       serviceType,
     })
   }
@@ -111,57 +96,14 @@ export default function PaymentModal({
 
   return (
     <CModal visible={show} onClose={onHide} alignment="center" size="lg">
-      {/* =====================================================
-          HEADER
-      ====================================================== */}
-
       <CModalHeader>
         <CModalTitle>Complete Payment</CModalTitle>
       </CModalHeader>
 
       <CModalBody>
-        {/* ===================================================
-            SERVICE TYPE INDICATOR
-        ==================================================== */}
-
-        <CCard
-          className={`border-0 mb-4 ${isHomeService ? 'bg-warning-subtle' : 'bg-success-subtle'}`}
-        >
-          <CCardBody>
-            <div className="d-flex align-items-center justify-content-between">
-              <div>
-                <small className="text-medium-emphasis">Service Type</small>
-
-                <h5 className="fw-bold mt-1 mb-0">
-                  {isHomeService ? 'Home Service' : 'In-Salon Service'}
-                </h5>
-              </div>
-
-              <div>
-                <span className={`badge ${isHomeService ? 'text-bg-warning' : 'text-bg-success'}`}>
-                  {isHomeService ? 'HOME SERVICE' : 'IN SALON'}
-                </span>
-              </div>
-            </div>
-          </CCardBody>
-        </CCard>
-
-        {/* ===================================================
-            HOME SERVICE NOTICE
-        ==================================================== */}
-
-        {isHomeService && (
-          <CAlert color="warning" className="mb-4">
-            <strong>Home Service</strong>
-            <div className="small mt-1">
-              Stand number and card number are not required for home services.
-            </div>
-          </CAlert>
-        )}
-
-        {/* ===================================================
+        {/* =====================================================
             PAYMENT SUMMARY
-        ==================================================== */}
+        ====================================================== */}
 
         <CCard className="border-0 bg-light mb-4">
           <CCardBody>
@@ -181,9 +123,41 @@ export default function PaymentModal({
           </CCardBody>
         </CCard>
 
-        {/* ===================================================
+        {/* =====================================================
+            SERVICE TYPE
+        ====================================================== */}
+
+        <CRow className="mb-3">
+          <CCol md={12}>
+            <label className="form-label fw-semibold">Service Type</label>
+
+            <CFormSelect value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
+              <option value="in_salon">In-Salon Service</option>
+
+              <option value="home_service">Home Service</option>
+            </CFormSelect>
+
+            <small className="text-muted">Select where the service will be provided.</small>
+          </CCol>
+        </CRow>
+
+        {/* =====================================================
+            HOME SERVICE NOTICE
+        ====================================================== */}
+
+        {isHomeService && (
+          <CAlert color="warning" className="mb-3">
+            <strong>Home Service Selected</strong>
+
+            <div className="small mt-1">
+              Stand number and card number are not required for home services.
+            </div>
+          </CAlert>
+        )}
+
+        {/* =====================================================
             PAYMENT METHOD
-        ==================================================== */}
+        ====================================================== */}
 
         <CRow className="mb-3">
           <CCol md={12}>
@@ -201,9 +175,9 @@ export default function PaymentModal({
           </CCol>
         </CRow>
 
-        {/* ===================================================
+        {/* =====================================================
             SERVICE PROVIDER
-        ==================================================== */}
+        ====================================================== */}
 
         <CRow className="mb-3">
           <CCol md={12}>
@@ -226,10 +200,10 @@ export default function PaymentModal({
           </CCol>
         </CRow>
 
-        {/* ===================================================
+        {/* =====================================================
             STAND + CARD
-            ONLY FOR IN-SALON SERVICES
-        ==================================================== */}
+            ONLY SHOW FOR IN-SALON
+        ====================================================== */}
 
         {!isHomeService && (
           <CRow className="mb-3">
@@ -271,9 +245,9 @@ export default function PaymentModal({
           </CRow>
         )}
 
-        {/* ===================================================
+        {/* =====================================================
             REMARKS
-        ==================================================== */}
+        ====================================================== */}
 
         <CRow>
           <CCol md={12}>
@@ -283,19 +257,11 @@ export default function PaymentModal({
               rows={3}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder={
-                isHomeService
-                  ? 'Add home service remarks, address details, etc...'
-                  : 'Optional note...'
-              }
+              placeholder={isHomeService ? 'Optional home service remarks...' : 'Optional note...'}
             />
           </CCol>
         </CRow>
       </CModalBody>
-
-      {/* =====================================================
-          FOOTER
-      ====================================================== */}
 
       <CModalFooter>
         <CButton color="secondary" variant="outline" onClick={onHide}>
