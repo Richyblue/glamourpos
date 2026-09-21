@@ -203,25 +203,81 @@ const Commission = () => {
   // KPI CALCULATIONS
   // =========================================================
 
+  // CURRENT COMMISSION
+  // This is the current value of all commission records
+  // after any return adjustments.
   const totalCommission = filteredCommissions.reduce(
-    (sum, item) => sum + getCurrentCommission(item),
+    (sum, item) => sum + Number(item.commissionAmount || 0),
     0,
   )
 
-  const pendingCommission = filteredCommissions.reduce(
-    (sum, item) => (item.status === 'pending' ? sum + getCurrentCommission(item) : sum),
-    0,
-  )
+  // =========================================================
+  // CURRENT PENDING COMMISSION
+  // =========================================================
+  //
+  // IMPORTANT:
+  // commissionAmount is already adjusted by the
+  // return controller.
+  //
+  // Example:
+  //
+  // Original commission = ₦6,000
+  // Service returned
+  // Current commission = ₦4,000
+  //
+  // Pending KPI = ₦4,000
+  //
+  // NOT ₦6,000.
+  //
+  // =========================================================
 
-  const paidCommission = filteredCommissions.reduce(
-    (sum, item) => (item.status === 'paid' ? sum + getCurrentCommission(item) : sum),
-    0,
-  )
+  const pendingCommission = filteredCommissions.reduce((sum, item) => {
+    if (item.status !== 'pending') {
+      return sum
+    }
 
-  const returnedCommission = filteredCommissions.reduce(
-    (sum, item) => sum + getReturnedCommission(item),
-    0,
-  )
+    return sum + Number(item.commissionAmount || 0)
+  }, 0)
+
+  // =========================================================
+  // PAID COMMISSION
+  // =========================================================
+
+  const paidCommission = filteredCommissions.reduce((sum, item) => {
+    if (item.status !== 'paid') {
+      return sum
+    }
+
+    return sum + Number(item.commissionAmount || 0)
+  }, 0)
+
+  // =========================================================
+  // RETURN ADJUSTMENTS
+  // =========================================================
+  //
+  // This is the amount removed from the original
+  // commission because of returned services.
+  //
+  // If your API provides returnedCommissionAmount,
+  // use it directly.
+  //
+  // Otherwise calculate it as:
+  //
+  // Original commission - Current commission
+  //
+  // =========================================================
+
+  const returnedCommission = filteredCommissions.reduce((sum, item) => {
+    if (item.returnedCommissionAmount !== undefined) {
+      return sum + Number(item.returnedCommissionAmount || 0)
+    }
+
+    const original = Number(item.originalCommissionAmount || item.commissionAmount || 0)
+
+    const current = Number(item.commissionAmount || 0)
+
+    return sum + Math.max(original - current, 0)
+  }, 0)
 
   // =========================================================
   // RESET FILTERS
