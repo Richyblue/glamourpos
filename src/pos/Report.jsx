@@ -954,28 +954,6 @@ const Report = () => {
         </CCol>
       </CRow>
 
-      {/* EXPENSES */}
-
-      <CCol xs={12} sm={6} xl={3}>
-        <CCard className="border-0 shadow-sm h-100">
-          <CCardBody>
-            <div className="d-flex justify-content-between align-items-start">
-              <div>
-                <div className="text-medium-emphasis small mb-2">Expenses</div>
-
-                <h3 className="fw-bold text-danger mb-1">{money(kpis.totalExpenses)}</h3>
-
-                <small className="text-medium-emphasis">Business expenses</small>
-              </div>
-
-              <div className="rounded-circle bg-danger bg-opacity-10 p-3">
-                <CIcon icon={cilMoney} className="text-danger" size="xl" />
-              </div>
-            </div>
-          </CCardBody>
-        </CCard>
-      </CCol>
-
       {/* =====================================================
           KPI SECTION 2
       ===================================================== */}
@@ -1065,6 +1043,27 @@ const Report = () => {
 
                 <div className="rounded-circle bg-success bg-opacity-10 p-3">
                   <CIcon icon={cilChart} className="text-success" size="xl" />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
+        </CCol>
+        {/* EXPENSES */}
+
+        <CCol xs={12} sm={6} xl={3}>
+          <CCard className="border-0 shadow-sm h-100">
+            <CCardBody>
+              <div className="d-flex justify-content-between align-items-start">
+                <div>
+                  <div className="text-medium-emphasis small mb-2">Expenses</div>
+
+                  <h3 className="fw-bold text-danger mb-1">{money(kpis.totalExpenses)}</h3>
+
+                  <small className="text-medium-emphasis">Business expenses</small>
+                </div>
+
+                <div className="rounded-circle bg-danger bg-opacity-10 p-3">
+                  <CIcon icon={cilMoney} className="text-danger" size="xl" />
                 </div>
               </div>
             </CCardBody>
