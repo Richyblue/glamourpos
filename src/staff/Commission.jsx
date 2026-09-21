@@ -200,35 +200,41 @@ const Commission = () => {
   }, [commissions, search, selectedStaff, statusFilter, monthFilter, yearFilter])
 
   // =========================================================
-  // KPI CALCULATIONS
+  // COMMISSION KPIs
   // =========================================================
 
-  // CURRENT COMMISSION
-  // This is the current value of all commission records
-  // after any return adjustments.
-  const totalCommission = filteredCommissions.reduce(
-    (sum, item) => sum + Number(item.commissionAmount || 0),
-    0,
-  )
-
   // =========================================================
-  // CURRENT PENDING COMMISSION
+  // 1. CURRENT COMMISSION
   // =========================================================
-  //
-  // IMPORTANT:
-  // commissionAmount is already adjusted by the
-  // return controller.
+  // Total commission currently applicable to all records
+  // after service returns have been accounted for.
   //
   // Example:
+  // Original = ₦10,000
+  // Return adjustment = ₦3,000
+  // Current = ₦7,000
   //
-  // Original commission = ₦6,000
-  // Service returned
-  // Current commission = ₦4,000
+  // Current Commission = ₦7,000
+  // =========================================================
+
+  const totalCommission = filteredCommissions.reduce((sum, item) => {
+    return sum + Number(item.currentCommissionAmount ?? item.commissionAmount ?? 0)
+  }, 0)
+
+  // =========================================================
+  // 2. CURRENT PENDING COMMISSION
+  // =========================================================
+  // Only commissions that are still pending.
   //
-  // Pending KPI = ₦4,000
+  // IMPORTANT:
+  // This uses the CURRENT amount after returns.
   //
-  // NOT ₦6,000.
+  // Example:
+  // Original commission = ₦10,000
+  // Return adjustment  = ₦3,000
+  // Current pending    = ₦7,000
   //
+  // Pending KPI = ₦7,000
   // =========================================================
 
   const pendingCommission = filteredCommissions.reduce((sum, item) => {
@@ -236,11 +242,16 @@ const Commission = () => {
       return sum
     }
 
-    return sum + Number(item.commissionAmount || 0)
+    return sum + Number(item.currentCommissionAmount ?? item.commissionAmount ?? 0)
   }, 0)
 
   // =========================================================
-  // PAID COMMISSION
+  // 3. PAID COMMISSION
+  // =========================================================
+  // Only commissions whose status is paid.
+  //
+  // These are commissions that have already been paid
+  // to the service provider.
   // =========================================================
 
   const paidCommission = filteredCommissions.reduce((sum, item) => {
@@ -248,35 +259,26 @@ const Commission = () => {
       return sum
     }
 
-    return sum + Number(item.commissionAmount || 0)
+    return sum + Number(item.currentCommissionAmount ?? item.commissionAmount ?? 0)
   }, 0)
 
   // =========================================================
-  // RETURN ADJUSTMENTS
+  // 4. RETURN ADJUSTMENTS
   // =========================================================
+  // Total commission removed because services were returned.
   //
-  // This is the amount removed from the original
-  // commission because of returned services.
+  // Example:
+  // Original commission = ₦10,000
+  // Current commission  = ₦7,000
+  // Return adjustment   = ₦3,000
   //
-  // If your API provides returnedCommissionAmount,
-  // use it directly.
+  // Return Adjustment KPI = ₦3,000
   //
-  // Otherwise calculate it as:
-  //
-  // Original commission - Current commission
-  //
+  // This value comes from the backend calculation.
   // =========================================================
 
   const returnedCommission = filteredCommissions.reduce((sum, item) => {
-    if (item.returnedCommissionAmount !== undefined) {
-      return sum + Number(item.returnedCommissionAmount || 0)
-    }
-
-    const original = Number(item.originalCommissionAmount || item.commissionAmount || 0)
-
-    const current = Number(item.commissionAmount || 0)
-
-    return sum + Math.max(original - current, 0)
+    return sum + Number(item.returnedCommissionAmount || 0)
   }, 0)
 
   // =========================================================
