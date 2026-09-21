@@ -94,6 +94,7 @@ const Report = () => {
   const getCustomerName = (sale) => {
     return sale.Customer?.fullname || '-'
   }
+  const REVENUE_COLORS = ['#321fdb', '#e55353', '#2eb85c']
 
   // =========================================================
   // SALE ITEMS
@@ -784,9 +785,10 @@ const Report = () => {
                       type="monotone"
                       dataKey="sales"
                       name="Sales"
+                      stroke="#321fdb"
                       strokeWidth={3}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
+                      dot={{ r: 4, fill: '#321fdb' }}
+                      activeDot={{ r: 6, fill: '#321fdb' }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -824,7 +826,10 @@ const Report = () => {
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     >
                       {revenueBreakdownData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} />
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={REVENUE_COLORS[index % REVENUE_COLORS.length]}
+                        />
                       ))}
                     </Pie>
 
@@ -882,7 +887,14 @@ const Report = () => {
 
                     <Tooltip formatter={(value) => `₦${Number(value).toLocaleString()}`} />
 
-                    <Bar dataKey="amount" name="Amount" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="amount" name="Amount" radius={[6, 6, 0, 0]}>
+                      {profitChartData.map((entry, index) => (
+                        <Cell
+                          key={`profit-cell-${index}`}
+                          fill={index === 0 ? '#321fdb' : index === 1 ? '#f9b115' : '#2eb85c'}
+                        />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
