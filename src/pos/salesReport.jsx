@@ -332,7 +332,7 @@ const MySales = () => {
                   <h3 className="fw-bold mb-1">My Sales Dashboard</h3>
 
                   <div className="text-body-secondary">
-                    View and track your sales, payments, customers and returns.
+                    View and track your sales, payments.
                   </div>
                 </div>
               </div>
