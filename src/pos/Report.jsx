@@ -138,7 +138,8 @@ const Report = () => {
   const getStaffShare = (sale) => {
     const commission = getCommission(sale)
 
-    if (commission) {
+    // Only pending commissions count as current staff share
+    if (commission && commission.status === 'pending') {
       return Number(commission.commissionAmount || 0)
     }
 
@@ -183,9 +184,13 @@ const Report = () => {
 
   const getOwnerServiceProfit = (sale) => {
     const serviceRevenue = getServiceTotal(sale)
-    const staffShare = getStaffShare(sale)
 
-    return Math.max(serviceRevenue - staffShare, 0)
+    const commission = getCommission(sale)
+
+    const pendingCommission =
+      commission?.status === 'pending' ? Number(commission.commissionAmount || 0) : 0
+
+    return Math.max(serviceRevenue - pendingCommission, 0)
   }
 
   // =========================================================
