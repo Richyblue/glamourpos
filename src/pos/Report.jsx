@@ -37,6 +37,21 @@ import {
   CInputGroupText,
   CSpinner,
 } from '@coreui/react'
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts'
 
 const Report = () => {
   const API_URL = import.meta.env.VITE_BACKEND_URL
@@ -331,6 +346,66 @@ const Report = () => {
 
     const averageSale = totalTransactions > 0 ? netSales / totalTransactions : 0
 
+    const salesTrendData = useMemo(() => {
+      const grouped = {}
+
+      filteredSales.forEach((sale) => {
+        const date = sale.createdAt
+          ? new Date(sale.createdAt).toLocaleDateString('en-NG', {
+              day: '2-digit',
+              month: 'short',
+            })
+          : 'Unknown'
+
+        if (!grouped[date]) {
+          grouped[date] = {
+            date,
+            sales: 0,
+            transactions: 0,
+          }
+        }
+
+        grouped[date].sales += Number(sale.totalAmount || 0)
+
+        grouped[date].transactions += 1
+      })
+
+      return Object.values(grouped)
+    }, [filteredSales])
+
+    const profitChartData = useMemo(() => {
+      return [
+        {
+          name: 'Service Revenue',
+          amount: Number(kpis.totalServiceSales || 0),
+        },
+        {
+          name: 'Staff Share',
+          amount: Number(kpis.staffShare || 0),
+        },
+        {
+          name: 'Owner Service Profit',
+          amount: Number(kpis.ownerServiceProfit || 0),
+        },
+      ]
+    }, [kpis])
+
+    const revenueBreakdownData = useMemo(() => {
+      return [
+        {
+          name: 'In-Salon',
+          value: Number(kpis.inSalonServiceSales || 0),
+        },
+        {
+          name: 'Home Service',
+          value: Number(kpis.homeServiceSales || 0),
+        },
+        {
+          name: 'Products',
+          value: Number(kpis.totalProductSales || 0),
+        },
+      ].filter((item) => item.value > 0)
+    }, [kpis])
     return {
       grossSales,
       totalReturns,
@@ -705,6 +780,182 @@ const Report = () => {
                   <CIcon icon={cilHome} className="text-dark" size="xl" />
                 </div>
               </div>
+            </CCardBody>
+          </CCard>
+        </CCol>
+      </CRow>
+
+      {/* =====================================================
+    REPORT ANALYTICS
+===================================================== */}
+
+      <CRow className="g-3 mb-4">
+        {/* ===================================================
+    SALES TREND
+=================================================== */}
+
+        <CCol xs={12} lg={8}>
+          <CCard className="border-0 shadow-sm h-100">
+            <CCardHeader className="bg-transparent border-0 pt-4 px-4">
+              <div>
+                <h5 className="fw-bold mb-1">Sales Performance</h5>
+
+                <small className="text-medium-emphasis">
+                  Sales revenue and transaction activity for the current report.
+                </small>
+              </div>
+            </CCardHeader>
+
+            <CCardBody>
+              {salesTrendData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={320}>
+                  <LineChart
+                    data={salesTrendData}
+                    margin={{
+                      top: 10,
+                      right: 20,
+                      left: 10,
+                      bottom: 10,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+
+                    <XAxis dataKey="date" tickLine={false} axisLine={false} />
+
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => `₦${Number(value).toLocaleString()}`}
+                    />
+
+                    <Tooltip
+                      formatter={(value, name) => [
+                        name === 'sales' ? `₦${Number(value).toLocaleString()}` : value,
+                        name === 'sales' ? 'Sales' : 'Transactions',
+                      ]}
+                    />
+
+                    <Legend />
+
+                    <Line
+                      type="monotone"
+                      dataKey="sales"
+                      name="Sales"
+                      strokeWidth={3}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+
+                    <Line
+                      type="monotone"
+                      dataKey="transactions"
+                      name="Transactions"
+                      strokeWidth={2}
+                      yAxisId={0}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-center text-medium-emphasis py-5">
+                  No sales data available for the selected filters.
+                </div>
+              )}
+            </CCardBody>
+          </CCard>
+        </CCol>
+
+        {/* ===================================================
+    REVENUE BREAKDOWN
+=================================================== */}
+
+        <CCol xs={12} lg={4}>
+          <CCard className="border-0 shadow-sm h-100">
+            <CCardHeader className="bg-transparent border-0 pt-4 px-4">
+              <div>
+                <h5 className="fw-bold mb-1">Revenue Breakdown</h5>
+
+                <small className="text-medium-emphasis">Services and product revenue</small>
+              </div>
+            </CCardHeader>
+
+            <CCardBody>
+              {revenueBreakdownData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={320}>
+                  <PieChart>
+                    <Pie
+                      data={revenueBreakdownData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={105}
+                      innerRadius={55}
+                      paddingAngle={3}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {revenueBreakdownData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} />
+                      ))}
+                    </Pie>
+
+                    <Tooltip formatter={(value) => `₦${Number(value).toLocaleString()}`} />
+
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="text-center text-medium-emphasis py-5">
+                  No revenue data available.
+                </div>
+              )}
+            </CCardBody>
+          </CCard>
+        </CCol>
+      </CRow>
+
+      {/* =====================================================
+  SERVICE / PROFIT ANALYSIS
+===================================================== */}
+
+      <CRow className="mb-4">
+        <CCol xs={12}>
+          <CCard className="border-0 shadow-sm">
+            <CCardHeader className="bg-transparent border-0 pt-4 px-4">
+              <div>
+                <h5 className="fw-bold mb-1">Service Revenue & Profit Analysis</h5>
+
+                <small className="text-medium-emphasis">
+                  Compare service revenue, current pending staff share and owner service profit.
+                </small>
+              </div>
+            </CCardHeader>
+
+            <CCardBody>
+              <ResponsiveContainer width="100%" height={330}>
+                <BarChart
+                  data={profitChartData}
+                  margin={{
+                    top: 10,
+                    right: 20,
+                    left: 10,
+                    bottom: 10,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} />
+
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => `₦${Number(value).toLocaleString()}`}
+                  />
+
+                  <Tooltip formatter={(value) => `₦${Number(value).toLocaleString()}`} />
+
+                  <Bar dataKey="amount" name="Amount" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </CCardBody>
           </CCard>
         </CCol>
