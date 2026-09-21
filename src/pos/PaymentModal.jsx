@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import {
   CModal,
@@ -8,12 +8,12 @@ import {
   CModalFooter,
   CButton,
   CFormSelect,
-  CFormInput,
   CFormTextarea,
   CRow,
   CCol,
   CCard,
   CCardBody,
+  CAlert,
 } from '@coreui/react'
 
 export default function PaymentModal({
@@ -24,6 +24,7 @@ export default function PaymentModal({
   processing,
   staff = [],
   currentUser,
+  cartItems = [],
 }) {
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [serviceProviderId, setServiceProviderId] = useState('')
@@ -31,24 +32,136 @@ export default function PaymentModal({
   const [standTag, setStandTag] = useState('')
   const [cardNumber, setCardNumber] = useState('')
 
+  // =========================================================
+  // DETERMINE SERVICE TYPE FROM CART
+  // =========================================================
+
+  const serviceType = useMemo(() => {
+    const services = cartItems.filter((item) => item.type === 'service')
+
+    if (services.length === 0) {
+      return 'in_salon'
+    }
+
+    const hasHomeService = services.some((item) => item.serviceType === 'home_service')
+
+    if (hasHomeService) {
+      return 'home_service'
+    }
+
+    return 'in_salon'
+  }, [cartItems])
+
+  // =========================================================
+  // HOME SERVICE?
+  // =========================================================
+
+  const isHomeService = serviceType === 'home_service'
+
+  // =========================================================
+  // RESET STAND/CARD WHEN HOME SERVICE
+  // =========================================================
+
+  useEffect(() => {
+    if (isHomeService) {
+      setStandTag('')
+      setCardNumber('')
+    }
+  }, [isHomeService])
+
+  // =========================================================
+  // RESET FORM WHEN MODAL OPENS
+  // =========================================================
+
+  useEffect(() => {
+    if (show) {
+      setPaymentMethod('cash')
+      setServiceProviderId('')
+      setNote('')
+      setStandTag('')
+      setCardNumber('')
+    }
+  }, [show])
+
+  // =========================================================
+  // HANDLE SUBMIT
+  // =========================================================
+
   const handleSubmit = () => {
     onSubmit({
       paymentMethod,
       serviceProviderId,
-      standTag,
-      cardNumber,
+      standTag: isHomeService ? '' : standTag,
+      cardNumber: isHomeService ? '' : cardNumber,
       note,
+
+      // Send service type to backend
+      serviceType,
     })
   }
 
+  // =========================================================
+  // ACTIVE STAFF
+  // =========================================================
+
+  const activeStaff = staff.filter(
+    (item) =>
+      (item.User?.isActive === true || item.User?.isActive === 1) && item.User?.fullname?.trim(),
+  )
+
   return (
     <CModal visible={show} onClose={onHide} alignment="center" size="lg">
+      {/* =====================================================
+          HEADER
+      ====================================================== */}
+
       <CModalHeader>
         <CModalTitle>Complete Payment</CModalTitle>
       </CModalHeader>
 
       <CModalBody>
-        {/* PAYMENT SUMMARY */}
+        {/* ===================================================
+            SERVICE TYPE INDICATOR
+        ==================================================== */}
+
+        <CCard
+          className={`border-0 mb-4 ${isHomeService ? 'bg-warning-subtle' : 'bg-success-subtle'}`}
+        >
+          <CCardBody>
+            <div className="d-flex align-items-center justify-content-between">
+              <div>
+                <small className="text-medium-emphasis">Service Type</small>
+
+                <h5 className="fw-bold mt-1 mb-0">
+                  {isHomeService ? 'Home Service' : 'In-Salon Service'}
+                </h5>
+              </div>
+
+              <div>
+                <span className={`badge ${isHomeService ? 'text-bg-warning' : 'text-bg-success'}`}>
+                  {isHomeService ? 'HOME SERVICE' : 'IN SALON'}
+                </span>
+              </div>
+            </div>
+          </CCardBody>
+        </CCard>
+
+        {/* ===================================================
+            HOME SERVICE NOTICE
+        ==================================================== */}
+
+        {isHomeService && (
+          <CAlert color="warning" className="mb-4">
+            <strong>Home Service</strong>
+            <div className="small mt-1">
+              Stand number and card number are not required for home services.
+            </div>
+          </CAlert>
+        )}
+
+        {/* ===================================================
+            PAYMENT SUMMARY
+        ==================================================== */}
 
         <CCard className="border-0 bg-light mb-4">
           <CCardBody>
@@ -68,7 +181,9 @@ export default function PaymentModal({
           </CCardBody>
         </CCard>
 
-        {/* PAYMENT METHOD */}
+        {/* ===================================================
+            PAYMENT METHOD
+        ==================================================== */}
 
         <CRow className="mb-3">
           <CCol md={12}>
@@ -86,24 +201,13 @@ export default function PaymentModal({
           </CCol>
         </CRow>
 
-        {/* SERVICE PROVIDER */}
+        {/* ===================================================
+            SERVICE PROVIDER
+        ==================================================== */}
 
         <CRow className="mb-3">
           <CCol md={12}>
             <label className="form-label fw-semibold">Service Provider</label>
-
-            {/* <CFormSelect
-              value={serviceProviderId}
-              onChange={(e) => setServiceProviderId(e.target.value)}
-            >
-              <option value="">Select Staff</option>
-
-              {staff.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.User?.fullname}
-                </option>
-              ))}
-            </CFormSelect> */}
 
             <CFormSelect
               value={serviceProviderId}
@@ -111,55 +215,65 @@ export default function PaymentModal({
             >
               <option value="">Select Staff</option>
 
-              {staff
-                .filter(
-                  (item) =>
-                    (item.User?.isActive === true || item.User?.isActive === 1) &&
-                    item.User?.fullname?.trim(),
-                )
-                .map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.User.fullname.trim()}
-                  </option>
-                ))}
+              {activeStaff.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.User.fullname.trim()}
+                </option>
+              ))}
             </CFormSelect>
+
             <small className="text-muted">Staff that attended to the customer</small>
           </CCol>
         </CRow>
 
-        {/* STAND TAG */}
+        {/* ===================================================
+            STAND + CARD
+            ONLY FOR IN-SALON SERVICES
+        ==================================================== */}
 
-        <CRow className="mb-3">
-          <CCol md={6}>
-            <label className="form-label fw-semibold">Stand Tag</label>
+        {!isHomeService && (
+          <CRow className="mb-3">
+            {/* STAND */}
 
-            <CFormSelect value={standTag} onChange={(e) => setStandTag(e.target.value)}>
-              <option value="">Select Stand</option>
+            <CCol md={6}>
+              <label className="form-label fw-semibold">Stand Tag</label>
 
-              {[...Array(20)].map((_, i) => (
-                <option key={i + 1} value={`Stand ${i + 1}`}>
-                  Stand {i + 1}
-                </option>
-              ))}
-            </CFormSelect>
-          </CCol>
+              <CFormSelect value={standTag} onChange={(e) => setStandTag(e.target.value)}>
+                <option value="">Select Stand</option>
 
-          <CCol md={6}>
-            <label className="form-label fw-semibold">Card Number</label>
+                {[...Array(20)].map((_, i) => (
+                  <option key={i + 1} value={`Stand ${i + 1}`}>
+                    Stand {i + 1}
+                  </option>
+                ))}
+              </CFormSelect>
+            </CCol>
 
-            <CFormSelect value={cardNumber} onChange={(e) => setCardNumber(e.target.value)}>
-              <option value="">Select Card</option>
+            {/* CARD */}
 
-              {[...Array(100)].map((_, i) => (
-                <option key={i + 1} value={String(i + 1).padStart(3, '0')}>
-                  Card #{String(i + 1).padStart(3, '0')}
-                </option>
-              ))}
-            </CFormSelect>
-          </CCol>
-        </CRow>
+            <CCol md={6}>
+              <label className="form-label fw-semibold">Card Number</label>
 
-        {/* NOTE */}
+              <CFormSelect value={cardNumber} onChange={(e) => setCardNumber(e.target.value)}>
+                <option value="">Select Card</option>
+
+                {[...Array(100)].map((_, i) => {
+                  const number = String(i + 1).padStart(3, '0')
+
+                  return (
+                    <option key={i + 1} value={number}>
+                      Card #{number}
+                    </option>
+                  )
+                })}
+              </CFormSelect>
+            </CCol>
+          </CRow>
+        )}
+
+        {/* ===================================================
+            REMARKS
+        ==================================================== */}
 
         <CRow>
           <CCol md={12}>
@@ -169,11 +283,19 @@ export default function PaymentModal({
               rows={3}
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Optional note..."
+              placeholder={
+                isHomeService
+                  ? 'Add home service remarks, address details, etc...'
+                  : 'Optional note...'
+              }
             />
           </CCol>
         </CRow>
       </CModalBody>
+
+      {/* =====================================================
+          FOOTER
+      ====================================================== */}
 
       <CModalFooter>
         <CButton color="secondary" variant="outline" onClick={onHide}>
