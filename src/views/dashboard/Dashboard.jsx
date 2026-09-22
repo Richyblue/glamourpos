@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import Swal from 'sweetalert2'
 import CIcon from '@coreui/icons-react'
-import KpiCard from './KpiCard'
 
 import {
   CAvatar,
@@ -477,7 +476,7 @@ const Dashboard = () => {
       )}
 
       {/* =====================================================
-          TODAY OVERVIEW
+          TODAY'S OVERVIEW
       ====================================================== */}
 
       <div className="d-flex align-items-center justify-content-between mb-3">
@@ -495,43 +494,131 @@ const Dashboard = () => {
 
       {/* =====================================================
           TODAY KPI CARDS
+          
+          IMPORTANT:
+          Cards are built directly inside the CCol.
+          No KpiCard component.
       ====================================================== */}
 
-      <CRow className="mb-4 g-3">
-        <CCol sm={6} xl={3} className="d-flex">
-          <KpiCard
-            title="Today's Sales"
-            value={money(dashboard.todaySales)}
-            icon={cilMoney}
-            color="success"
-          />
+      <CRow className="g-3 mb-4">
+        {/* TODAY SALES */}
+
+        <CCol xs={12} sm={6} xl={3}>
+          <CCard className="border-0 shadow-sm h-100 w-100">
+            <CCardBody className="p-4">
+              <div className="d-flex justify-content-between align-items-start">
+                <div className="pe-2">
+                  <div className="text-body-secondary small mb-2">Today's Sales</div>
+
+                  <h3 className="fw-bold text-success mb-1">{money(dashboard.todaySales)}</h3>
+
+                  <small className="text-body-secondary">Today's revenue</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                    minWidth: '52px',
+                  }}
+                >
+                  <CIcon icon={cilMoney} className="text-success" size="xl" />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
         </CCol>
 
-        <CCol sm={6} xl={3} className="d-flex">
-          <KpiCard
-            title="Today's Profit"
-            value={money(dashboard.todayProfit)}
-            icon={cilChartLine}
-            color="primary"
-          />
+        {/* TODAY PROFIT */}
+
+        <CCol xs={12} sm={6} xl={3}>
+          <CCard className="border-0 shadow-sm h-100 w-100">
+            <CCardBody className="p-4">
+              <div className="d-flex justify-content-between align-items-start">
+                <div className="pe-2">
+                  <div className="text-body-secondary small mb-2">Today's Profit</div>
+
+                  <h3 className="fw-bold text-primary mb-1">{money(dashboard.todayProfit)}</h3>
+
+                  <small className="text-body-secondary">Current profit</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                    minWidth: '52px',
+                  }}
+                >
+                  <CIcon icon={cilChartLine} className="text-primary" size="xl" />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
         </CCol>
 
-        <CCol sm={6} xl={3} className="d-flex">
-          <KpiCard
-            title="Transactions"
-            value={Number(dashboard.todayTransactions || 0).toLocaleString()}
-            icon={cilCart}
-            color="info"
-          />
+        {/* TRANSACTIONS */}
+
+        <CCol xs={12} sm={6} xl={3}>
+          <CCard className="border-0 shadow-sm h-100 w-100">
+            <CCardBody className="p-4">
+              <div className="d-flex justify-content-between align-items-start">
+                <div className="pe-2">
+                  <div className="text-body-secondary small mb-2">Transactions</div>
+
+                  <h3 className="fw-bold text-info mb-1">
+                    {Number(dashboard.todayTransactions || 0).toLocaleString()}
+                  </h3>
+
+                  <small className="text-body-secondary">Today's transactions</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-info bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                    minWidth: '52px',
+                  }}
+                >
+                  <CIcon icon={cilCart} className="text-info" size="xl" />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
         </CCol>
 
-        <CCol sm={6} xl={3} className="d-flex">
-          <KpiCard
-            title="Today's Customers"
-            value={Number(dashboard.todayCustomers || 0).toLocaleString()}
-            icon={cilPeople}
-            color="warning"
-          />
+        {/* CUSTOMERS */}
+
+        <CCol xs={12} sm={6} xl={3}>
+          <CCard className="border-0 shadow-sm h-100 w-100">
+            <CCardBody className="p-4">
+              <div className="d-flex justify-content-between align-items-start">
+                <div className="pe-2">
+                  <div className="text-body-secondary small mb-2">Today's Customers</div>
+
+                  <h3 className="fw-bold text-warning mb-1">
+                    {Number(dashboard.todayCustomers || 0).toLocaleString()}
+                  </h3>
+
+                  <small className="text-body-secondary">Customers served today</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-warning bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                    minWidth: '52px',
+                  }}
+                >
+                  <CIcon icon={cilPeople} className="text-warning" size="xl" />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
         </CCol>
       </CRow>
 
@@ -599,50 +686,130 @@ const Dashboard = () => {
           MONTHLY KPI CARDS
       ====================================================== */}
 
-      <CRow className="mb-4 g-3">
-        <CCol md={3} sm={6} className="d-flex">
-          <KpiCard
-            title="Monthly Sales"
-            value={money(dashboard.monthSales)}
-            icon={cilMoney}
-            color="success"
-          />
+      <CRow className="g-3 mb-4">
+        {/* MONTHLY SALES */}
+
+        <CCol xs={12} sm={6} xl={3}>
+          <CCard className="border-0 shadow-sm h-100 w-100">
+            <CCardBody className="p-4">
+              <div className="d-flex justify-content-between align-items-start">
+                <div className="pe-2">
+                  <div className="text-body-secondary small mb-2">Monthly Sales</div>
+
+                  <h3 className="fw-bold text-success mb-1">{money(dashboard.monthSales)}</h3>
+
+                  <small className="text-body-secondary">Current month revenue</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                    minWidth: '52px',
+                  }}
+                >
+                  <CIcon icon={cilMoney} className="text-success" size="xl" />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
         </CCol>
 
-        <CCol md={3} sm={6} className="d-flex">
-          <KpiCard
-            title="Monthly Profit"
-            value={money(dashboard.monthProfit)}
-            icon={cilChartLine}
-            color="primary"
-          />
+        {/* MONTHLY PROFIT */}
+
+        <CCol xs={12} sm={6} xl={3}>
+          <CCard className="border-0 shadow-sm h-100 w-100">
+            <CCardBody className="p-4">
+              <div className="d-flex justify-content-between align-items-start">
+                <div className="pe-2">
+                  <div className="text-body-secondary small mb-2">Monthly Profit</div>
+
+                  <h3 className="fw-bold text-primary mb-1">{money(dashboard.monthProfit)}</h3>
+
+                  <small className="text-body-secondary">Current month profit</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                    minWidth: '52px',
+                  }}
+                >
+                  <CIcon icon={cilChartLine} className="text-primary" size="xl" />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
         </CCol>
 
-        <CCol md={3} sm={6} className="d-flex">
-          <KpiCard
-            title="Monthly Expenses"
-            value={money(dashboard.monthExpenses)}
-            icon={cilWarning}
-            color="danger"
-          />
+        {/* MONTHLY EXPENSES */}
+
+        <CCol xs={12} sm={6} xl={3}>
+          <CCard className="border-0 shadow-sm h-100 w-100">
+            <CCardBody className="p-4">
+              <div className="d-flex justify-content-between align-items-start">
+                <div className="pe-2">
+                  <div className="text-body-secondary small mb-2">Monthly Expenses</div>
+
+                  <h3 className="fw-bold text-danger mb-1">{money(dashboard.monthExpenses)}</h3>
+
+                  <small className="text-body-secondary">Current month expenses</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-danger bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                    minWidth: '52px',
+                  }}
+                >
+                  <CIcon icon={cilWarning} className="text-danger" size="xl" />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
         </CCol>
 
-        <CCol md={3} sm={6} className="d-flex">
-          <KpiCard
-            title="Monthly Commission"
-            value={money(dashboard.monthCommission)}
-            icon={cilUser}
-            color="warning"
-          />
+        {/* MONTHLY COMMISSION */}
+
+        <CCol xs={12} sm={6} xl={3}>
+          <CCard className="border-0 shadow-sm h-100 w-100">
+            <CCardBody className="p-4">
+              <div className="d-flex justify-content-between align-items-start">
+                <div className="pe-2">
+                  <div className="text-body-secondary small mb-2">Monthly Commission</div>
+
+                  <h3 className="fw-bold text-warning mb-1">{money(dashboard.monthCommission)}</h3>
+
+                  <small className="text-body-secondary">Staff commission</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-warning bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                    minWidth: '52px',
+                  }}
+                >
+                  <CIcon icon={cilUser} className="text-warning" size="xl" />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
         </CCol>
       </CRow>
 
       {/* =====================================================
-          SALES & PROFIT ANALYTICS
+          REVENUE & PROFITABILITY
       ====================================================== */}
 
-      <CRow className="mb-4">
-        <CCol lg={7} className="mb-4 mb-lg-0">
+      <CRow className="mb-4 g-3">
+        <CCol lg={7}>
           <CCard className="border-0 shadow-sm h-100">
             <CCardHeader className="bg-white border-0 px-4 pt-4">
               <h5 className="fw-bold mb-1">Revenue & Profitability</h5>
@@ -805,41 +972,127 @@ const Dashboard = () => {
           BUSINESS KPI CARDS
       ====================================================== */}
 
-      <CRow className="mb-4 g-3">
-        <CCol md={3} sm={6} className="d-flex">
-          <KpiCard
-            title="Products"
-            value={Number(dashboard.totalProducts || 0).toLocaleString()}
-            icon={cilBasket}
-            color="primary"
-          />
+      <CRow className="g-3 mb-4">
+        {/* PRODUCTS */}
+
+        <CCol xs={12} sm={6} xl={3}>
+          <CCard className="border-0 shadow-sm h-100 w-100">
+            <CCardBody className="p-4">
+              <div className="d-flex justify-content-between align-items-start">
+                <div className="pe-2">
+                  <div className="text-body-secondary small mb-2">Products</div>
+
+                  <h3 className="fw-bold text-primary mb-1">
+                    {Number(dashboard.totalProducts || 0).toLocaleString()}
+                  </h3>
+
+                  <small className="text-body-secondary">Products in system</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                    minWidth: '52px',
+                  }}
+                >
+                  <CIcon icon={cilBasket} className="text-primary" size="xl" />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
         </CCol>
 
-        <CCol md={3} sm={6} className="d-flex">
-          <KpiCard
-            title="Customers"
-            value={Number(dashboard.totalCustomers || 0).toLocaleString()}
-            icon={cilPeople}
-            color="success"
-          />
+        {/* CUSTOMERS */}
+
+        <CCol xs={12} sm={6} xl={3}>
+          <CCard className="border-0 shadow-sm h-100 w-100">
+            <CCardBody className="p-4">
+              <div className="d-flex justify-content-between align-items-start">
+                <div className="pe-2">
+                  <div className="text-body-secondary small mb-2">Customers</div>
+
+                  <h3 className="fw-bold text-success mb-1">
+                    {Number(dashboard.totalCustomers || 0).toLocaleString()}
+                  </h3>
+
+                  <small className="text-body-secondary">Registered customers</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                    minWidth: '52px',
+                  }}
+                >
+                  <CIcon icon={cilPeople} className="text-success" size="xl" />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
         </CCol>
 
-        <CCol md={3} sm={6} className="d-flex">
-          <KpiCard
-            title="Staff"
-            value={Number(dashboard.totalStaff || 0).toLocaleString()}
-            icon={cilUser}
-            color="warning"
-          />
+        {/* STAFF */}
+
+        <CCol xs={12} sm={6} xl={3}>
+          <CCard className="border-0 shadow-sm h-100 w-100">
+            <CCardBody className="p-4">
+              <div className="d-flex justify-content-between align-items-start">
+                <div className="pe-2">
+                  <div className="text-body-secondary small mb-2">Staff</div>
+
+                  <h3 className="fw-bold text-warning mb-1">
+                    {Number(dashboard.totalStaff || 0).toLocaleString()}
+                  </h3>
+
+                  <small className="text-body-secondary">Active staff members</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-warning bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                    minWidth: '52px',
+                  }}
+                >
+                  <CIcon icon={cilUser} className="text-warning" size="xl" />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
         </CCol>
 
-        <CCol md={3} sm={6} className="d-flex">
-          <KpiCard
-            title="Inventory Value"
-            value={money(dashboard.inventoryValue)}
-            icon={cilMoney}
-            color="info"
-          />
+        {/* INVENTORY VALUE */}
+
+        <CCol xs={12} sm={6} xl={3}>
+          <CCard className="border-0 shadow-sm h-100 w-100">
+            <CCardBody className="p-4">
+              <div className="d-flex justify-content-between align-items-start">
+                <div className="pe-2">
+                  <div className="text-body-secondary small mb-2">Inventory Value</div>
+
+                  <h3 className="fw-bold text-info mb-1">{money(dashboard.inventoryValue)}</h3>
+
+                  <small className="text-body-secondary">Current stock value</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-info bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                    minWidth: '52px',
+                  }}
+                >
+                  <CIcon icon={cilMoney} className="text-info" size="xl" />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
         </CCol>
       </CRow>
 
@@ -847,10 +1100,8 @@ const Dashboard = () => {
           TOP PRODUCTS + TOP STAFF
       ====================================================== */}
 
-      <CRow>
-        {/* =====================================================
-            TOP PRODUCTS
-        ====================================================== */}
+      <CRow className="g-3">
+        {/* TOP PRODUCTS */}
 
         <CCol lg={6} className="mb-4">
           <CCard className="border-0 shadow-sm h-100">
@@ -918,9 +1169,7 @@ const Dashboard = () => {
           </CCard>
         </CCol>
 
-        {/* =====================================================
-            TOP STAFF
-        ====================================================== */}
+        {/* TOP STAFF */}
 
         <CCol lg={6} className="mb-4">
           <CCard className="border-0 shadow-sm h-100">
