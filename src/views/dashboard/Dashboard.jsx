@@ -19,7 +19,6 @@ import {
   CTableHead,
   CTableHeaderCell,
   CTableRow,
-  CAlert,
   CSpinner,
   CBadge,
 } from '@coreui/react'
@@ -39,21 +38,15 @@ import { Line } from 'react-chartjs-2'
 
 import {
   cilMoney,
-  cilDollar,
   cilPeople,
   cilCart,
   cilBasket,
   cilUser,
   cilWarning,
   cilChartLine,
-  cilUserFemale,
   cilReload,
-  cilCloudDownload,
-  cilArrowTop,
-  cilArrowBottom,
   cilCalendar,
   cilCheckCircle,
-  cilLoopCircular,
 } from '@coreui/icons'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip, Legend)
@@ -189,7 +182,7 @@ const Dashboard = () => {
   }, [])
 
   // =========================================================
-  // REFRESH
+  // REFRESH DASHBOARD
   // =========================================================
 
   const refreshDashboard = async () => {
@@ -500,8 +493,12 @@ const Dashboard = () => {
         </CBadge>
       </div>
 
-      <CRow className="mb-4">
-        <CCol sm={6} xl={3} className="mb-3 mb-xl-0">
+      {/* =====================================================
+          TODAY KPI CARDS
+      ====================================================== */}
+
+      <CRow className="mb-4 g-3">
+        <CCol sm={6} xl={3} className="d-flex">
           <KpiCard
             title="Today's Sales"
             value={money(dashboard.todaySales)}
@@ -510,7 +507,7 @@ const Dashboard = () => {
           />
         </CCol>
 
-        <CCol sm={6} xl={3} className="mb-3 mb-xl-0">
+        <CCol sm={6} xl={3} className="d-flex">
           <KpiCard
             title="Today's Profit"
             value={money(dashboard.todayProfit)}
@@ -519,7 +516,7 @@ const Dashboard = () => {
           />
         </CCol>
 
-        <CCol sm={6} xl={3} className="mb-3 mb-xl-0">
+        <CCol sm={6} xl={3} className="d-flex">
           <KpiCard
             title="Transactions"
             value={Number(dashboard.todayTransactions || 0).toLocaleString()}
@@ -528,7 +525,7 @@ const Dashboard = () => {
           />
         </CCol>
 
-        <CCol sm={6} xl={3}>
+        <CCol sm={6} xl={3} className="d-flex">
           <KpiCard
             title="Today's Customers"
             value={Number(dashboard.todayCustomers || 0).toLocaleString()}
@@ -598,8 +595,12 @@ const Dashboard = () => {
         <small className="text-body-secondary">Current month's financial position</small>
       </div>
 
-      <CRow className="mb-4">
-        <CCol md={3} sm={6} className="mb-3 mb-md-0">
+      {/* =====================================================
+          MONTHLY KPI CARDS
+      ====================================================== */}
+
+      <CRow className="mb-4 g-3">
+        <CCol md={3} sm={6} className="d-flex">
           <KpiCard
             title="Monthly Sales"
             value={money(dashboard.monthSales)}
@@ -608,7 +609,7 @@ const Dashboard = () => {
           />
         </CCol>
 
-        <CCol md={3} sm={6} className="mb-3 mb-md-0">
+        <CCol md={3} sm={6} className="d-flex">
           <KpiCard
             title="Monthly Profit"
             value={money(dashboard.monthProfit)}
@@ -617,7 +618,7 @@ const Dashboard = () => {
           />
         </CCol>
 
-        <CCol md={3} sm={6}>
+        <CCol md={3} sm={6} className="d-flex">
           <KpiCard
             title="Monthly Expenses"
             value={money(dashboard.monthExpenses)}
@@ -626,7 +627,7 @@ const Dashboard = () => {
           />
         </CCol>
 
-        <CCol md={3} sm={6}>
+        <CCol md={3} sm={6} className="d-flex">
           <KpiCard
             title="Monthly Commission"
             value={money(dashboard.monthCommission)}
@@ -800,8 +801,12 @@ const Dashboard = () => {
         <small className="text-body-secondary">Current business resources</small>
       </div>
 
-      <CRow className="mb-4">
-        <CCol md={3} sm={6} className="mb-3 mb-md-0">
+      {/* =====================================================
+          BUSINESS KPI CARDS
+      ====================================================== */}
+
+      <CRow className="mb-4 g-3">
+        <CCol md={3} sm={6} className="d-flex">
           <KpiCard
             title="Products"
             value={Number(dashboard.totalProducts || 0).toLocaleString()}
@@ -810,7 +815,7 @@ const Dashboard = () => {
           />
         </CCol>
 
-        <CCol md={3} sm={6} className="mb-3 mb-md-0">
+        <CCol md={3} sm={6} className="d-flex">
           <KpiCard
             title="Customers"
             value={Number(dashboard.totalCustomers || 0).toLocaleString()}
@@ -819,7 +824,7 @@ const Dashboard = () => {
           />
         </CCol>
 
-        <CCol md={3} sm={6}>
+        <CCol md={3} sm={6} className="d-flex">
           <KpiCard
             title="Staff"
             value={Number(dashboard.totalStaff || 0).toLocaleString()}
@@ -828,7 +833,7 @@ const Dashboard = () => {
           />
         </CCol>
 
-        <CCol md={3} sm={6}>
+        <CCol md={3} sm={6} className="d-flex">
           <KpiCard
             title="Inventory Value"
             value={money(dashboard.inventoryValue)}
@@ -843,7 +848,9 @@ const Dashboard = () => {
       ====================================================== */}
 
       <CRow>
-        {/* TOP PRODUCTS */}
+        {/* =====================================================
+            TOP PRODUCTS
+        ====================================================== */}
 
         <CCol lg={6} className="mb-4">
           <CCard className="border-0 shadow-sm h-100">
@@ -911,7 +918,9 @@ const Dashboard = () => {
           </CCard>
         </CCol>
 
-        {/* TOP STAFF */}
+        {/* =====================================================
+            TOP STAFF
+        ====================================================== */}
 
         <CCol lg={6} className="mb-4">
           <CCard className="border-0 shadow-sm h-100">
@@ -951,7 +960,7 @@ const Dashboard = () => {
                               <CAvatar
                                 size="sm"
                                 color={index === 0 ? 'warning' : 'light'}
-                                textColor={index === 0 ? 'dark' : 'dark'}
+                                textColor="dark"
                               >
                                 {name.charAt(0).toUpperCase()}
                               </CAvatar>
