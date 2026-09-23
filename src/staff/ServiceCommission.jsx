@@ -30,9 +30,9 @@ import {
 } from '@coreui/react'
 
 import CIcon from '@coreui/icons-react'
+
 import {
   cilCheckCircle,
-  cilCloudDownload,
   cilPencil,
   cilPlus,
   cilReload,
@@ -40,6 +40,7 @@ import {
   cilSettings,
   cilTrash,
   cilXCircle,
+  cilHome,
 } from '@coreui/icons'
 
 const ServiceCommission = () => {
@@ -57,9 +58,17 @@ const ServiceCommission = () => {
 
   const [search, setSearch] = useState('')
 
-  const [defaultStaffPercentage, setDefaultStaffPercentage] = useState(30)
+  // ==========================================
+  // DEFAULT COMMISSION
+  // ==========================================
 
-  const [defaultOwnerPercentage, setDefaultOwnerPercentage] = useState(70)
+  const [defaultInSalonStaffPercentage, setDefaultInSalonStaffPercentage] = useState(30)
+
+  const [defaultHomeServiceStaffPercentage, setDefaultHomeServiceStaffPercentage] = useState(50)
+
+  // ==========================================
+  // MODAL
+  // ==========================================
 
   const [showModal, setShowModal] = useState(false)
 
@@ -67,9 +76,15 @@ const ServiceCommission = () => {
 
   const [selectedService, setSelectedService] = useState('')
 
-  const [staffPercentage, setStaffPercentage] = useState(30)
+  const [inSalonStaffPercentage, setInSalonStaffPercentage] = useState(30)
+
+  const [homeServiceStaffPercentage, setHomeServiceStaffPercentage] = useState(50)
 
   const [isActive, setIsActive] = useState(true)
+
+  // ==========================================
+  // MESSAGE
+  // ==========================================
 
   const [message, setMessage] = useState({
     type: '',
@@ -89,18 +104,80 @@ const ServiceCommission = () => {
   }
 
   // ==========================================
+  // MESSAGE
+  // ==========================================
+
+  const showMessage = (type, text) => {
+    setMessage({
+      type,
+      text,
+    })
+
+    setTimeout(() => {
+      setMessage({
+        type: '',
+        text: '',
+      })
+    }, 4000)
+  }
+
+  // ==========================================
+  // NORMALIZE API ARRAY
+  //
+  // Prevents:
+  // "t.filter is not a function"
+  // ==========================================
+
+  const normalizeArray = (response) => {
+    const data = response?.data
+
+    if (Array.isArray(data)) {
+      return data
+    }
+
+    if (Array.isArray(data?.data)) {
+      return data.data
+    }
+
+    if (Array.isArray(data?.services)) {
+      return data.services
+    }
+
+    if (Array.isArray(data?.commissions)) {
+      return data.commissions
+    }
+
+    return []
+  }
+
+  // ==========================================
   // FETCH SERVICES
   // ==========================================
 
   const getServices = async () => {
     try {
+      /*
+       * IMPORTANT:
+       *
+       * Your previous URL was:
+       *
+       * /api/v1/servicess
+       *
+       * If your actual backend route is /services,
+       * use the URL below.
+       */
+
       const response = await axios.get(`${API_URL}api/v1/servicess`, axiosConfig)
 
-      setServices(response.data.data || response.data || [])
+      const serviceData = normalizeArray(response)
+
+      setServices(serviceData)
     } catch (error) {
       console.error('Failed to fetch services:', error)
 
-      showMessage('danger', 'Unable to load services.')
+      setServices([])
+
+      showMessage('danger', error.response?.data?.message || 'Unable to load services.')
     }
   }
 
@@ -112,11 +189,15 @@ const ServiceCommission = () => {
     try {
       const response = await axios.get(`${API_URL}api/v1/service-commissions`, axiosConfig)
 
-      setCommissions(response.data.data || [])
+      const commissionData = normalizeArray(response)
+
+      setCommissions(commissionData)
     } catch (error) {
       console.error('Failed to fetch commissions:', error)
 
-      showMessage('danger', 'Unable to load commission settings.')
+      setCommissions([])
+
+      showMessage('danger', error.response?.data?.message || 'Unable to load commission settings.')
     }
   }
 
@@ -139,24 +220,6 @@ const ServiceCommission = () => {
   }, [])
 
   // ==========================================
-  // MESSAGE
-  // ==========================================
-
-  const showMessage = (type, text) => {
-    setMessage({
-      type,
-      text,
-    })
-
-    setTimeout(() => {
-      setMessage({
-        type: '',
-        text: '',
-      })
-    }, 4000)
-  }
-
-  // ==========================================
   // OWNER PERCENTAGE
   // ==========================================
 
@@ -171,13 +234,46 @@ const ServiceCommission = () => {
   }
 
   // ==========================================
+  // DEFAULT IN-SALON
+  // ==========================================
+
+  const handleDefaultInSalonChange = (value) => {
+    const percentage = Number(value)
+
+    if (Number.isNaN(percentage) || percentage < 0 || percentage > 100) {
+      return
+    }
+
+    setDefaultInSalonStaffPercentage(percentage)
+  }
+
+  // ==========================================
+  // DEFAULT HOME SERVICE
+  // ==========================================
+
+  const handleDefaultHomeServiceChange = (value) => {
+    const percentage = Number(value)
+
+    if (Number.isNaN(percentage) || percentage < 0 || percentage > 100) {
+      return
+    }
+
+    setDefaultHomeServiceStaffPercentage(percentage)
+  }
+
+  // ==========================================
   // OPEN CREATE MODAL
   // ==========================================
 
   const openCreateModal = () => {
     setEditingCommission(null)
+
     setSelectedService('')
-    setStaffPercentage(defaultStaffPercentage)
+
+    setInSalonStaffPercentage(defaultInSalonStaffPercentage)
+
+    setHomeServiceStaffPercentage(defaultHomeServiceStaffPercentage)
+
     setIsActive(true)
 
     setShowModal(true)
@@ -192,9 +288,15 @@ const ServiceCommission = () => {
 
     setSelectedService(commission.service_id)
 
-    setStaffPercentage(Number(commission.staff_percentage))
+    setInSalonStaffPercentage(
+      Number(commission.in_salon_staff_percentage ?? defaultInSalonStaffPercentage),
+    )
 
-    setIsActive(commission.is_active)
+    setHomeServiceStaffPercentage(
+      Number(commission.home_service_staff_percentage ?? defaultHomeServiceStaffPercentage),
+    )
+
+    setIsActive(commission.is_active !== false)
 
     setShowModal(true)
   }
@@ -210,10 +312,22 @@ const ServiceCommission = () => {
       return
     }
 
-    const percentage = Number(staffPercentage)
+    const inSalonPercentage = Number(inSalonStaffPercentage)
 
-    if (Number.isNaN(percentage) || percentage < 0 || percentage > 100) {
-      showMessage('danger', 'Staff commission must be between 0% and 100%.')
+    const homeServicePercentage = Number(homeServiceStaffPercentage)
+
+    if (Number.isNaN(inSalonPercentage) || inSalonPercentage < 0 || inSalonPercentage > 100) {
+      showMessage('danger', 'In-salon staff commission must be between 0% and 100%.')
+
+      return
+    }
+
+    if (
+      Number.isNaN(homeServicePercentage) ||
+      homeServicePercentage < 0 ||
+      homeServicePercentage > 100
+    ) {
+      showMessage('danger', 'Home-service staff commission must be between 0% and 100%.')
 
       return
     }
@@ -225,13 +339,21 @@ const ServiceCommission = () => {
         `${API_URL}api/v1/service-commissions`,
         {
           service_id: selectedService,
-          staff_percentage: percentage,
+
+          in_salon_staff_percentage: inSalonPercentage,
+
+          in_salon_owner_percentage: 100 - inSalonPercentage,
+
+          home_service_staff_percentage: homeServicePercentage,
+
+          home_service_owner_percentage: 100 - homeServicePercentage,
+
           is_active: isActive,
         },
         axiosConfig,
       )
 
-      showMessage('success', 'Commission setting saved successfully.')
+      showMessage('success', 'Commission settings saved successfully.')
 
       setShowModal(false)
 
@@ -239,7 +361,7 @@ const ServiceCommission = () => {
     } catch (error) {
       console.error('Save commission error:', error)
 
-      showMessage('danger', error.response?.data?.message || 'Failed to save commission setting.')
+      showMessage('danger', error.response?.data?.message || 'Failed to save commission settings.')
     } finally {
       setSaving(false)
     }
@@ -250,10 +372,10 @@ const ServiceCommission = () => {
   // ==========================================
 
   const deleteCommission = async (commission) => {
-    const serviceName = commission.Service?.name || 'this service'
+    const serviceName = commission.Service?.name || getServiceName(commission.service_id)
 
     const confirmed = window.confirm(
-      `Remove the custom commission for ${serviceName}? This service will return to the default commission.`,
+      `Remove the custom commission for ${serviceName}? This service will return to the default commission settings.`,
     )
 
     if (!confirmed) return
@@ -299,24 +421,8 @@ const ServiceCommission = () => {
     } catch (error) {
       console.error('Toggle commission error:', error)
 
-      showMessage('danger', 'Failed to update commission status.')
+      showMessage('danger', error.response?.data?.message || 'Failed to update commission status.')
     }
-  }
-
-  // ==========================================
-  // DEFAULT COMMISSION
-  // ==========================================
-
-  const handleDefaultStaffChange = (value) => {
-    const percentage = Number(value)
-
-    if (Number.isNaN(percentage) || percentage < 0 || percentage > 100) {
-      return
-    }
-
-    setDefaultStaffPercentage(percentage)
-
-    setDefaultOwnerPercentage(100 - percentage)
   }
 
   // ==========================================
@@ -326,7 +432,9 @@ const ServiceCommission = () => {
   const filteredServices = useMemo(() => {
     const keyword = search.toLowerCase().trim()
 
-    return services.filter((service) => service.name?.toLowerCase().includes(keyword))
+    return (Array.isArray(services) ? services : []).filter((service) =>
+      service?.name?.toLowerCase().includes(keyword),
+    )
   }, [services, search])
 
   // ==========================================
@@ -336,7 +444,7 @@ const ServiceCommission = () => {
   const commissionMap = useMemo(() => {
     const map = {}
 
-    commissions.forEach((commission) => {
+    ;(Array.isArray(commissions) ? commissions : []).forEach((commission) => {
       map[commission.service_id] = commission
     })
 
@@ -347,20 +455,26 @@ const ServiceCommission = () => {
   // STATISTICS
   // ==========================================
 
-  const totalServices = services.length
+  const totalServices = Array.isArray(services) ? services.length : 0
 
-  const customServices = commissions.length
+  const customServices = Array.isArray(commissions) ? commissions.length : 0
 
-  const activeCustomServices = commissions.filter((item) => item.is_active).length
+  const activeCustomServices = Array.isArray(commissions)
+    ? commissions.filter((item) => item.is_active).length
+    : 0
 
-  const inactiveCustomServices = commissions.filter((item) => !item.is_active).length
+  const inactiveCustomServices = Array.isArray(commissions)
+    ? commissions.filter((item) => !item.is_active).length
+    : 0
 
   // ==========================================
   // SERVICE NAME
   // ==========================================
 
   const getServiceName = (serviceId) => {
-    const service = services.find((item) => Number(item.id) === Number(serviceId))
+    const service = (Array.isArray(services) ? services : []).find(
+      (item) => Number(item.id) === Number(serviceId),
+    )
 
     return service?.name || 'Unknown Service'
   }
@@ -394,8 +508,8 @@ const ServiceCommission = () => {
                   <h3 className="mb-1 fw-bold">Staff Commission</h3>
 
                   <p className="text-medium-emphasis mb-0">
-                    Configure how service revenue is shared between your business and service
-                    providers.
+                    Configure staff commission percentages separately for in-salon and home-service
+                    services.
                   </p>
                 </div>
               </div>
@@ -493,12 +607,12 @@ const ServiceCommission = () => {
             <CCardBody>
               <div className="d-flex justify-content-between">
                 <div>
-                  <div className="text-medium-emphasis small">Default Staff Share</div>
+                  <div className="text-medium-emphasis small">In-Salon Default</div>
 
-                  <h3 className="fw-bold mt-2 mb-0">{defaultStaffPercentage}%</h3>
+                  <h3 className="fw-bold mt-2 mb-0">{defaultInSalonStaffPercentage}%</h3>
                 </div>
 
-                <CIcon icon={cilCloudDownload} size="xl" className="text-warning" />
+                <CIcon icon={cilSettings} size="xl" className="text-warning" />
               </div>
             </CCardBody>
           </CCard>
@@ -518,7 +632,7 @@ const ServiceCommission = () => {
               <h5 className="mb-0 fw-bold">Default Commission</h5>
 
               <small className="text-medium-emphasis">
-                Applied automatically to services without a custom commission rule.
+                These percentages apply to services that do not have a custom rule.
               </small>
             </div>
           </div>
@@ -526,63 +640,101 @@ const ServiceCommission = () => {
 
         <CCardBody>
           <CRow>
-            <CCol lg={4} md={6}>
-              <CFormLabel className="fw-semibold">Default Staff Commission</CFormLabel>
+            {/* IN-SALON */}
 
-              <div className="input-group">
-                <CFormInput
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={defaultStaffPercentage}
-                  onChange={(e) => handleDefaultStaffChange(e.target.value)}
-                />
+            <CCol lg={5} md={6}>
+              <div className="p-3 border rounded h-100">
+                <div className="d-flex align-items-center mb-3">
+                  <CIcon icon={cilSettings} className="text-primary me-2" />
 
-                <span className="input-group-text">%</span>
-              </div>
+                  <div>
+                    <h6 className="fw-bold mb-0">In-Salon Service</h6>
 
-              <small className="text-medium-emphasis">
-                Percentage paid to the service provider.
-              </small>
-            </CCol>
-
-            <CCol lg={4} md={6}>
-              <CFormLabel className="fw-semibold">Business Share</CFormLabel>
-
-              <div className="input-group">
-                <CFormInput value={defaultOwnerPercentage} readOnly />
-
-                <span className="input-group-text">%</span>
-              </div>
-
-              <small className="text-medium-emphasis">Automatically calculated.</small>
-            </CCol>
-
-            <CCol lg={4} md={12} className="mt-4 mt-lg-0">
-              <div className="p-3 rounded bg-light">
-                <div className="d-flex justify-content-between mb-2">
-                  <span className="fw-semibold">Revenue Distribution</span>
-
-                  <span className="small text-medium-emphasis">100%</span>
+                    <small className="text-medium-emphasis">
+                      Services rendered inside the salon.
+                    </small>
+                  </div>
                 </div>
 
-                <CProgress height={12} className="mb-2">
-                  <CProgress value={defaultStaffPercentage} color="primary" />
+                <CFormLabel className="fw-semibold">Staff Commission</CFormLabel>
 
-                  <CProgress value={defaultOwnerPercentage} color="success" />
-                </CProgress>
+                <div className="input-group">
+                  <CFormInput
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={defaultInSalonStaffPercentage}
+                    onChange={(e) => handleDefaultInSalonChange(e.target.value)}
+                  />
 
-                <div className="d-flex justify-content-between small">
+                  <span className="input-group-text">%</span>
+                </div>
+
+                <div className="mt-3 d-flex justify-content-between">
                   <span>
-                    <span className="text-primary fw-bold">●</span> Staff {defaultStaffPercentage}%
+                    Staff
+                    <strong className="text-primary ms-1">{defaultInSalonStaffPercentage}%</strong>
                   </span>
 
                   <span>
-                    <span className="text-success fw-bold">●</span> Business{' '}
-                    {defaultOwnerPercentage}%
+                    Business
+                    <strong className="text-success ms-1">
+                      {calculateOwnerPercentage(defaultInSalonStaffPercentage)}%
+                    </strong>
                   </span>
                 </div>
+
+                <CProgress height={8} className="mt-2" value={defaultInSalonStaffPercentage} />
+              </div>
+            </CCol>
+
+            {/* HOME SERVICE */}
+
+            <CCol lg={5} md={6} className="mt-3 mt-md-0">
+              <div className="p-3 border rounded h-100">
+                <div className="d-flex align-items-center mb-3">
+                  <CIcon icon={cilHome} className="text-info me-2" />
+
+                  <div>
+                    <h6 className="fw-bold mb-0">Home Service</h6>
+
+                    <small className="text-medium-emphasis">
+                      Services rendered at the customer's location.
+                    </small>
+                  </div>
+                </div>
+
+                <CFormLabel className="fw-semibold">Staff Commission</CFormLabel>
+
+                <div className="input-group">
+                  <CFormInput
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={defaultHomeServiceStaffPercentage}
+                    onChange={(e) => handleDefaultHomeServiceChange(e.target.value)}
+                  />
+
+                  <span className="input-group-text">%</span>
+                </div>
+
+                <div className="mt-3 d-flex justify-content-between">
+                  <span>
+                    Staff
+                    <strong className="text-info ms-1">{defaultHomeServiceStaffPercentage}%</strong>
+                  </span>
+
+                  <span>
+                    Business
+                    <strong className="text-success ms-1">
+                      {calculateOwnerPercentage(defaultHomeServiceStaffPercentage)}%
+                    </strong>
+                  </span>
+                </div>
+
+                <CProgress height={8} className="mt-2" value={defaultHomeServiceStaffPercentage} />
               </div>
             </CCol>
           </CRow>
@@ -600,7 +752,7 @@ const ServiceCommission = () => {
               <h5 className="mb-1 fw-bold">Service-Specific Commission</h5>
 
               <small className="text-medium-emphasis">
-                Override the default percentage for selected services.
+                Set different percentages for individual services and service types.
               </small>
             </CCol>
 
@@ -651,13 +803,9 @@ const ServiceCommission = () => {
                 <CTableRow>
                   <CTableHeaderCell className="ps-4">SERVICE</CTableHeaderCell>
 
-                  <CTableHeaderCell>COMMISSION TYPE</CTableHeaderCell>
+                  <CTableHeaderCell>IN-SALON</CTableHeaderCell>
 
-                  <CTableHeaderCell>STAFF</CTableHeaderCell>
-
-                  <CTableHeaderCell>BUSINESS</CTableHeaderCell>
-
-                  <CTableHeaderCell>DISTRIBUTION</CTableHeaderCell>
+                  <CTableHeaderCell>HOME SERVICE</CTableHeaderCell>
 
                   <CTableHeaderCell>STATUS</CTableHeaderCell>
 
@@ -673,16 +821,29 @@ const ServiceCommission = () => {
 
                   const active = commission ? commission.is_active : true
 
-                  const staff =
+                  const inSalonStaff =
                     commission && active
-                      ? Number(commission.staff_percentage)
-                      : defaultStaffPercentage
+                      ? Number(
+                          commission.in_salon_staff_percentage ?? defaultInSalonStaffPercentage,
+                        )
+                      : defaultInSalonStaffPercentage
 
-                  const owner = 100 - staff
+                  const inSalonOwner = calculateOwnerPercentage(inSalonStaff)
+
+                  const homeStaff =
+                    commission && active
+                      ? Number(
+                          commission.home_service_staff_percentage ??
+                            defaultHomeServiceStaffPercentage,
+                        )
+                      : defaultHomeServiceStaffPercentage
+
+                  const homeOwner = calculateOwnerPercentage(homeStaff)
 
                   return (
                     <CTableRow key={service.id}>
                       {/* SERVICE */}
+
                       <CTableDataCell className="ps-4">
                         <div className="fw-semibold">{service.name}</div>
 
@@ -691,57 +852,42 @@ const ServiceCommission = () => {
                         )}
                       </CTableDataCell>
 
-                      {/* TYPE */}
+                      {/* IN-SALON */}
+
                       <CTableDataCell>
-                        {isCustom ? (
-                          <CBadge color="info" className="px-3 py-2">
-                            Custom
+                        <div className="mb-1">
+                          <CBadge color="primary" className="me-2">
+                            Staff
                           </CBadge>
-                        ) : (
-                          <CBadge color="secondary" className="px-3 py-2">
-                            Default
-                          </CBadge>
-                        )}
-                      </CTableDataCell>
 
-                      {/* STAFF */}
-                      <CTableDataCell>
-                        <span className="fw-bold text-primary">{staff}%</span>
-                      </CTableDataCell>
-
-                      {/* BUSINESS */}
-                      <CTableDataCell>
-                        <span className="fw-bold text-success">{owner}%</span>
-                      </CTableDataCell>
-
-                      {/* DISTRIBUTION */}
-                      <CTableDataCell
-                        style={{
-                          minWidth: '180px',
-                        }}
-                      >
-                        <div className="mb-1 small d-flex justify-content-between">
-                          <span>Staff</span>
-
-                          <span>{staff}%</span>
+                          <strong>{inSalonStaff}%</strong>
                         </div>
 
-                        <CProgress height={7} value={staff} />
+                        <small className="text-success">Business {inSalonOwner}%</small>
+                      </CTableDataCell>
 
-                        <div className="mt-1 small d-flex justify-content-between text-medium-emphasis">
-                          <span>Business</span>
+                      {/* HOME SERVICE */}
 
-                          <span>{owner}%</span>
+                      <CTableDataCell>
+                        <div className="mb-1">
+                          <CBadge color="info" className="me-2">
+                            Staff
+                          </CBadge>
+
+                          <strong>{homeStaff}%</strong>
                         </div>
+
+                        <small className="text-success">Business {homeOwner}%</small>
                       </CTableDataCell>
 
                       {/* STATUS */}
+
                       <CTableDataCell>
                         {isCustom ? (
                           active ? (
                             <CBadge color="success" className="px-3 py-2">
                               <CIcon icon={cilCheckCircle} className="me-1" />
-                              Active
+                              Custom Active
                             </CBadge>
                           ) : (
                             <CBadge color="secondary" className="px-3 py-2">
@@ -757,6 +903,7 @@ const ServiceCommission = () => {
                       </CTableDataCell>
 
                       {/* ACTIONS */}
+
                       <CTableDataCell className="text-end pe-4">
                         {isCustom ? (
                           <>
@@ -797,7 +944,9 @@ const ServiceCommission = () => {
                             onClick={() => {
                               setSelectedService(service.id)
 
-                              setStaffPercentage(defaultStaffPercentage)
+                              setInSalonStaffPercentage(defaultInSalonStaffPercentage)
+
+                              setHomeServiceStaffPercentage(defaultHomeServiceStaffPercentage)
 
                               setIsActive(true)
 
@@ -837,6 +986,8 @@ const ServiceCommission = () => {
         </CModalHeader>
 
         <CModalBody>
+          {/* SERVICE */}
+
           <div className="mb-4">
             <CFormLabel className="fw-semibold">Service</CFormLabel>
 
@@ -847,104 +998,161 @@ const ServiceCommission = () => {
             >
               <option value="">Select a service...</option>
 
-              {services.map((service) => (
-                <option key={service.id} value={service.id}>
-                  {service.name}
-                </option>
-              ))}
+              {Array.isArray(services) &&
+                services.map((service) => (
+                  <option key={service.id} value={service.id}>
+                    {service.name}
+                  </option>
+                ))}
             </CFormSelect>
           </div>
 
-          <CRow>
-            <CCol md={6}>
-              <CFormLabel className="fw-semibold">Staff Commission</CFormLabel>
+          {/* ==================================
+              IN-SALON
+          ================================== */}
 
-              <div className="input-group input-group-lg">
-                <CFormInput
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={staffPercentage}
-                  onChange={(e) => setStaffPercentage(e.target.value)}
-                />
+          <div className="p-3 border rounded mb-4">
+            <div className="d-flex align-items-center mb-3">
+              <CIcon icon={cilSettings} className="text-primary me-2" />
 
-                <span className="input-group-text">%</span>
-              </div>
-
-              <small className="text-medium-emphasis">
-                Percentage paid to the service provider.
-              </small>
-            </CCol>
-
-            <CCol md={6}>
-              <CFormLabel className="fw-semibold">Business Share</CFormLabel>
-
-              <div className="input-group input-group-lg">
-                <CFormInput value={calculateOwnerPercentage(staffPercentage)} readOnly />
-
-                <span className="input-group-text">%</span>
-              </div>
-
-              <small className="text-medium-emphasis">Automatically calculated.</small>
-            </CCol>
-          </CRow>
-
-          {/* DISTRIBUTION PREVIEW */}
-
-          <div className="mt-4 p-4 rounded border bg-light">
-            <div className="d-flex justify-content-between mb-3">
               <div>
-                <h6 className="fw-bold mb-1">Commission Preview</h6>
+                <h6 className="fw-bold mb-0">In-Salon Service</h6>
 
                 <small className="text-medium-emphasis">
-                  Revenue distribution for this service.
+                  Commission when the service is rendered inside the salon.
                 </small>
               </div>
-
-              <CBadge color="primary">100%</CBadge>
             </div>
 
-            <CProgress height={16} className="mb-3">
-              <CProgress value={Number(staffPercentage || 0)} color="primary" />
-
-              <CProgress value={calculateOwnerPercentage(staffPercentage)} color="success" />
-            </CProgress>
-
             <CRow>
-              <CCol xs={6}>
-                <div className="d-flex align-items-center">
-                  <span
-                    className="bg-primary rounded-circle me-2"
-                    style={{
-                      width: 10,
-                      height: 10,
-                    }}
+              <CCol md={6}>
+                <CFormLabel className="fw-semibold">Staff Commission</CFormLabel>
+
+                <div className="input-group input-group-lg">
+                  <CFormInput
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={inSalonStaffPercentage}
+                    onChange={(e) => setInSalonStaffPercentage(e.target.value)}
                   />
 
-                  <div>
-                    <small className="text-medium-emphasis">Staff</small>
+                  <span className="input-group-text">%</span>
+                </div>
+              </CCol>
 
-                    <div className="fw-bold">{Number(staffPercentage || 0)}%</div>
+              <CCol md={6}>
+                <CFormLabel className="fw-semibold">Business Share</CFormLabel>
+
+                <div className="input-group input-group-lg">
+                  <CFormInput value={calculateOwnerPercentage(inSalonStaffPercentage)} readOnly />
+
+                  <span className="input-group-text">%</span>
+                </div>
+              </CCol>
+            </CRow>
+
+            <CProgress height={10} className="mt-3" value={Number(inSalonStaffPercentage || 0)} />
+          </div>
+
+          {/* ==================================
+              HOME SERVICE
+          ================================== */}
+
+          <div className="p-3 border rounded mb-4">
+            <div className="d-flex align-items-center mb-3">
+              <CIcon icon={cilHome} className="text-info me-2" />
+
+              <div>
+                <h6 className="fw-bold mb-0">Home Service</h6>
+
+                <small className="text-medium-emphasis">
+                  Commission when the service is rendered at the customer's location.
+                </small>
+              </div>
+            </div>
+
+            <CRow>
+              <CCol md={6}>
+                <CFormLabel className="fw-semibold">Staff Commission</CFormLabel>
+
+                <div className="input-group input-group-lg">
+                  <CFormInput
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={homeServiceStaffPercentage}
+                    onChange={(e) => setHomeServiceStaffPercentage(e.target.value)}
+                  />
+
+                  <span className="input-group-text">%</span>
+                </div>
+              </CCol>
+
+              <CCol md={6}>
+                <CFormLabel className="fw-semibold">Business Share</CFormLabel>
+
+                <div className="input-group input-group-lg">
+                  <CFormInput
+                    value={calculateOwnerPercentage(homeServiceStaffPercentage)}
+                    readOnly
+                  />
+
+                  <span className="input-group-text">%</span>
+                </div>
+              </CCol>
+            </CRow>
+
+            <CProgress
+              height={10}
+              className="mt-3"
+              value={Number(homeServiceStaffPercentage || 0)}
+            />
+          </div>
+
+          {/* ==================================
+              COMPARISON
+          ================================== */}
+
+          <div className="p-3 rounded bg-light">
+            <h6 className="fw-bold mb-3">Commission Summary</h6>
+
+            <CRow>
+              <CCol md={6}>
+                <div className="border rounded p-3 bg-white">
+                  <div className="small text-medium-emphasis">In-Salon</div>
+
+                  <div className="d-flex justify-content-between mt-2">
+                    <strong className="text-primary">Staff</strong>
+
+                    <strong>{Number(inSalonStaffPercentage || 0)}%</strong>
+                  </div>
+
+                  <div className="d-flex justify-content-between">
+                    <strong className="text-success">Business</strong>
+
+                    <strong>{calculateOwnerPercentage(inSalonStaffPercentage)}%</strong>
                   </div>
                 </div>
               </CCol>
 
-              <CCol xs={6} className="text-end">
-                <div className="d-flex align-items-center justify-content-end">
-                  <div>
-                    <small className="text-medium-emphasis">Business</small>
+              <CCol md={6} className="mt-3 mt-md-0">
+                <div className="border rounded p-3 bg-white">
+                  <div className="small text-medium-emphasis">Home Service</div>
 
-                    <div className="fw-bold">{calculateOwnerPercentage(staffPercentage)}%</div>
+                  <div className="d-flex justify-content-between mt-2">
+                    <strong className="text-info">Staff</strong>
+
+                    <strong>{Number(homeServiceStaffPercentage || 0)}%</strong>
                   </div>
 
-                  <span
-                    className="bg-success rounded-circle ms-2"
-                    style={{
-                      width: 10,
-                      height: 10,
-                    }}
-                  />
+                  <div className="d-flex justify-content-between">
+                    <strong className="text-success">Business</strong>
+
+                    <strong>{calculateOwnerPercentage(homeServiceStaffPercentage)}%</strong>
+                  </div>
                 </div>
               </CCol>
             </CRow>
@@ -961,7 +1169,7 @@ const ServiceCommission = () => {
             />
 
             <small className="text-medium-emphasis d-block ms-4 mt-1">
-              When disabled, the service will use the default commission.
+              When disabled, the service will use the default commission percentages.
             </small>
           </div>
         </CModalBody>
