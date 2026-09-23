@@ -1,5 +1,5 @@
 {
-  "name": "Glamour POS Manager",
+  "name": "Glamour Manager",
   "short_name": "Glamour Manager",
   "description": "Glamour Unisex Salon Management System",
   "start_url": "/#/dashboard",
@@ -20,6 +20,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/assets/img/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }
