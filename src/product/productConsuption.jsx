@@ -31,7 +31,7 @@ import { cilCheck, cilClock, cilFilter, cilPlus, cilSearch, cilTrash, cilX } fro
 
 import CIcon from '@coreui/icons-react'
 
-const API_URL = import.meta.env.VITE_API_URL
+const API_URL = import.meta.env.VITE_BACKEND_URL
 
 const ProductConsumption = () => {
   // =========================================================
