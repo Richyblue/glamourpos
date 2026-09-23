@@ -94,7 +94,7 @@ const ServiceCommission = () => {
 
   const getServices = async () => {
     try {
-      const response = await axios.get(`${API_URL}api/v1/services`, axiosConfig)
+      const response = await axios.get(`${API_URL}api/v1/servicess`, axiosConfig)
 
       setServices(response.data.data || response.data || [])
     } catch (error) {
