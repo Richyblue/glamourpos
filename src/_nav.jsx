@@ -120,6 +120,11 @@ const _nav = [
         name: 'Staff Penalty',
         to: '/staffPenalty',
       },
+      {
+        component: CNavItem,
+        name: 'Service Commission',
+        to: '/serviceCommission',
+      },
     ],
   },
   {
