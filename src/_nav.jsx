@@ -148,6 +148,11 @@ const _nav = [
         name: 'Recycle Bin',
         to: '/recycleBin',
       },
+      {
+        component: CNavItem,
+        name: 'Product Consumption',
+        to: '/productConsumption',
+      },
     ],
   },
 
