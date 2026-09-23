@@ -54,25 +54,14 @@ const BusinessHours = () => {
     },
   }
 
-  const days = [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday',
-  ]
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
   const getBusinessHours = async () => {
     try {
       setLoading(true)
       setError('')
 
-      const response = await axios.get(
-        `${API_URL}api/v1/business-hours`,
-        authConfig,
-      )
+      const response = await axios.get(`${API_URL}api/v1/business-hours`, authConfig)
 
       console.log('Business hours response:', response.data)
 
@@ -80,15 +69,9 @@ const BusinessHours = () => {
 
       setHours(Array.isArray(businessHours) ? businessHours : [])
     } catch (error) {
-      console.error(
-        'Get business hours error:',
-        error.response?.data || error,
-      )
+      console.error('Get business hours error:', error.response?.data || error)
 
-      setError(
-        error.response?.data?.message ||
-          'Unable to load business hours.',
-      )
+      setError(error.response?.data?.message || 'Unable to load business hours.')
     } finally {
       setLoading(false)
     }
@@ -103,12 +86,7 @@ const BusinessHours = () => {
 
     setFormData((previous) => ({
       ...previous,
-      [name]:
-        type === 'checkbox'
-          ? checked
-          : type === 'number'
-            ? Number(value)
-            : value,
+      [name]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value,
     }))
   }
 
@@ -170,9 +148,7 @@ const BusinessHours = () => {
             : item,
         )
       } else {
-        const alreadyExists = hours.some(
-          (item) => item.dayOfWeek === formData.dayOfWeek,
-        )
+        const alreadyExists = hours.some((item) => item.dayOfWeek === formData.dayOfWeek)
 
         if (alreadyExists) {
           Swal.fire({
@@ -184,10 +160,7 @@ const BusinessHours = () => {
           return
         }
 
-        updatedBusinessHours = [
-          ...hours,
-          formData,
-        ]
+        updatedBusinessHours = [...hours, formData]
       }
 
       const payload = {
@@ -196,11 +169,7 @@ const BusinessHours = () => {
 
       console.log('Business hours payload:', payload)
 
-      const response = await axios.put(
-        `${API_URL}api/v1/business-hours`,
-        payload,
-        authConfig,
-      )
+      const response = await axios.put(`${API_URL}api/v1/business-hours`, payload, authConfig)
 
       console.log('Save business hours response:', response.data)
 
@@ -217,10 +186,7 @@ const BusinessHours = () => {
         confirmButtonColor: '#321fdb',
       })
     } catch (error) {
-      console.error(
-        'Save business hours error:',
-        error.response?.data || error,
-      )
+      console.error('Save business hours error:', error.response?.data || error)
 
       Swal.fire({
         icon: 'error',
@@ -279,10 +245,7 @@ const BusinessHours = () => {
             <CTableBody>
               {hours.length === 0 ? (
                 <CTableRow>
-                  <CTableDataCell
-                    colSpan={7}
-                    className="text-center py-4"
-                  >
+                  <CTableDataCell colSpan={7} className="text-center py-4">
                     No business hours found.
                   </CTableDataCell>
                 </CTableRow>
@@ -293,21 +256,13 @@ const BusinessHours = () => {
                       <strong>{item.dayOfWeek}</strong>
                     </CTableDataCell>
 
-                    <CTableDataCell>
-                      {item.openingTime || '--:--'}
-                    </CTableDataCell>
+                    <CTableDataCell>{item.openingTime || '--:--'}</CTableDataCell>
 
-                    <CTableDataCell>
-                      {item.closingTime || '--:--'}
-                    </CTableDataCell>
+                    <CTableDataCell>{item.closingTime || '--:--'}</CTableDataCell>
 
-                    <CTableDataCell>
-                      {item.workingHours ?? 0} hours
-                    </CTableDataCell>
+                    <CTableDataCell>{item.workingHours ?? 0} hours</CTableDataCell>
 
-                    <CTableDataCell>
-                      {item.gracePeriod ?? 0} minutes
-                    </CTableDataCell>
+                    <CTableDataCell>{item.gracePeriod ?? 0} minutes</CTableDataCell>
 
                     <CTableDataCell>
                       {item.isOpen ? (
@@ -335,17 +290,9 @@ const BusinessHours = () => {
         </CCardBody>
       </CCard>
 
-      <CModal
-        visible={visible}
-        onClose={() => setVisible(false)}
-        backdrop="static"
-      >
+      <CModal visible={visible} onClose={() => setVisible(false)} backdrop="static">
         <CModalHeader>
-          <CModalTitle>
-            {editingHour
-              ? 'Edit Business Hour'
-              : 'Add Business Hour'}
-          </CModalTitle>
+          <CModalTitle>{editingHour ? 'Edit Business Hour' : 'Add Business Hour'}</CModalTitle>
         </CModalHeader>
 
         <CForm onSubmit={saveBusinessHour}>
@@ -431,11 +378,7 @@ const BusinessHours = () => {
               Cancel
             </CButton>
 
-            <CButton
-              color="primary"
-              type="submit"
-              disabled={saving}
-            >
+            <CButton color="primary" type="submit" disabled={saving}>
               {saving ? 'Saving...' : 'Save Business Hour'}
             </CButton>
           </CModalFooter>
