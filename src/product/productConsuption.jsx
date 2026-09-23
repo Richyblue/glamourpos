@@ -142,7 +142,7 @@ const ProductConsumption = () => {
 
   const fetchStaff = async () => {
     try {
-      const response = await axios.get(`${API_URL}api/v1/staff`, authConfig())
+      const response = await axios.get(`${API_URL}api/v1/staffs`, authConfig())
 
       setStaff(normalizeArray(response))
     } catch (error) {
