@@ -108,6 +108,17 @@ const POSPage = () => {
 
     localStorage.removeItem(CART_KEY)
   }
+  const [hardwareStatus, setHardwareStatus] = useState({
+    thermalPrinter: {
+      connected: false,
+    },
+    cashDrawer: {
+      connected: false,
+    },
+    verifone: {
+      connected: false,
+    },
+  })
   const currentUser = JSON.parse(localStorage.getItem('user'))
 
   const CART_KEY = `pos_cart_${currentUser.id}`
@@ -340,7 +351,34 @@ const POSPage = () => {
     fetchData()
   }, [])
   // Daily Sales end
+  useEffect(() => {
+    if (!window.electronAPI?.getHardwareStatus) {
+      return
+    }
 
+    let cancelled = false
+
+    const checkHardware = async () => {
+      try {
+        const status = await window.electronAPI.getHardwareStatus()
+
+        if (!cancelled) {
+          setHardwareStatus(status)
+        }
+      } catch (error) {
+        console.error('Hardware status check failed:', error)
+      }
+    }
+
+    checkHardware()
+
+    const interval = setInterval(checkHardware, 5000)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [])
   // Loyaltycard lookup
 
   const searchLoyaltyCard = async () => {
@@ -1718,10 +1756,21 @@ const POSPage = () => {
               </div>
 
               {[
-                ['Thermal Printer', true],
-                ['Verifone P400 POS', true],
-                ['RJ12 Cash Drawer', true],
-              ].map(([name, connected]) => (
+                {
+                  name: 'Thermal Printer',
+                  connected: hardwareStatus.thermalPrinter.connected,
+                },
+
+                {
+                  name: 'Verifone P400 POS',
+                  connected: hardwareStatus.verifone.connected,
+                },
+
+                {
+                  name: 'RJ12 Cash Drawer',
+                  connected: hardwareStatus.cashDrawer.connected,
+                },
+              ].map(({ name, connected }) => (
                 <div
                   key={name}
                   style={{
@@ -1734,7 +1783,13 @@ const POSPage = () => {
                   }}
                 >
                   <span>{name}</span>
-                  <span style={{ color: connected ? '#63d391' : '#dc6b6b', fontWeight: 800 }}>
+
+                  <span
+                    style={{
+                      color: connected ? '#63d391' : '#dc6b6b',
+                      fontWeight: 800,
+                    }}
+                  >
                     {connected ? '● Ready' : '● Offline'}
                   </span>
                 </div>
