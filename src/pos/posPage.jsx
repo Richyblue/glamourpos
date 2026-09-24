@@ -999,7 +999,6 @@ const POSPage = () => {
 
     showNewCustomerModal,
     showCustomerModal,
-    showHoldSaleModal,
     showHeldSalesModal,
     showReceiptSearchModal,
     showBarcodeModal,
