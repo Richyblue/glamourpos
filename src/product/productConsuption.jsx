@@ -9,9 +9,11 @@ import {
   CCardBody,
   CCardHeader,
   CCol,
+  CForm,
   CFormInput,
   CFormLabel,
   CFormSelect,
+  CFormTextarea,
   CModal,
   CModalBody,
   CModalFooter,
@@ -27,16 +29,15 @@ import {
   CTableRow,
 } from '@coreui/react'
 
-import { cilCheck, cilClock, cilFilter, cilPlus, cilSearch, cilTrash, cilX } from '@coreui/icons'
-
 import CIcon from '@coreui/icons-react'
+import { cilCheck, cilPlus, cilTrash, cilX, cilSearch, cilInfo, cilWarning } from '@coreui/icons'
 
 const API_URL = import.meta.env.VITE_BACKEND_URL
 
 const ProductConsumption = () => {
-  // =========================================================
-  // DATA
-  // =========================================================
+  // ============================================================
+  // STATE
+  // ============================================================
 
   const [consumptions, setConsumptions] = useState([])
   const [products, setProducts] = useState([])
@@ -44,42 +45,28 @@ const ProductConsumption = () => {
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
 
-  // =========================================================
-  // FILTERS
-  // =========================================================
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [staffFilter, setStaffFilter] = useState('all')
 
-  // =========================================================
-  // MODALS
-  // =========================================================
-
+  // Create modal
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showDetailsModal, setShowDetailsModal] = useState(false)
-  const [showRejectModal, setShowRejectModal] = useState(false)
 
+  // Details modal
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [selectedConsumption, setSelectedConsumption] = useState(null)
 
-  // =========================================================
-  // ERROR / SUCCESS MESSAGE
-  // =========================================================
+  // Reject modal
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
+  const [rejectingId, setRejectingId] = useState(null)
 
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-
-  // =========================================================
-  // REJECTION
-  // =========================================================
-
-  const [rejectionReason, setRejectionReason] = useState('')
-
-  // =========================================================
-  // FORM
-  // =========================================================
-
+  // Form
   const [form, setForm] = useState({
     staff_id: '',
     reason: '',
@@ -93,164 +80,68 @@ const ProductConsumption = () => {
     },
   ])
 
-  // =========================================================
-  // TOKEN
-  // =========================================================
+  // ============================================================
+  // HELPERS
+  // ============================================================
 
   const getToken = () => {
     return localStorage.getItem('token')
   }
 
-  // =========================================================
-  // FETCH STAFF
-  // =========================================================
+  const getStaffName = (person) => {
+    if (!person) return 'Unknown Staff'
 
-  const getStaff = async () => {
-    try {
-      const token = localStorage.getItem('token')
-
-      const response = await axios.get(`${API_URL}api/v1/staffs`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      setStaff(response.data.staffs || [])
-    } catch (error) {
-      console.error('Error fetching staff:', error)
-
-      setError(error.response?.data?.message || 'Unable to load staff.')
-    }
+    return (
+      person.User?.fullname ||
+      person.User?.name ||
+      person.fullname ||
+      person.name ||
+      `${person.firstName || ''} ${person.lastName || ''}`.trim() ||
+      `Staff #${person.id}`
+    )
   }
 
-  // =========================================================
-  // FETCH PRODUCTS
-  // =========================================================
+  const getProductName = (product) => {
+    if (!product) return 'Unknown Product'
 
-  const getProducts = async () => {
-    try {
-      const token = localStorage.getItem('token')
-
-      const response = await axios.get(`${API_URL}api/v1/products`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      setProducts(response.data.products || [])
-    } catch (error) {
-      console.error('Error fetching products:', error)
-
-      setError(error.response?.data?.message || 'Unable to load products.')
-    }
+    return product.name || product.Product?.name || `Product #${product.id}`
   }
 
-  // =========================================================
-  // FETCH CONSUMPTIONS
-  // =========================================================
-
-  const getConsumptions = async () => {
-    try {
-      const token = localStorage.getItem('token')
-
-      const response = await axios.get(`${API_URL}api/v1/product-consumptions`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      setConsumptions(response.data.consumptions || [])
-    } catch (error) {
-      console.error('Error fetching consumptions:', error)
-
-      setError(error.response?.data?.message || 'Unable to load product usage records.')
-    }
+  const formatCurrency = (value) => {
+    return `₦${Number(value || 0).toLocaleString()}`
   }
 
-  // =========================================================
-  // LOAD ALL DATA
-  // =========================================================
+  const formatDate = (date) => {
+    if (!date) return '-'
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true)
-        setError('')
-
-        await getStaff()
-        await getProducts()
-        await getConsumptions()
-      } catch (error) {
-        console.error(error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchData()
-  }, [])
-
-  // =========================================================
-  // FILTERED DATA
-  // =========================================================
-
-  const filteredConsumptions = useMemo(() => {
-    return consumptions.filter((item) => {
-      const searchText = search.toLowerCase().trim()
-
-      const staffName = item.Staff?.fullname || item.Staff?.name || ''
-
-      const reason = item.reason || ''
-
-      const reference = item.reference_number || ''
-
-      const matchesSearch =
-        !searchText ||
-        reference.toLowerCase().includes(searchText) ||
-        staffName.toLowerCase().includes(searchText) ||
-        reason.toLowerCase().includes(searchText)
-
-      const matchesStatus = statusFilter === 'all' || item.status === statusFilter
-
-      const matchesStaff = staffFilter === 'all' || String(item.staff_id) === String(staffFilter)
-
-      return matchesSearch && matchesStatus && matchesStaff
+    return new Date(date).toLocaleString('en-NG', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     })
-  }, [consumptions, search, statusFilter, staffFilter])
+  }
 
-  // =========================================================
-  // KPIs
-  // =========================================================
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'approved':
+        return <CBadge color="success">Approved</CBadge>
 
-  const statistics = useMemo(() => {
-    const approved = consumptions.filter((item) => item.status === 'approved')
+      case 'rejected':
+        return <CBadge color="danger">Rejected</CBadge>
 
-    const pending = consumptions.filter((item) => item.status === 'pending')
+      case 'pending':
+        return <CBadge color="warning">Pending</CBadge>
 
-    const rejected = consumptions.filter((item) => item.status === 'rejected')
-
-    const totalCost = approved.reduce((sum, consumption) => {
-      return (
-        sum +
-        (consumption.Items || []).reduce(
-          (itemSum, item) => itemSum + Number(item.total_cost || 0),
-          0,
-        )
-      )
-    }, 0)
-
-    return {
-      total: consumptions.length,
-      pending: pending.length,
-      approved: approved.length,
-      rejected: rejected.length,
-      totalCost,
+      default:
+        return <CBadge color="secondary">{status || 'Unknown'}</CBadge>
     }
-  }, [consumptions])
+  }
 
-  // =========================================================
+  // ============================================================
   // FORM HANDLERS
-  // =========================================================
+  // ============================================================
 
   const handleFormChange = (field, value) => {
     setForm((prev) => ({
@@ -272,10 +163,6 @@ const ProductConsumption = () => {
     })
   }
 
-  // =========================================================
-  // ADD PRODUCT
-  // =========================================================
-
   const addItem = () => {
     setFormItems((prev) => [
       ...prev,
@@ -286,10 +173,6 @@ const ProductConsumption = () => {
     ])
   }
 
-  // =========================================================
-  // REMOVE PRODUCT
-  // =========================================================
-
   const removeItem = (index) => {
     if (formItems.length === 1) {
       return
@@ -298,11 +181,383 @@ const ProductConsumption = () => {
     setFormItems((prev) => prev.filter((_, i) => i !== index))
   }
 
-  // =========================================================
-  // RESET FORM
-  // =========================================================
+  // ============================================================
+  // GET STAFF
+  // ============================================================
 
-  const resetForm = () => {
+  const getStaff = async () => {
+    try {
+      const token = getToken()
+
+      const response = await axios.get(`${API_URL}api/v1/staffs`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      console.log('Staff API response:', response.data)
+
+      setStaff(response.data.staffs || [])
+    } catch (error) {
+      console.error('Staff Error:', error)
+
+      setError(error.response?.data?.message || 'Unable to load staff members.')
+    }
+  }
+
+  // ============================================================
+  // GET PRODUCTS
+  // ============================================================
+
+  const getProducts = async () => {
+    try {
+      const token = getToken()
+
+      const response = await axios.get(`${API_URL}api/v1/products`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      console.log('Products API response:', response.data)
+
+      setProducts(response.data.products || [])
+    } catch (error) {
+      console.error('Products Error:', error)
+
+      setError(error.response?.data?.message || 'Unable to load products.')
+    }
+  }
+
+  // ============================================================
+  // GET CONSUMPTIONS
+  // ============================================================
+
+  const getConsumptions = async () => {
+    try {
+      const token = getToken()
+
+      const response = await axios.get(`${API_URL}api/v1/product-consumptions`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      console.log('Consumption API response:', response.data)
+
+      setConsumptions(response.data.consumptions || [])
+    } catch (error) {
+      console.error('Consumption Error:', error)
+
+      setError(error.response?.data?.message || 'Unable to load product consumption records.')
+    }
+  }
+
+  // ============================================================
+  // INITIAL LOAD
+  // ============================================================
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true)
+      setError('')
+
+      try {
+        await Promise.all([getConsumptions(), getProducts(), getStaff()])
+      } catch (error) {
+        console.error(error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  // ============================================================
+  // CREATE CONSUMPTION
+  // ============================================================
+
+  const handleCreate = async (e) => {
+    e.preventDefault()
+
+    setError('')
+    setSuccess('')
+
+    // Staff validation
+    if (!form.staff_id) {
+      setError('Please select a staff member.')
+      return
+    }
+
+    // Product validation
+    const validItems = formItems.filter((item) => item.product_id && Number(item.quantity) > 0)
+
+    if (validItems.length === 0) {
+      setError('Please select at least one product and enter a valid quantity.')
+      return
+    }
+
+    // Check duplicate products
+    const productIds = validItems.map((item) => String(item.product_id))
+
+    const hasDuplicates = new Set(productIds).size !== productIds.length
+
+    if (hasDuplicates) {
+      setError('You cannot add the same product more than once.')
+      return
+    }
+
+    try {
+      setSaving(true)
+
+      const token = getToken()
+
+      const payload = {
+        staff_id: Number(form.staff_id),
+
+        reason: form.reason,
+
+        notes: form.notes,
+
+        items: validItems.map((item) => ({
+          product_id: Number(item.product_id),
+          quantity: Number(item.quantity),
+        })),
+      }
+
+      console.log('Creating consumption:', payload)
+
+      const response = await axios.post(`${API_URL}api/v1/product-consumptions`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      console.log('Create consumption response:', response.data)
+
+      setSuccess(response.data.message || 'Product consumption request created successfully.')
+
+      setForm({
+        staff_id: '',
+        reason: '',
+        notes: '',
+      })
+
+      setFormItems([
+        {
+          product_id: '',
+          quantity: 1,
+        },
+      ])
+
+      setShowCreateModal(false)
+
+      await getConsumptions()
+    } catch (error) {
+      console.error('Create Consumption Error:', error)
+
+      setError(error.response?.data?.message || 'Unable to create product consumption request.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ============================================================
+  // VIEW DETAILS
+  // ============================================================
+
+  const handleView = async (id) => {
+    setError('')
+
+    try {
+      const token = getToken()
+
+      const response = await axios.get(`${API_URL}api/v1/product-consumptions/${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      console.log('Consumption details:', response.data)
+
+      setSelectedConsumption(response.data.consumption || response.data)
+
+      setShowDetailsModal(true)
+    } catch (error) {
+      console.error('Get Consumption Error:', error)
+
+      setError(error.response?.data?.message || 'Unable to load consumption details.')
+    }
+  }
+
+  // ============================================================
+  // APPROVE
+  // ============================================================
+
+  const handleApprove = async (id) => {
+    const confirmed = window.confirm(
+      'Are you sure you want to approve this product consumption request? Stock will be deducted.',
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setError('')
+    setSuccess('')
+
+    try {
+      setActionLoading(true)
+
+      const token = getToken()
+
+      const response = await axios.patch(
+        `${API_URL}api/v1/product-consumptions/${id}/approve`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      setSuccess(response.data.message || 'Product consumption approved successfully.')
+
+      await getConsumptions()
+
+      if (selectedConsumption?.id === id) {
+        await handleView(id)
+      }
+    } catch (error) {
+      console.error('Approve Consumption Error:', error)
+
+      setError(error.response?.data?.message || 'Unable to approve product consumption.')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  // ============================================================
+  // OPEN REJECT MODAL
+  // ============================================================
+
+  const openRejectModal = (id) => {
+    setRejectingId(id)
+    setRejectReason('')
+    setShowRejectModal(true)
+  }
+
+  // ============================================================
+  // REJECT
+  // ============================================================
+
+  const handleReject = async () => {
+    if (!rejectingId) {
+      return
+    }
+
+    if (!rejectReason.trim()) {
+      setError('Please enter a reason for rejecting this request.')
+      return
+    }
+
+    setError('')
+    setSuccess('')
+
+    try {
+      setActionLoading(true)
+
+      const token = getToken()
+
+      const response = await axios.patch(
+        `${API_URL}api/v1/product-consumptions/${rejectingId}/reject`,
+        {
+          rejection_reason: rejectReason.trim(),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      setSuccess(response.data.message || 'Product consumption request rejected.')
+
+      setShowRejectModal(false)
+      setRejectingId(null)
+      setRejectReason('')
+
+      await getConsumptions()
+
+      if (selectedConsumption?.id === rejectingId) {
+        await handleView(rejectingId)
+      }
+    } catch (error) {
+      console.error('Reject Consumption Error:', error)
+
+      setError(error.response?.data?.message || 'Unable to reject product consumption.')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  // ============================================================
+  // FILTER DATA
+  // ============================================================
+
+  const filteredConsumptions = useMemo(() => {
+    return consumptions.filter((item) => {
+      const staffName = getStaffName(item.Staff).toLowerCase()
+
+      const referenceNumber = String(item.reference_number || '').toLowerCase()
+
+      const reason = String(item.reason || '').toLowerCase()
+
+      const searchValue = search.toLowerCase()
+
+      const matchesSearch =
+        !searchValue ||
+        staffName.includes(searchValue) ||
+        referenceNumber.includes(searchValue) ||
+        reason.includes(searchValue)
+
+      const matchesStatus = statusFilter === 'all' || item.status === statusFilter
+
+      const matchesStaff = staffFilter === 'all' || String(item.staff_id) === String(staffFilter)
+
+      return matchesSearch && matchesStatus && matchesStaff
+    })
+  }, [consumptions, search, statusFilter, staffFilter])
+
+  // ============================================================
+  // SUMMARY
+  // ============================================================
+
+  const summary = useMemo(() => {
+    const total = consumptions.length
+
+    const pending = consumptions.filter((item) => item.status === 'pending').length
+
+    const approved = consumptions.filter((item) => item.status === 'approved').length
+
+    const rejected = consumptions.filter((item) => item.status === 'rejected').length
+
+    return {
+      total,
+      pending,
+      approved,
+      rejected,
+    }
+  }, [consumptions])
+
+  // ============================================================
+  // RESET CREATE FORM
+  // ============================================================
+
+  const openCreateModal = () => {
+    setError('')
+
     setForm({
       staff_id: '',
       reason: '',
@@ -316,287 +571,45 @@ const ProductConsumption = () => {
       },
     ])
 
-    setError('')
+    setShowCreateModal(true)
   }
 
-  // =========================================================
-  // CREATE CONSUMPTION
-  // =========================================================
-
-  const handleCreateConsumption = async () => {
-    setError('')
-    setSuccess('')
-
-    // Validate staff
-    if (!form.staff_id) {
-      setError('Please select a staff member.')
-      return
-    }
-
-    // Validate products
-    const validItems = formItems.filter((item) => item.product_id && Number(item.quantity) > 0)
-
-    if (validItems.length === 0) {
-      setError('Please select at least one product and quantity.')
-      return
-    }
-
-    // Validate stock
-    for (const item of validItems) {
-      const product = products.find((product) => String(product.id) === String(item.product_id))
-
-      if (!product) {
-        setError('One of the selected products is invalid.')
-        return
-      }
-
-      if (Number(item.quantity) > Number(product.quantity || 0)) {
-        setError(`${product.name} does not have enough stock.`)
-        return
-      }
-    }
-
-    try {
-      setSaving(true)
-
-      const token = localStorage.getItem('token')
-
-      const response = await axios.post(
-        `${API_URL}api/v1/product-consumptions`,
-        {
-          staff_id: form.staff_id,
-
-          items: validItems.map((item) => ({
-            product_id: Number(item.product_id),
-            quantity: Number(item.quantity),
-          })),
-
-          reason: form.reason,
-
-          notes: form.notes,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
-
-      console.log('Consumption created:', response.data)
-
-      await getConsumptions()
-
-      resetForm()
-
-      setShowCreateModal(false)
-
-      setSuccess('Product usage request created successfully.')
-    } catch (error) {
-      console.error('Error creating consumption:', error)
-
-      setError(error.response?.data?.message || 'Unable to create product usage request.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // =========================================================
-  // APPROVE
-  // =========================================================
-
-  const handleApprove = async (id) => {
-    if (!id) {
-      return
-    }
-
-    try {
-      setSaving(true)
-      setError('')
-      setSuccess('')
-
-      const token = localStorage.getItem('token')
-
-      const response = await axios.patch(
-        `${API_URL}api/v1/product-consumptions/${id}/approve`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
-
-      console.log('Consumption approved:', response.data)
-
-      await getConsumptions()
-      await getProducts()
-
-      setShowDetailsModal(false)
-      setSelectedConsumption(null)
-
-      setSuccess('Product usage request approved and stock deducted.')
-    } catch (error) {
-      console.error('Error approving consumption:', error)
-
-      setError(error.response?.data?.message || 'Unable to approve product usage request.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // =========================================================
-  // OPEN REJECT MODAL
-  // =========================================================
-
-  const openRejectModal = (item) => {
-    setSelectedConsumption(item)
-    setRejectionReason('')
-    setShowRejectModal(true)
-  }
-
-  // =========================================================
-  // REJECT
-  // =========================================================
-
-  const handleReject = async (id) => {
-    if (!id) {
-      return
-    }
-
-    if (!rejectionReason.trim()) {
-      setError('Please provide a reason for rejecting this request.')
-      return
-    }
-
-    try {
-      setSaving(true)
-      setError('')
-      setSuccess('')
-
-      const token = localStorage.getItem('token')
-
-      const response = await axios.patch(
-        `${API_URL}api/v1/product-consumptions/${id}/reject`,
-        {
-          rejection_reason: rejectionReason.trim(),
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
-
-      console.log('Consumption rejected:', response.data)
-
-      await getConsumptions()
-
-      setShowRejectModal(false)
-      setShowDetailsModal(false)
-
-      setSelectedConsumption(null)
-      setRejectionReason('')
-
-      setSuccess('Product usage request rejected successfully.')
-    } catch (error) {
-      console.error('Error rejecting consumption:', error)
-
-      setError(error.response?.data?.message || 'Unable to reject product usage request.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // =========================================================
-  // STATUS BADGE
-  // =========================================================
-
-  const renderStatus = (status) => {
-    if (status === 'approved') {
-      return (
-        <CBadge color="success">
-          <CIcon icon={cilCheck} size="sm" className="me-1" />
-          Approved
-        </CBadge>
-      )
-    }
-
-    if (status === 'rejected') {
-      return (
-        <CBadge color="danger">
-          <CIcon icon={cilX} size="sm" className="me-1" />
-          Rejected
-        </CBadge>
-      )
-    }
-
-    return (
-      <CBadge color="warning">
-        <CIcon icon={cilClock} size="sm" className="me-1" />
-        Pending
-      </CBadge>
-    )
-  }
-
-  // =========================================================
-  // TOTAL COST
-  // =========================================================
-
-  const getTotalCost = (item) => {
-    return (item.Items || []).reduce((sum, product) => sum + Number(product.total_cost || 0), 0)
-  }
-
-  // =========================================================
-  // FORMAT DATE
-  // =========================================================
-
-  const formatDate = (date) => {
-    if (!date) {
-      return '-'
-    }
-
-    return new Date(date).toLocaleString('en-NG', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    })
-  }
-
-  // =========================================================
-  // LOADING
-  // =========================================================
-
-  if (loading) {
-    return (
-      <div
-        className="d-flex justify-content-center align-items-center"
-        style={{
-          minHeight: '60vh',
-        }}
-      >
-        <div className="text-center">
-          <CSpinner />
-
-          <div className="mt-3 text-body-secondary">Loading product usage records...</div>
-        </div>
-      </div>
-    )
-  }
-
-  // =========================================================
+  // ============================================================
   // RENDER
-  // =========================================================
+  // ============================================================
 
   return (
     <div className="product-consumption-page">
-      {/* =====================================================
-          SUCCESS / ERROR
+      {/* ======================================================
+          HEADER
       ====================================================== */}
 
-      {success && (
-        <CAlert color="success" dismissible onClose={() => setSuccess('')}>
-          {success}
-        </CAlert>
-      )}
+      <CCard className="border-0 shadow-sm mb-4">
+        <CCardBody className="p-4">
+          <CRow className="align-items-center">
+            <CCol md={8}>
+              <div>
+                <h3 className="fw-bold mb-1">Staff Product Consumption</h3>
+
+                <p className="text-medium-emphasis mb-0">
+                  Manage products taken by staff for business use.
+                </p>
+              </div>
+            </CCol>
+
+            <CCol md={4} className="text-md-end mt-3 mt-md-0">
+              <CButton color="primary" className="px-4" onClick={openCreateModal}>
+                <CIcon icon={cilPlus} className="me-2" />
+                New Consumption
+              </CButton>
+            </CCol>
+          </CRow>
+        </CCardBody>
+      </CCard>
+
+      {/* ======================================================
+          ALERTS
+      ====================================================== */}
 
       {error && (
         <CAlert color="danger" dismissible onClose={() => setError('')}>
@@ -604,127 +617,96 @@ const ProductConsumption = () => {
         </CAlert>
       )}
 
-      {/* =====================================================
-          PAGE HEADER
+      {success && (
+        <CAlert color="success" dismissible onClose={() => setSuccess('')}>
+          {success}
+        </CAlert>
+      )}
+
+      {/* ======================================================
+          SUMMARY CARDS
       ====================================================== */}
 
-      <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
-        <div>
-          <h3 className="mb-1 fw-semibold">Product Usage</h3>
-
-          <div className="text-body-secondary">
-            Track products issued for staff use and manage approvals.
-          </div>
-        </div>
-
-        <CButton
-          color="primary"
-          className="px-4"
-          onClick={() => {
-            resetForm()
-            setShowCreateModal(true)
-          }}
-        >
-          <CIcon icon={cilPlus} className="me-2" />
-          New Product Request
-        </CButton>
-      </div>
-
-      {/* =====================================================
-          KPI CARDS
-      ====================================================== */}
-
-      <CRow className="g-3 mb-4">
-        <CCol xs={12} sm={6} xl={3}>
+      <CRow className="mb-4">
+        <CCol md={3} sm={6} className="mb-3">
           <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <div className="text-body-secondary small mb-2">Total Requests</div>
+              <div className="text-medium-emphasis small mb-1">Total Requests</div>
 
-              <div className="fs-3 fw-semibold">{statistics.total}</div>
-
-              <div className="small text-body-secondary mt-2">All usage requests</div>
+              <h3 className="fw-bold mb-0">{summary.total}</h3>
             </CCardBody>
           </CCard>
         </CCol>
 
-        <CCol xs={12} sm={6} xl={3}>
+        <CCol md={3} sm={6} className="mb-3">
           <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <div className="text-body-secondary small mb-2">Pending Approval</div>
+              <div className="text-medium-emphasis small mb-1">Pending</div>
 
-              <div className="fs-3 fw-semibold text-warning">{statistics.pending}</div>
-
-              <div className="small text-body-secondary mt-2">Awaiting action</div>
+              <h3 className="fw-bold text-warning mb-0">{summary.pending}</h3>
             </CCardBody>
           </CCard>
         </CCol>
 
-        <CCol xs={12} sm={6} xl={3}>
+        <CCol md={3} sm={6} className="mb-3">
           <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <div className="text-body-secondary small mb-2">Approved</div>
+              <div className="text-medium-emphasis small mb-1">Approved</div>
 
-              <div className="fs-3 fw-semibold text-success">{statistics.approved}</div>
-
-              <div className="small text-body-secondary mt-2">Stock deducted</div>
+              <h3 className="fw-bold text-success mb-0">{summary.approved}</h3>
             </CCardBody>
           </CCard>
         </CCol>
 
-        <CCol xs={12} sm={6} xl={3}>
+        <CCol md={3} sm={6} className="mb-3">
           <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <div className="text-body-secondary small mb-2">Consumption Value</div>
+              <div className="text-medium-emphasis small mb-1">Rejected</div>
 
-              <div className="fs-3 fw-semibold">
-                ₦
-                {statistics.totalCost.toLocaleString('en-NG', {
-                  minimumFractionDigits: 2,
-                })}
-              </div>
-
-              <div className="small text-body-secondary mt-2">Approved usage</div>
+              <h3 className="fw-bold text-danger mb-0">{summary.rejected}</h3>
             </CCardBody>
           </CCard>
         </CCol>
       </CRow>
 
-      {/* =====================================================
+      {/* ======================================================
           FILTERS
       ====================================================== */}
 
       <CCard className="border-0 shadow-sm mb-4">
         <CCardBody>
-          <CRow className="g-3 align-items-end">
-            <CCol xs={12} lg={5}>
-              <CFormLabel className="small fw-semibold">Search</CFormLabel>
+          <CRow className="align-items-end">
+            <CCol lg={4} md={6} className="mb-3">
+              <CFormLabel>Search</CFormLabel>
 
               <div className="position-relative">
-                <CIcon
-                  icon={cilSearch}
-                  className="position-absolute text-body-secondary"
-                  style={{
-                    left: '12px',
-                    top: '11px',
-                  }}
-                />
-
                 <CFormInput
+                  placeholder="Search reference, staff or reason..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search reference, staff or reason..."
-                  style={{
-                    paddingLeft: '38px',
-                  }}
                 />
               </div>
             </CCol>
 
-            <CCol xs={12} sm={6} lg={3}>
-              <CFormLabel className="small fw-semibold">Status</CFormLabel>
+            <CCol lg={3} md={6} className="mb-3">
+              <CFormLabel>Staff</CFormLabel>
+
+              <CFormSelect value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)}>
+                <option value="all">All Staff</option>
+
+                {staff.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {getStaffName(person)}
+                  </option>
+                ))}
+              </CFormSelect>
+            </CCol>
+
+            <CCol lg={3} md={6} className="mb-3">
+              <CFormLabel>Status</CFormLabel>
 
               <CFormSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="all">All statuses</option>
+                <option value="all">All Status</option>
 
                 <option value="pending">Pending</option>
 
@@ -734,23 +716,7 @@ const ProductConsumption = () => {
               </CFormSelect>
             </CCol>
 
-            <CCol xs={12} sm={6} lg={3}>
-              <CFormLabel className="small fw-semibold">Staff</CFormLabel>
-
-              <CFormSelect value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)}>
-                <option value="all">All staff</option>
-
-                {staff.map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {person.fullname ||
-                      person.name ||
-                      `${person.firstName || ''} ${person.lastName || ''}`}
-                  </option>
-                ))}
-              </CFormSelect>
-            </CCol>
-
-            <CCol xs={12} lg={1}>
+            <CCol lg={2} md={6} className="mb-3">
               <CButton
                 color="light"
                 className="w-100"
@@ -760,131 +726,151 @@ const ProductConsumption = () => {
                   setStaffFilter('all')
                 }}
               >
-                <CIcon icon={cilFilter} />
+                Clear Filters
               </CButton>
             </CCol>
           </CRow>
         </CCardBody>
       </CCard>
 
-      {/* =====================================================
+      {/* ======================================================
           TABLE
       ====================================================== */}
 
       <CCard className="border-0 shadow-sm">
-        <CCardHeader className="bg-transparent py-3 border-bottom">
+        <CCardHeader className="bg-white border-0 p-4">
           <div className="d-flex justify-content-between align-items-center">
             <div>
-              <div className="fw-semibold">Product Usage Requests</div>
+              <h5 className="fw-bold mb-1">Consumption Requests</h5>
 
-              <div className="small text-body-secondary">
-                {filteredConsumptions.length} record
-                {filteredConsumptions.length !== 1 ? 's' : ''} found
-              </div>
+              <small className="text-medium-emphasis">
+                {filteredConsumptions.length} request
+                {filteredConsumptions.length !== 1 ? 's' : ''}
+              </small>
             </div>
           </div>
         </CCardHeader>
 
         <CCardBody className="p-0">
-          <div className="table-responsive">
-            <CTable hover align="middle" className="mb-0">
-              <CTableHead>
-                <CTableRow>
-                  <CTableHeaderCell className="px-4">Reference</CTableHeaderCell>
+          {loading ? (
+            <div className="text-center py-5">
+              <CSpinner />
 
-                  <CTableHeaderCell>Staff</CTableHeaderCell>
+              <div className="mt-2 text-medium-emphasis">Loading records...</div>
+            </div>
+          ) : filteredConsumptions.length === 0 ? (
+            <div className="text-center py-5">
+              <CIcon icon={cilInfo} size="xl" className="text-medium-emphasis mb-3" />
 
-                  <CTableHeaderCell>Products</CTableHeaderCell>
+              <h5>No consumption records</h5>
 
-                  <CTableHeaderCell>Requested</CTableHeaderCell>
-
-                  <CTableHeaderCell>Value</CTableHeaderCell>
-
-                  <CTableHeaderCell>Status</CTableHeaderCell>
-
-                  <CTableHeaderCell className="text-end px-4">Action</CTableHeaderCell>
-                </CTableRow>
-              </CTableHead>
-
-              <CTableBody>
-                {filteredConsumptions.length === 0 ? (
+              <p className="text-medium-emphasis mb-0">
+                No product consumption records match your search.
+              </p>
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <CTable hover align="middle" className="mb-0">
+                <CTableHead>
                   <CTableRow>
-                    <CTableDataCell colSpan={7} className="text-center py-5">
-                      <div className="text-body-secondary">No product usage records found.</div>
-                    </CTableDataCell>
+                    <CTableHeaderCell>Reference</CTableHeaderCell>
+
+                    <CTableHeaderCell>Staff</CTableHeaderCell>
+
+                    <CTableHeaderCell>Products</CTableHeaderCell>
+
+                    <CTableHeaderCell>Reason</CTableHeaderCell>
+
+                    <CTableHeaderCell>Date</CTableHeaderCell>
+
+                    <CTableHeaderCell>Status</CTableHeaderCell>
+
+                    <CTableHeaderCell className="text-end">Actions</CTableHeaderCell>
                   </CTableRow>
-                ) : (
-                  filteredConsumptions.map((item) => (
+                </CTableHead>
+
+                <CTableBody>
+                  {filteredConsumptions.map((item) => (
                     <CTableRow key={item.id}>
-                      <CTableDataCell className="px-4">
-                        <div className="fw-semibold">{item.reference_number}</div>
-
-                        <div className="small text-body-secondary">#{item.id}</div>
+                      <CTableDataCell>
+                        <span className="fw-semibold">
+                          {item.reference_number || `#${item.id}`}
+                        </span>
                       </CTableDataCell>
 
-                      <CTableDataCell>
-                        <div className="fw-medium">
-                          {item.Staff?.fullname || item.Staff?.name || 'Unknown Staff'}
-                        </div>
-                      </CTableDataCell>
+                      <CTableDataCell>{getStaffName(item.Staff)}</CTableDataCell>
 
                       <CTableDataCell>
-                        <div className="fw-medium">
+                        <div>
                           {item.Items?.length || 0} product
                           {item.Items?.length !== 1 ? 's' : ''}
                         </div>
 
-                        <div className="small text-body-secondary">
-                          {item.Items?.slice(0, 2).map((product, index) => (
-                            <span key={product.id || index}>
-                              {product.Product?.name || 'Product'}
+                        {item.Items?.slice(0, 2).map((consumptionItem, index) => (
+                          <small
+                            key={consumptionItem.id || index}
+                            className="d-block text-medium-emphasis"
+                          >
+                            {getProductName(consumptionItem.Product)} × {consumptionItem.quantity}
+                          </small>
+                        ))}
 
-                              {index < Math.min(item.Items.length, 2) - 1 ? ', ' : ''}
-                            </span>
-                          ))}
-
-                          {item.Items?.length > 2 && ` +${item.Items.length - 2} more`}
-                        </div>
+                        {item.Items?.length > 2 && (
+                          <small className="text-primary">+{item.Items.length - 2} more</small>
+                        )}
                       </CTableDataCell>
+
+                      <CTableDataCell>{item.reason || '-'}</CTableDataCell>
 
                       <CTableDataCell>
                         {formatDate(item.requested_at || item.createdAt)}
                       </CTableDataCell>
 
+                      <CTableDataCell>{getStatusBadge(item.status)}</CTableDataCell>
+
                       <CTableDataCell>
-                        <div className="fw-semibold">
-                          ₦
-                          {getTotalCost(item).toLocaleString('en-NG', {
-                            minimumFractionDigits: 2,
-                          })}
+                        <div className="d-flex justify-content-end gap-2">
+                          <CButton size="sm" color="light" onClick={() => handleView(item.id)}>
+                            View
+                          </CButton>
+
+                          {item.status === 'pending' && (
+                            <>
+                              <CButton
+                                size="sm"
+                                color="success"
+                                variant="outline"
+                                disabled={actionLoading}
+                                onClick={() => handleApprove(item.id)}
+                              >
+                                <CIcon icon={cilCheck} className="me-1" />
+                                Approve
+                              </CButton>
+
+                              <CButton
+                                size="sm"
+                                color="danger"
+                                variant="outline"
+                                disabled={actionLoading}
+                                onClick={() => openRejectModal(item.id)}
+                              >
+                                <CIcon icon={cilX} className="me-1" />
+                                Reject
+                              </CButton>
+                            </>
+                          )}
                         </div>
                       </CTableDataCell>
-
-                      <CTableDataCell>{renderStatus(item.status)}</CTableDataCell>
-
-                      <CTableDataCell className="text-end px-4">
-                        <CButton
-                          color="light"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedConsumption(item)
-
-                            setShowDetailsModal(true)
-                          }}
-                        >
-                          View
-                        </CButton>
-                      </CTableDataCell>
                     </CTableRow>
-                  ))
-                )}
-              </CTableBody>
-            </CTable>
-          </div>
+                  ))}
+                </CTableBody>
+              </CTable>
+            </div>
+          )}
         </CCardBody>
       </CCard>
 
-      {/* =====================================================
+      {/* ======================================================
           CREATE MODAL
       ====================================================== */}
 
@@ -895,325 +881,277 @@ const ProductConsumption = () => {
         backdrop="static"
       >
         <CModalHeader>
-          <CModalTitle>New Product Usage Request</CModalTitle>
+          <CModalTitle className="fw-bold">New Product Consumption</CModalTitle>
         </CModalHeader>
 
-        <CModalBody>
-          <CAlert color="info">
-            Products will only be deducted from inventory after the request is approved.
-          </CAlert>
+        <CForm onSubmit={handleCreate}>
+          <CModalBody>
+            {error && (
+              <CAlert color="danger" dismissible onClose={() => setError('')}>
+                {error}
+              </CAlert>
+            )}
 
-          <CRow className="g-3">
-            <CCol xs={12} md={6}>
-              <CFormLabel className="fw-semibold">
-                Staff Member
-                <span className="text-danger"> *</span>
-              </CFormLabel>
+            <CRow>
+              {/* STAFF */}
 
-              <CFormSelect
-                value={form.staff_id}
-                onChange={(e) => handleFormChange('staff_id', e.target.value)}
-              >
-                <option value="">Select staff member</option>
+              <CCol md={6} className="mb-3">
+                <CFormLabel>
+                  Staff Member <span className="text-danger">*</span>
+                </CFormLabel>
 
-                {staff.map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {person.fullname ||
-                      person.name ||
-                      `${person.firstName || ''} ${person.lastName || ''}`}
-                  </option>
-                ))}
-              </CFormSelect>
-            </CCol>
+                <CFormSelect
+                  value={form.staff_id}
+                  onChange={(e) => handleFormChange('staff_id', e.target.value)}
+                >
+                  <option value="">Select staff member</option>
 
-            <CCol xs={12} md={6}>
-              <CFormLabel className="fw-semibold">Reason</CFormLabel>
+                  {staff.map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {getStaffName(person)}
+                    </option>
+                  ))}
+                </CFormSelect>
 
-              <CFormInput
-                value={form.reason}
-                onChange={(e) => handleFormChange('reason', e.target.value)}
-                placeholder="e.g. Product used during service"
-              />
-            </CCol>
-          </CRow>
+                {staff.length === 0 && (
+                  <small className="text-danger">No staff members found.</small>
+                )}
+              </CCol>
 
-          {/* PRODUCTS */}
+              {/* REASON */}
 
-          <div className="mt-4">
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <div>
-                <div className="fw-semibold">Products</div>
+              <CCol md={6} className="mb-3">
+                <CFormLabel>Reason</CFormLabel>
 
-                <div className="small text-body-secondary">Select products and quantities.</div>
+                <CFormInput
+                  placeholder="e.g. Product used for client service"
+                  value={form.reason}
+                  onChange={(e) => handleFormChange('reason', e.target.value)}
+                />
+              </CCol>
+            </CRow>
+
+            {/* PRODUCTS */}
+
+            <div className="border rounded p-3 mb-3">
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                  <h6 className="fw-bold mb-0">Products</h6>
+
+                  <small className="text-medium-emphasis">
+                    Select products and the quantities taken.
+                  </small>
+                </div>
+
+                <CButton
+                  size="sm"
+                  color="primary"
+                  variant="outline"
+                  type="button"
+                  onClick={addItem}
+                >
+                  <CIcon icon={cilPlus} className="me-1" />
+                  Add Product
+                </CButton>
               </div>
 
-              <CButton color="light" size="sm" onClick={addItem}>
-                <CIcon icon={cilPlus} className="me-1" />
-                Add Product
-              </CButton>
+              {formItems.map((item, index) => (
+                <CRow key={index} className="align-items-end mb-3">
+                  <CCol md={7}>
+                    <CFormLabel>Product</CFormLabel>
+
+                    <CFormSelect
+                      value={item.product_id}
+                      onChange={(e) => handleItemChange(index, 'product_id', e.target.value)}
+                    >
+                      <option value="">Select product</option>
+
+                      {products.map((product) => (
+                        <option
+                          key={product.id}
+                          value={product.id}
+                          disabled={Number(product.quantity) <= 0}
+                        >
+                          {product.name} — Stock: {product.quantity}
+                        </option>
+                      ))}
+                    </CFormSelect>
+                  </CCol>
+
+                  <CCol md={3}>
+                    <CFormLabel>Quantity</CFormLabel>
+
+                    <CFormInput
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={item.quantity}
+                      onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                    />
+                  </CCol>
+
+                  <CCol md={2}>
+                    <CButton
+                      type="button"
+                      color="danger"
+                      variant="outline"
+                      className="w-100"
+                      disabled={formItems.length === 1}
+                      onClick={() => removeItem(index)}
+                    >
+                      <CIcon icon={cilTrash} />
+                    </CButton>
+                  </CCol>
+                </CRow>
+              ))}
             </div>
 
-            {formItems.map((item, index) => {
-              const selectedProduct = products.find(
-                (product) => String(product.id) === String(item.product_id),
-              )
+            {/* NOTES */}
 
-              const stock = Number(selectedProduct?.quantity || 0)
+            <div className="mb-3">
+              <CFormLabel>Notes</CFormLabel>
 
-              const quantity = Number(item.quantity || 0)
+              <CFormTextarea
+                rows={3}
+                placeholder="Additional notes..."
+                value={form.notes}
+                onChange={(e) => handleFormChange('notes', e.target.value)}
+              />
+            </div>
 
-              const insufficient = selectedProduct && quantity > stock
+            {/* INFO */}
 
-              return (
-                <CCard key={index} className="border mb-3">
-                  <CCardBody>
-                    <CRow className="g-3 align-items-end">
-                      <CCol xs={12} md={6}>
-                        <CFormLabel className="small fw-semibold">Product</CFormLabel>
+            <CAlert color="info" className="mb-0">
+              <CIcon icon={cilInfo} className="me-2" />
+              Stock will only be deducted after the request is approved.
+            </CAlert>
+          </CModalBody>
 
-                        <CFormSelect
-                          value={item.product_id}
-                          onChange={(e) => handleItemChange(index, 'product_id', e.target.value)}
-                        >
-                          <option value="">Select product</option>
+          <CModalFooter>
+            <CButton
+              color="secondary"
+              variant="outline"
+              type="button"
+              disabled={saving}
+              onClick={() => setShowCreateModal(false)}
+            >
+              Cancel
+            </CButton>
 
-                          {products.map((product) => (
-                            <option key={product.id} value={product.id}>
-                              {product.name} — Stock: {product.quantity}
-                            </option>
-                          ))}
-                        </CFormSelect>
-                      </CCol>
-
-                      <CCol xs={8} md={3}>
-                        <CFormLabel className="small fw-semibold">Quantity</CFormLabel>
-
-                        <CFormInput
-                          type="number"
-                          min="1"
-                          step="1"
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                        />
-                      </CCol>
-
-                      <CCol xs={4} md={2}>
-                        <div className="small text-body-secondary mb-1">Available</div>
-
-                        <div
-                          className={
-                            insufficient ? 'fw-semibold text-danger' : 'fw-semibold text-success'
-                          }
-                        >
-                          {selectedProduct ? stock : '—'}
-                        </div>
-                      </CCol>
-
-                      <CCol xs={12} md={1}>
-                        <CButton
-                          color="light"
-                          className="w-100 text-danger"
-                          disabled={formItems.length === 1}
-                          onClick={() => removeItem(index)}
-                        >
-                          <CIcon icon={cilTrash} />
-                        </CButton>
-                      </CCol>
-                    </CRow>
-
-                    {insufficient && (
-                      <div className="text-danger small mt-2">
-                        Requested quantity exceeds available stock.
-                      </div>
-                    )}
-                  </CCardBody>
-                </CCard>
-              )
-            })}
-          </div>
-
-          {/* NOTES */}
-
-          <div className="mt-3">
-            <CFormLabel className="fw-semibold">Notes</CFormLabel>
-
-            <CFormInput
-              value={form.notes}
-              onChange={(e) => handleFormChange('notes', e.target.value)}
-              placeholder="Optional notes..."
-            />
-          </div>
-        </CModalBody>
-
-        <CModalFooter>
-          <CButton color="light" disabled={saving} onClick={() => setShowCreateModal(false)}>
-            Cancel
-          </CButton>
-
-          <CButton color="primary" disabled={saving} onClick={handleCreateConsumption}>
-            {saving ? (
-              <>
-                <CSpinner size="sm" className="me-2" />
-                Submitting...
-              </>
-            ) : (
-              <>
-                <CIcon icon={cilCheck} className="me-2" />
-                Submit Request
-              </>
-            )}
-          </CButton>
-        </CModalFooter>
+            <CButton color="primary" type="submit" disabled={saving}>
+              {saving ? (
+                <>
+                  <CSpinner size="sm" className="me-2" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CIcon icon={cilCheck} className="me-2" />
+                  Submit Request
+                </>
+              )}
+            </CButton>
+          </CModalFooter>
+        </CForm>
       </CModal>
 
-      {/* =====================================================
+      {/* ======================================================
           DETAILS MODAL
       ====================================================== */}
 
-      <CModal
-        visible={showDetailsModal}
-        onClose={() => !saving && setShowDetailsModal(false)}
-        size="lg"
-      >
+      <CModal visible={showDetailsModal} onClose={() => setShowDetailsModal(false)} size="lg">
         <CModalHeader>
-          <CModalTitle>Product Usage Details</CModalTitle>
+          <CModalTitle className="fw-bold">Consumption Details</CModalTitle>
         </CModalHeader>
 
         <CModalBody>
           {selectedConsumption && (
             <>
-              <div className="d-flex flex-column flex-md-row justify-content-between gap-3 mb-4">
-                <div>
-                  <div className="small text-body-secondary">Reference</div>
+              <CRow className="mb-4">
+                <CCol md={6}>
+                  <small className="text-medium-emphasis">Reference</small>
 
-                  <div className="fs-5 fw-semibold">{selectedConsumption.reference_number}</div>
-                </div>
-
-                <div>{renderStatus(selectedConsumption.status)}</div>
-              </div>
-
-              <CRow className="g-3 mb-4">
-                <CCol xs={12} md={4}>
-                  <div className="small text-body-secondary">Staff</div>
-
-                  <div className="fw-semibold">
-                    {selectedConsumption.Staff?.fullname ||
-                      selectedConsumption.Staff?.name ||
-                      'Unknown'}
+                  <div className="fw-bold">
+                    {selectedConsumption.reference_number || `#${selectedConsumption.id}`}
                   </div>
                 </CCol>
 
-                <CCol xs={12} md={4}>
-                  <div className="small text-body-secondary">Requested</div>
+                <CCol md={6}>
+                  <small className="text-medium-emphasis">Status</small>
+
+                  <div className="mt-1">{getStatusBadge(selectedConsumption.status)}</div>
+                </CCol>
+              </CRow>
+
+              <CRow className="mb-4">
+                <CCol md={6}>
+                  <small className="text-medium-emphasis">Staff</small>
+
+                  <div className="fw-semibold">{getStaffName(selectedConsumption.Staff)}</div>
+                </CCol>
+
+                <CCol md={6}>
+                  <small className="text-medium-emphasis">Requested At</small>
 
                   <div className="fw-semibold">
                     {formatDate(selectedConsumption.requested_at || selectedConsumption.createdAt)}
                   </div>
                 </CCol>
-
-                <CCol xs={12} md={4}>
-                  <div className="small text-body-secondary">Total Value</div>
-
-                  <div className="fw-semibold">
-                    ₦
-                    {getTotalCost(selectedConsumption).toLocaleString('en-NG', {
-                      minimumFractionDigits: 2,
-                    })}
-                  </div>
-                </CCol>
               </CRow>
 
-              {/* PRODUCTS */}
-
               <div className="mb-4">
-                <div className="fw-semibold mb-2">Products</div>
+                <small className="text-medium-emphasis">Reason</small>
 
-                <div className="table-responsive border rounded">
-                  <CTable hover className="mb-0">
-                    <CTableHead>
-                      <CTableRow>
-                        <CTableHeaderCell>Product</CTableHeaderCell>
-
-                        <CTableHeaderCell>Quantity</CTableHeaderCell>
-
-                        <CTableHeaderCell>Unit Cost</CTableHeaderCell>
-
-                        <CTableHeaderCell className="text-end">Total</CTableHeaderCell>
-                      </CTableRow>
-                    </CTableHead>
-
-                    <CTableBody>
-                      {selectedConsumption.Items?.map((item) => (
-                        <CTableRow key={item.id}>
-                          <CTableDataCell>
-                            <div className="fw-medium">{item.Product?.name}</div>
-                          </CTableDataCell>
-
-                          <CTableDataCell>{item.quantity}</CTableDataCell>
-
-                          <CTableDataCell>
-                            ₦
-                            {Number(item.unit_cost || 0).toLocaleString('en-NG', {
-                              minimumFractionDigits: 2,
-                            })}
-                          </CTableDataCell>
-
-                          <CTableDataCell className="text-end fw-semibold">
-                            ₦
-                            {Number(item.total_cost || 0).toLocaleString('en-NG', {
-                              minimumFractionDigits: 2,
-                            })}
-                          </CTableDataCell>
-                        </CTableRow>
-                      ))}
-                    </CTableBody>
-                  </CTable>
-                </div>
+                <div className="fw-semibold">{selectedConsumption.reason || '-'}</div>
               </div>
 
-              {/* REASON */}
+              <div className="mb-4">
+                <small className="text-medium-emphasis">Notes</small>
 
-              {selectedConsumption.reason && (
-                <div className="mb-3">
-                  <div className="small text-body-secondary">Reason</div>
+                <div>{selectedConsumption.notes || '-'}</div>
+              </div>
 
-                  <div>{selectedConsumption.reason}</div>
-                </div>
-              )}
+              <h6 className="fw-bold mb-3">Products</h6>
 
-              {/* NOTES */}
+              <CTable bordered hover responsive>
+                <CTableHead>
+                  <CTableRow>
+                    <CTableHeaderCell>Product</CTableHeaderCell>
 
-              {selectedConsumption.notes && (
-                <div className="mb-3">
-                  <div className="small text-body-secondary">Notes</div>
+                    <CTableHeaderCell>Quantity</CTableHeaderCell>
 
-                  <div>{selectedConsumption.notes}</div>
-                </div>
-              )}
+                    <CTableHeaderCell>Unit Cost</CTableHeaderCell>
 
-              {/* APPROVED */}
+                    <CTableHeaderCell>Total Cost</CTableHeaderCell>
+                  </CTableRow>
+                </CTableHead>
 
-              {selectedConsumption.status === 'approved' && (
-                <CAlert color="success">
-                  <strong>Approved</strong>
+                <CTableBody>
+                  {selectedConsumption.Items?.map((consumptionItem) => (
+                    <CTableRow key={consumptionItem.id}>
+                      <CTableDataCell>{getProductName(consumptionItem.Product)}</CTableDataCell>
 
-                  <div className="small mt-1">
-                    Approved on {formatDate(selectedConsumption.approved_at)}
-                  </div>
+                      <CTableDataCell>{consumptionItem.quantity}</CTableDataCell>
+
+                      <CTableDataCell>{formatCurrency(consumptionItem.unit_cost)}</CTableDataCell>
+
+                      <CTableDataCell>{formatCurrency(consumptionItem.total_cost)}</CTableDataCell>
+                    </CTableRow>
+                  ))}
+                </CTableBody>
+              </CTable>
+
+              {selectedConsumption.status === 'rejected' && (
+                <CAlert color="danger" className="mt-4 mb-0">
+                  <strong>Rejection Reason:</strong>{' '}
+                  {selectedConsumption.rejection_reason || 'No reason provided.'}
                 </CAlert>
               )}
 
-              {/* REJECTED */}
-
-              {selectedConsumption.status === 'rejected' && (
-                <CAlert color="danger">
-                  <strong>Rejected</strong>
-
-                  <div className="small mt-1">{selectedConsumption.rejection_reason}</div>
-
-                  <div className="small mt-1">
-                    Rejected on {formatDate(selectedConsumption.rejected_at)}
-                  </div>
+              {selectedConsumption.status === 'approved' && (
+                <CAlert color="success" className="mt-4 mb-0">
+                  <CIcon icon={cilCheck} className="me-2" />
+                  This request has been approved and the product stock was deducted.
                 </CAlert>
               )}
             </>
@@ -1221,17 +1159,13 @@ const ProductConsumption = () => {
         </CModalBody>
 
         <CModalFooter>
-          <CButton color="light" disabled={saving} onClick={() => setShowDetailsModal(false)}>
-            Close
-          </CButton>
-
           {selectedConsumption?.status === 'pending' && (
             <>
               <CButton
                 color="danger"
                 variant="outline"
-                disabled={saving}
-                onClick={() => openRejectModal(selectedConsumption)}
+                disabled={actionLoading}
+                onClick={() => openRejectModal(selectedConsumption.id)}
               >
                 <CIcon icon={cilX} className="me-2" />
                 Reject
@@ -1239,64 +1173,74 @@ const ProductConsumption = () => {
 
               <CButton
                 color="success"
-                disabled={saving}
+                disabled={actionLoading}
                 onClick={() => handleApprove(selectedConsumption.id)}
               >
-                {saving ? (
+                {actionLoading ? (
                   <CSpinner size="sm" />
                 ) : (
                   <>
                     <CIcon icon={cilCheck} className="me-2" />
-                    Approve & Deduct Stock
+                    Approve
                   </>
                 )}
               </CButton>
             </>
           )}
+
+          <CButton color="secondary" onClick={() => setShowDetailsModal(false)}>
+            Close
+          </CButton>
         </CModalFooter>
       </CModal>
 
-      {/* =====================================================
+      {/* ======================================================
           REJECT MODAL
       ====================================================== */}
 
       <CModal
         visible={showRejectModal}
-        onClose={() => !saving && setShowRejectModal(false)}
-        size="sm"
+        onClose={() => !actionLoading && setShowRejectModal(false)}
         backdrop="static"
       >
         <CModalHeader>
-          <CModalTitle>Reject Request</CModalTitle>
+          <CModalTitle className="fw-bold">Reject Consumption Request</CModalTitle>
         </CModalHeader>
 
         <CModalBody>
-          <div className="mb-3 text-body-secondary">
-            Please provide a reason for rejecting this product usage request.
-          </div>
+          <CAlert color="warning">
+            <CIcon icon={cilWarning} className="me-2" />
+            Rejecting this request will not deduct any stock.
+          </CAlert>
 
-          <CFormLabel className="fw-semibold">Rejection Reason</CFormLabel>
+          <CFormLabel>
+            Rejection Reason <span className="text-danger">*</span>
+          </CFormLabel>
 
-          <CFormInput
-            value={rejectionReason}
-            onChange={(e) => setRejectionReason(e.target.value)}
-            placeholder="Enter rejection reason..."
-            autoFocus
+          <CFormTextarea
+            rows={4}
+            placeholder="Enter the reason for rejecting this request..."
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
           />
         </CModalBody>
 
         <CModalFooter>
-          <CButton color="light" disabled={saving} onClick={() => setShowRejectModal(false)}>
+          <CButton
+            color="secondary"
+            variant="outline"
+            disabled={actionLoading}
+            onClick={() => setShowRejectModal(false)}
+          >
             Cancel
           </CButton>
 
-          <CButton
-            color="danger"
-            disabled={saving || !rejectionReason.trim()}
-            onClick={() => handleReject(selectedConsumption?.id)}
-          >
-            {saving ? (
-              <CSpinner size="sm" />
+          <CButton color="danger" disabled={actionLoading} onClick={handleReject}>
+            {actionLoading ? (
+              <>
+                <CSpinner size="sm" className="me-2" />
+                Rejecting...
+              </>
             ) : (
               <>
                 <CIcon icon={cilX} className="me-2" />
