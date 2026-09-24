@@ -797,7 +797,7 @@ const POSPage = () => {
   }
   const [currentPageServices, setCurrentPageServices] = useState(1)
   const [currentPageProducts, setCurrentPageProducts] = useState(1)
-  const itemsPerPage = 8 // Number of items per page
+  const itemsPerPage = 12 // Number of items per page
 
   // Paginate Services
   const indexOfLastService = currentPageServices * itemsPerPage
@@ -1202,9 +1202,21 @@ const POSPage = () => {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
                 {[
                   { text: 'Scan Code', icon: cilBarcode, onClick: () => setShowBarcodeModal(true) },
-                  { text: 'New Client', icon: cilUserPlus, onClick: () => setShowNewCustomerModal(true) },
-                  { text: 'Loyalty', icon: cilCreditCard, onClick: () => setShowLoyaltyModal(true) },
-                  { text: 'Reprint', icon: cilPrint, onClick: () => setShowReceiptSearchModal(true) },
+                  {
+                    text: 'New Client',
+                    icon: cilUserPlus,
+                    onClick: () => setShowNewCustomerModal(true),
+                  },
+                  {
+                    text: 'Loyalty',
+                    icon: cilCreditCard,
+                    onClick: () => setShowLoyaltyModal(true),
+                  },
+                  {
+                    text: 'Reprint',
+                    icon: cilPrint,
+                    onClick: () => setShowReceiptSearchModal(true),
+                  },
                 ].map((action) => (
                   <button
                     key={action.text}
@@ -1302,7 +1314,10 @@ const POSPage = () => {
               </div>
 
               {[
-                ['All Inventory', activeTab === 'services' ? filteredServices.length : filteredProducts.length],
+                [
+                  'All Inventory',
+                  activeTab === 'services' ? filteredServices.length : filteredProducts.length,
+                ],
                 ['Hair Styling & Cuts', ''],
                 ['Treatments & Spa', ''],
                 ['Beard & Grooming', ''],
@@ -1619,7 +1634,9 @@ const POSPage = () => {
                       </span>
                       <button
                         type="button"
-                        disabled={currentPageServices === totalServicePages || totalServicePages === 0}
+                        disabled={
+                          currentPageServices === totalServicePages || totalServicePages === 0
+                        }
                         onClick={() => setCurrentPageServices((prev) => prev + 1)}
                         style={{
                           border: '1px solid #2b3138',
@@ -1644,7 +1661,11 @@ const POSPage = () => {
                       color: '#6f7780',
                     }}
                   >
-                    <CIcon icon={cilCart} size="xl" style={{ color: '#424850', marginBottom: '8px' }} />
+                    <CIcon
+                      icon={cilCart}
+                      size="xl"
+                      style={{ color: '#424850', marginBottom: '8px' }}
+                    />
                     <div style={{ fontWeight: 800 }}>No services found</div>
                     <div style={{ fontSize: '8px', marginTop: '4px' }}>Try another search.</div>
                   </div>
@@ -1802,7 +1823,9 @@ const POSPage = () => {
                     </span>
                     <button
                       type="button"
-                      disabled={currentPageProducts === totalProductPages || totalProductPages === 0}
+                      disabled={
+                        currentPageProducts === totalProductPages || totalProductPages === 0
+                      }
                       onClick={() => setCurrentPageProducts((prev) => prev + 1)}
                       style={{
                         border: '1px solid #2b3138',
@@ -1827,7 +1850,11 @@ const POSPage = () => {
                     color: '#6f7780',
                   }}
                 >
-                  <CIcon icon={cilCart} size="xl" style={{ color: '#424850', marginBottom: '8px' }} />
+                  <CIcon
+                    icon={cilCart}
+                    size="xl"
+                    style={{ color: '#424850', marginBottom: '8px' }}
+                  />
                   <div style={{ fontWeight: 800 }}>No products found</div>
                   <div style={{ fontSize: '8px', marginTop: '4px' }}>Try another search.</div>
                 </div>
@@ -2295,7 +2322,13 @@ const POSPage = () => {
                     cursor: 'pointer',
                   }}
                 >
-                  <span style={{ display: 'block', color: useWallet ? '#e8bd35' : '#c5c9cd', fontWeight: 900 }}>
+                  <span
+                    style={{
+                      display: 'block',
+                      color: useWallet ? '#e8bd35' : '#c5c9cd',
+                      fontWeight: 900,
+                    }}
+                  >
                     ₦{Number(selectedCustomer.walletBalance || 0).toLocaleString()}
                   </span>
                   {useWallet ? 'WALLET ENABLED' : 'WALLET BALANCE'}
@@ -2303,12 +2336,27 @@ const POSPage = () => {
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#777f88', fontSize: '8px', marginBottom: '4px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                color: '#777f88',
+                fontSize: '8px',
+                marginBottom: '4px',
+              }}
+            >
               <span>Subtotal</span>
               <span>₦{Number(subtotal).toLocaleString()}</span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '4px',
+              }}
+            >
               <span style={{ color: '#777f88', fontSize: '8px' }}>Discount</span>
               <CFormInput
                 type="number"
@@ -2328,14 +2376,30 @@ const POSPage = () => {
             </div>
 
             {usePoints && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e8bd35', fontSize: '8px', marginBottom: '3px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  color: '#e8bd35',
+                  fontSize: '8px',
+                  marginBottom: '3px',
+                }}
+              >
                 <span>Points Discount</span>
                 <span>- ₦{Number(pointsDiscount || 0).toLocaleString()}</span>
               </div>
             )}
 
             {useWallet && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e8bd35', fontSize: '8px', marginBottom: '3px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  color: '#e8bd35',
+                  fontSize: '8px',
+                  marginBottom: '3px',
+                }}
+              >
                 <span>Wallet Used</span>
                 <span>- ₦{Number(walletUsed || 0).toLocaleString()}</span>
               </div>
@@ -2352,17 +2416,28 @@ const POSPage = () => {
               }}
             >
               <div>
-                <div style={{ color: '#777f88', fontSize: '7px', textTransform: 'uppercase', letterSpacing: '.8px' }}>
+                <div
+                  style={{
+                    color: '#777f88',
+                    fontSize: '7px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '.8px',
+                  }}
+                >
                   Total Due
                 </div>
-                <div style={{ color: '#e8bd35', fontSize: '21px', lineHeight: 1.1, fontWeight: 900 }}>
+                <div
+                  style={{ color: '#e8bd35', fontSize: '21px', lineHeight: 1.1, fontWeight: 900 }}
+                >
                   ₦{Number(total).toLocaleString()}
                 </div>
               </div>
 
               <div style={{ textAlign: 'right', color: '#6e767e', fontSize: '7px' }}>
                 <div>LOYALTY EARNED</div>
-                <div style={{ color: '#c2c7cc', fontWeight: 900 }}>{Math.floor(total / 1000)} pts</div>
+                <div style={{ color: '#c2c7cc', fontWeight: 900 }}>
+                  {Math.floor(total / 1000)} pts
+                </div>
               </div>
             </div>
 
@@ -2685,25 +2760,134 @@ const POSPage = () => {
           <CModalTitle>Change Service Price</CModalTitle>
         </CModalHeader>
 
-        <CModalBody>
+        <CModalBody
+          style={{
+            background: '#f5f7fb',
+            padding: '22px',
+          }}
+        >
           {editingItem && (
             <>
-              <h5 className="fw-bold mb-3">{editingItem.name}</h5>
+              {/* PRODUCT / SERVICE HEADER */}
+              <div
+                style={{
+                  background: '#111827',
+                  borderRadius: '16px',
+                  padding: '18px 20px',
+                  color: '#fff',
+                  marginBottom: '18px',
+                  boxShadow: '0 8px 24px rgba(17, 24, 39, 0.14)',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '11px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1.3px',
+                    color: '#e8bd35',
+                    fontWeight: '700',
+                    marginBottom: '5px',
+                  }}
+                >
+                  Edit Item Price
+                </div>
 
-              <div className="mb-3">
-                <small className="text-muted">Original Price</small>
-
-                <h4 className="text-primary">
-                  ₦{Number(editingItem.originalPrice || editingItem.price).toLocaleString()}
-                </h4>
+                <h5
+                  className="mb-0"
+                  style={{
+                    fontWeight: '700',
+                    fontSize: '18px',
+                    color: '#fff',
+                  }}
+                >
+                  {editingItem.name}
+                </h5>
               </div>
 
-              <CFormInput
-                label="New Price"
-                type="number"
-                value={editedPrice}
-                onChange={(e) => setEditedPrice(e.target.value)}
-              />
+              {/* ORIGINAL PRICE */}
+              <div
+                style={{
+                  background: '#fff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '14px',
+                  padding: '16px 18px',
+                  marginBottom: '16px',
+                  boxShadow: '0 3px 12px rgba(17, 24, 39, 0.04)',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '11px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '.8px',
+                    color: '#6b7280',
+                    fontWeight: '700',
+                    marginBottom: '5px',
+                  }}
+                >
+                  Original Price
+                </div>
+
+                <div
+                  style={{
+                    fontSize: '24px',
+                    fontWeight: '800',
+                    color: '#111827',
+                  }}
+                >
+                  ₦{Number(editingItem.originalPrice || editingItem.price).toLocaleString()}
+                </div>
+              </div>
+
+              {/* NEW PRICE */}
+              <div
+                style={{
+                  background: '#fff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '14px',
+                  padding: '18px',
+                  boxShadow: '0 3px 12px rgba(17, 24, 39, 0.04)',
+                }}
+              >
+                <label
+                  className="form-label"
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    textTransform: 'uppercase',
+                    letterSpacing: '.7px',
+                    color: '#6b7280',
+                  }}
+                >
+                  New Price
+                </label>
+
+                <CFormInput
+                  type="number"
+                  value={editedPrice}
+                  onChange={(e) => setEditedPrice(e.target.value)}
+                  placeholder="Enter new price"
+                  style={{
+                    height: '50px',
+                    borderRadius: '12px',
+                    border: '1px solid #dfe3e8',
+                    fontSize: '17px',
+                    fontWeight: '600',
+                    color: '#111827',
+                    boxShadow: 'none',
+                  }}
+                />
+
+                <small
+                  className="d-block mt-2"
+                  style={{
+                    color: '#6b7280',
+                    fontSize: '12px',
+                  }}
+                >
+                  Enter the price you want to charge for this item.
+                </small>
+              </div>
             </>
           )}
         </CModalBody>
