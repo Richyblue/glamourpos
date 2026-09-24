@@ -875,879 +875,1597 @@ const POSPage = () => {
     boxShadow: '0 5px 18px rgba(0,0,0,.08)',
   }
   return (
-    <CContainer fluid className="py-2 px-3" style={{ background: '#f5f7fb', minHeight: '100vh' }}>
-      <CCard
-        className="border-0 shadow-sm mb-2"
+    <div
+      className="glamour-pos-shell"
+      style={{
+        minHeight: '100vh',
+        height: '100vh',
+        overflow: 'hidden',
+        background: '#0d0f12',
+        color: '#f4f5f6',
+        fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontSize: '12px',
+      }}
+    >
+      {/* =========================================================
+          TOP POS HEADER
+      ========================================================== */}
+      <div
         style={{
-          borderRadius: '20px',
-          background: '#fff',
+          height: '52px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '0 10px',
+          background: '#101317',
+          borderBottom: '1px solid #282d33',
         }}
       >
-        <CCardBody>
-          <CRow className="g-3">
-            <CCol md={2}>
-              <CButton
-                className="w-100 shadow"
-                style={{
-                  ...actionCardStyle,
-                  background: 'linear-gradient(135deg,#667eea,#764ba2)',
-                }}
-                onClick={() => setShowNewCustomerModal(true)}
-              >
-                <CIcon icon={cilUserPlus} size="xl" />
-                <small>New Customer</small>
-              </CButton>
-            </CCol>
-
-            <CCol md={2}>
-              <CButton
-                className="w-100 shadow"
-                style={{
-                  ...actionCardStyle,
-                  background: 'linear-gradient(135deg,#11998e,#38ef7d)',
-                }}
-                onClick={() => setShowCustomerModal(true)}
-              >
-                <CIcon icon={cilPeople} size="xl" />
-                <small>Customers</small>
-              </CButton>
-            </CCol>
-
-            <CCol md={2}>
-              <CButton
-                className="w-100 shadow"
-                style={{
-                  ...actionCardStyle,
-                  background: 'linear-gradient(135deg,#36d1dc,#5b86e5)',
-                }}
-              >
-                <CIcon icon={cilUser} size="xl" />
-                <small>Staff</small>
-              </CButton>
-            </CCol>
-
-            <CCol md={2}>
-              <CButton
-                className="w-100 shadow"
-                style={{
-                  ...actionCardStyle,
-                  background: 'linear-gradient(135deg,#f7971e,#ffd200)',
-                }}
-                onClick={() => setShowLoyaltyModal(true)}
-              >
-                <CIcon icon={cilCreditCard} size="xl" />
-                <small>Loyalty</small>
-              </CButton>
-            </CCol>
-
-            <CCol md={2}>
-              <CButton
-                className="w-100 shadow"
-                style={{
-                  ...actionCardStyle,
-                  background: 'linear-gradient(135deg,#232526,#414345)',
-                }}
-                onClick={() => setShowBarcodeModal(true)}
-              >
-                <CIcon icon={cilBarcode} size="xl" />
-                <small>Barcode</small>
-              </CButton>
-            </CCol>
-
-            <CCol md={2}>
-              <CButton
-                className="w-100 shadow"
-                style={{
-                  ...actionCardStyle,
-                  background: 'linear-gradient(135deg,#fc466b,#3f5efb)',
-                }}
-                onClick={() => setShowReceiptSearchModal(true)}
-              >
-                <CIcon icon={cilPrint} size="xl" />
-                <small>Reprint</small>
-              </CButton>
-            </CCol>
-
-            <CCol md={2}>
-              <CButton
-                className="w-100 shadow"
-                style={{
-                  ...actionCardStyle,
-                  background: 'linear-gradient(135deg,#ff416c,#ff4b2b)',
-                }}
-                onClick={() => setShowClearCartModal(true)}
-              >
-                <CIcon icon={cilTrash} size="xl" />
-                <small>Clear Cart</small>
-              </CButton>
-            </CCol>
-
-            <CCol md={2}>
-              <CButton
-                className="w-100 shadow"
-                style={{
-                  ...actionCardStyle,
-                  background: 'linear-gradient(135deg,#4e54c8,#8f94fb)',
-                }}
-              >
-                <CIcon icon={cilSpeedometer} size="xl" />
-                <small>Dashboard</small>
-              </CButton>
-            </CCol>
-
-            <CCol md={2}>
-              <Link
-                to="/salesReport"
-                style={{
-                  textDecoration: 'none',
-                }}
-              >
-                <CButton
-                  className="w-100 shadow"
-                  style={{
-                    ...actionCardStyle,
-                    background: 'linear-gradient(135deg,#00c6ff,#0072ff)',
-                  }}
-                >
-                  <CIcon icon={cilChart} size="xl" />
-                  <small>Sales Report</small>
-                </CButton>
-              </Link>
-            </CCol>
-
-            <CCol md={2}>
-              <div
-                style={{
-                  height: '90px',
-                }}
-              >
-                <LogoutButton />
-              </div>
-            </CCol>
-          </CRow>
-        </CCardBody>
-      </CCard>
-      <CRow style={{ width: '100%', marginLeft: '0px' }}>
-        <CCol md={6}>
-          <CCard className="shadow-sm border-0 h-100" style={{ borderRadius: '18px' }}>
-            <CCardBody>
-              <CFormInput
-                className="mb-3"
-                placeholder="Search service or product..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-
-              <CNav variant="tabs" activeKey={activeTab}>
-                <CNavItem>
-                  <CNavLink eventKey="services" onClick={() => setActiveTab('services')}>
-                    Services
-                  </CNavLink>
-                </CNavItem>
-
-                <CNavItem>
-                  <CNavLink eventKey="products" onClick={() => setActiveTab('products')}>
-                    Products
-                  </CNavLink>
-                </CNavItem>
-              </CNav>
-              <div className="mt-3">
-                {/* Services Tab */}
-                {activeTab === 'services' &&
-                  (filteredServices.length > 0 ? (
-                    <>
-                      <CRow>
-                        {currentServices.map((service) => (
-                          <CCol xs={6} md={4} lg={3} key={service.id} className="mb-3">
-                            <CCard
-                              className="border-0 shadow h-100"
-                              style={{
-                                borderRadius: '18px',
-                                overflow: 'hidden',
-                                cursor: 'pointer',
-                                background: getServiceColor(service.id),
-                                transition: 'all 0.3s ease',
-                                minHeight: '150px',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-5px)'
-                                e.currentTarget.style.boxShadow = '0 12px 25px rgba(0,0,0,0.15)'
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0px)'
-                                e.currentTarget.style.boxShadow = ''
-                              }}
-                              onClick={() =>
-                                addToCart({
-                                  ...service,
-                                  price: service.price,
-                                  type: 'service',
-                                })
-                              }
-                            >
-                              <CCardBody className="d-flex flex-column justify-content-between text-white p-3">
-                                <div>
-                                  <div
-                                    className="mb-3"
-                                    style={{
-                                      width: '50px',
-                                      height: '50px',
-                                      borderRadius: '14px',
-                                      background: 'rgba(255,255,255,0.20)',
-                                      backdropFilter: 'blur(10px)',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontSize: '24px',
-                                      border: '1px solid rgba(255,255,255,0.30)',
-                                    }}
-                                  >
-                                    ✂️
-                                  </div>
-
-                                  <h6
-                                    className="fw-bold mb-1"
-                                    style={{
-                                      fontSize: '15px',
-                                      lineHeight: '1.3',
-                                    }}
-                                  >
-                                    {service.name}
-                                  </h6>
-                                </div>
-
-                                <div className="mt-1">
-                                  <div
-                                    style={{
-                                      width: '100%',
-                                      height: '1px',
-                                      background: 'rgba(255,255,255,0.2)',
-                                      marginBottom: '10px',
-                                    }}
-                                  />
-
-                                  <h5
-                                    className="fw-bold mb-0"
-                                    style={{
-                                      letterSpacing: '0.5px',
-                                    }}
-                                  >
-                                    ₦{Number(service.price).toLocaleString()}
-                                  </h5>
-                                </div>
-                              </CCardBody>
-                            </CCard>
-                          </CCol>
-                        ))}
-                      </CRow>
-                      {/* Pagination Controls for Services */}
-                      <div className="pagination-controls mt-3">
-                        <CButton
-                          color="secondary"
-                          disabled={currentPageServices === 1}
-                          onClick={() => setCurrentPageServices((prev) => prev - 1)}
-                        >
-                          Previous
-                        </CButton>
-                        <span className="mx-2">
-                          Page {currentPageServices} of {totalServicePages}
-                        </span>
-                        <CButton
-                          color="secondary"
-                          disabled={currentPageServices === totalServicePages}
-                          onClick={() => setCurrentPageServices((prev) => prev + 1)}
-                        >
-                          Next
-                        </CButton>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-center text-medium-emphasis">No services found</div>
-                  ))}
-
-                {/* Products Tab */}
-                {activeTab === 'products' &&
-                  (loadingProducts ? (
-                    <div className="text-center py-3">Loading Products...</div>
-                  ) : filteredProducts.length > 0 ? (
-                    <>
-                      <CRow>
-                        {currentProducts.map((product) => (
-                          <CCol xs={6} md={4} lg={3} key={product.id} className="mb-3">
-                            <CCard
-                              className="border-0 shadow h-100"
-                              style={{
-                                cursor: 'pointer',
-                                borderRadius: '18px',
-                                overflow: 'hidden',
-                                transition: 'all .3s ease',
-                                background: '#fff',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-5px)'
-                                e.currentTarget.style.boxShadow = '0 12px 25px rgba(0,0,0,0.15)'
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0px)'
-                                e.currentTarget.style.boxShadow = ''
-                              }}
-                              onClick={() =>
-                                addToCart({
-                                  ...product,
-                                  price: product.sellingPrice,
-                                  type: 'product',
-                                })
-                              }
-                            >
-                              <div
-                                style={{
-                                  height: '90px',
-                                  background: getProductColor(product.id),
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  position: 'relative',
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    width: '55px',
-                                    height: '55px',
-                                    borderRadius: '14px',
-                                    background: 'rgba(255,255,255,0.2)',
-                                    backdropFilter: 'blur(10px)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: '28px',
-                                    color: '#fff',
-                                  }}
-                                >
-                                  🧴
-                                </div>
-
-                                <div
-                                  style={{
-                                    position: 'absolute',
-                                    top: '10px',
-                                    right: '10px',
-                                    background:
-                                      product.quantity > 10
-                                        ? '#198754'
-                                        : product.quantity > 0
-                                          ? '#fd7e14'
-                                          : '#dc3545',
-                                    color: '#fff',
-                                    padding: '5px 12px',
-                                    borderRadius: '20px',
-                                    fontSize: '11px',
-                                    fontWeight: '600',
-                                  }}
-                                >
-                                  {product.quantity} In Stock
-                                </div>
-                              </div>
-
-                              <CCardBody className="d-flex flex-column justify-content-between">
-                                <div>
-                                  <h6
-                                    className="fw-bold mb-1"
-                                    style={{
-                                      minHeight: '42px',
-                                      lineHeight: '1.3',
-                                    }}
-                                  >
-                                    {product.name}
-                                  </h6>
-                                </div>
-
-                                <div className="mt-3">
-                                  <div
-                                    style={{
-                                      width: '100%',
-                                      height: '1px',
-                                      background: '#f1f3f5',
-                                      marginBottom: '10px',
-                                    }}
-                                  />
-
-                                  <div className="d-flex justify-content-between align-items-center">
-                                    <h5
-                                      className="fw-bold text-success mb-0"
-                                      style={{
-                                        letterSpacing: '.5px',
-                                      }}
-                                    >
-                                      ₦{Number(product.sellingPrice).toLocaleString()}
-                                    </h5>
-
-                                    <div
-                                      style={{
-                                        width: '35px',
-                                        height: '35px',
-                                        borderRadius: '10px',
-                                        background: '#f8f9fa',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '18px',
-                                      }}
-                                    >
-                                      🛒
-                                    </div>
-                                  </div>
-                                </div>
-                              </CCardBody>
-                            </CCard>
-                          </CCol>
-                        ))}
-                      </CRow>
-
-                      {/* Pagination Controls for Products */}
-                      <div className="pagination-controls mt-3">
-                        <CButton
-                          color="secondary"
-                          disabled={currentPageProducts === 1}
-                          onClick={() => setCurrentPageProducts((prev) => prev - 1)}
-                        >
-                          Previous
-                        </CButton>
-                        <span className="mx-2">
-                          Page {currentPageProducts} of {totalProductPages}
-                        </span>
-                        <CButton
-                          color="secondary"
-                          disabled={currentPageProducts === totalProductPages}
-                          onClick={() => setCurrentPageProducts((prev) => prev + 1)}
-                        >
-                          Next
-                        </CButton>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-center text-medium-emphasis py-3">No products found</div>
-                  ))}
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-        <CCol md={6}>
-          <CCard
-            className="shadow-sm border-0 h-100"
+        <div
+          style={{
+            width: '188px',
+            minWidth: '188px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '9px',
+          }}
+        >
+          <div
             style={{
-              borderRadius: '12px',
+              width: '30px',
+              height: '30px',
+              borderRadius: '7px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: '#e8bd35',
+              color: '#111',
+              fontWeight: 900,
+              fontSize: '12px',
             }}
           >
-            <CCardBody className="p-0">
-              {/* Customer Header */}
-              {selectedCustomer && (
-                <div
-                  className="p-3 border-bottom"
-                  style={{
-                    background: '#f8fafc',
-                  }}
-                >
-                  <div className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <h6 className="mb-1 fw-bold">{selectedCustomer.fullname}</h6>
+            GP
+          </div>
 
-                      <small className="text-muted">{selectedCustomer.phone}</small>
-                    </div>
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: '13px',
+                lineHeight: 1,
+                fontWeight: 900,
+                letterSpacing: '.6px',
+                color: '#f4f5f6',
+              }}
+            >
+              GLAMOUR POS
+            </div>
+            <div
+              style={{
+                marginTop: '4px',
+                fontSize: '8px',
+                color: '#8c939b',
+                letterSpacing: '.8px',
+                textTransform: 'uppercase',
+              }}
+            >
+              GLAMOUR UNISEX SALON • REGISTER
+            </div>
+          </div>
+        </div>
 
-                    <div>
-                      <span className="badge bg-success">
-                        {selectedCustomer.loyaltyPoints || 0} Points
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            height: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '0 10px',
+            background: '#181c21',
+            border: '1px solid #2b3037',
+            borderRadius: '6px',
+          }}
+        >
+          <CIcon icon={cilBarcode} style={{ color: '#e8bd35', flexShrink: 0 }} />
+          <CFormInput
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search catalog or scan barcode..."
+            style={{
+              border: 0,
+              outline: 0,
+              boxShadow: 'none',
+              background: 'transparent',
+              color: '#f5f6f7',
+              padding: 0,
+              fontSize: '11px',
+              height: '24px',
+            }}
+          />
+          <span
+            style={{
+              color: '#626a74',
+              fontSize: '8px',
+              border: '1px solid #343a42',
+              padding: '3px 6px',
+              borderRadius: '4px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            CTRL + K
+          </span>
+        </div>
 
-              {/* POS Grid */}
+        <div
+          style={{
+            width: '112px',
+            minWidth: '112px',
+            padding: '4px 7px',
+            background: '#15191e',
+            border: '1px solid #292f35',
+            borderRadius: '5px',
+          }}
+        >
+          <div style={{ color: '#63d391', fontSize: '8px', fontWeight: 800 }}>● ONLINE SYNC</div>
+          <div style={{ color: '#747c85', fontSize: '7px', marginTop: '2px' }}>LIVE</div>
+        </div>
+
+        <div
+          style={{
+            width: '74px',
+            minWidth: '74px',
+            textAlign: 'center',
+            color: '#dfe2e5',
+          }}
+        >
+          <div style={{ fontSize: '11px', fontWeight: 800 }}>
+            {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </div>
+          <div style={{ fontSize: '7px', color: '#777f88', marginTop: '2px' }}>WAT</div>
+        </div>
+
+        <div
+          style={{
+            width: '126px',
+            minWidth: '126px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: '7px',
+          }}
+        >
+          <div style={{ textAlign: 'right', minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: '9px',
+                fontWeight: 800,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {currentUser?.fullname || currentUser?.name || 'Cashier'}
+            </div>
+            <div style={{ fontSize: '7px', color: '#737a83' }}>MASTER STYLIST / CASHIER</div>
+          </div>
+
+          <div
+            style={{
+              width: '27px',
+              height: '27px',
+              borderRadius: '50%',
+              background: '#e8bd35',
+              color: '#111',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 900,
+              fontSize: '10px',
+            }}
+          >
+            {(currentUser?.fullname || currentUser?.name || 'C').charAt(0).toUpperCase()}
+          </div>
+        </div>
+      </div>
+
+      {/* =========================================================
+          MAIN POS AREA
+      ========================================================== */}
+      <div
+        style={{
+          height: 'calc(100vh - 52px)',
+          display: 'grid',
+          gridTemplateColumns: '54px 1fr 365px',
+          minHeight: 0,
+        }}
+      >
+        {/* =======================================================
+            LEFT NAVIGATION RAIL
+        ======================================================== */}
+        <aside
+          style={{
+            background: '#0a0c0f',
+            borderRight: '1px solid #24282e',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            padding: '8px 5px',
+            minHeight: 0,
+          }}
+        >
+          {[
+            { label: 'REG', icon: cilCart, active: true },
+            { label: 'BOOK', icon: cilNotes },
+            { label: 'CLIENT', icon: cilPeople, onClick: () => setShowCustomerModal(true) },
+            { label: 'LEDGER', icon: cilChart, onClick: () => setShowDailyReportModal(true) },
+          ].map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={item.onClick}
+              style={{
+                width: '44px',
+                height: '52px',
+                marginBottom: '4px',
+                border: 0,
+                borderRadius: '5px',
+                background: item.active ? '#e8bd35' : 'transparent',
+                color: item.active ? '#111' : '#737b84',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                cursor: item.onClick ? 'pointer' : 'default',
+              }}
+            >
+              <CIcon icon={item.icon} size="sm" />
+              <span style={{ fontSize: '6px', fontWeight: 900, letterSpacing: '.5px' }}>
+                {item.label}
+              </span>
+            </button>
+          ))}
+
+          <div style={{ flex: 1 }} />
+
+          <button
+            type="button"
+            onClick={() => setShowBarcodeModal(true)}
+            style={{
+              width: '44px',
+              height: '46px',
+              border: 0,
+              background: 'transparent',
+              color: '#777f88',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              cursor: 'pointer',
+            }}
+          >
+            <CIcon icon={cilBarcode} size="sm" />
+            <span style={{ fontSize: '6px', fontWeight: 900 }}>SCAN</span>
+          </button>
+
+          <div style={{ width: '38px', margin: '3px 0 6px', borderTop: '1px solid #252a30' }} />
+
+          <div style={{ transform: 'scale(.72)', transformOrigin: 'bottom center' }}>
+            <LogoutButton />
+          </div>
+        </aside>
+
+        {/* =======================================================
+            CATALOG
+        ======================================================== */}
+        <main
+          style={{
+            minWidth: 0,
+            minHeight: 0,
+            display: 'grid',
+            gridTemplateColumns: '178px minmax(0, 1fr)',
+            background: '#111418',
+          }}
+        >
+          {/* CATALOG FILTER / CATEGORY PANEL */}
+          <section
+            style={{
+              minWidth: 0,
+              minHeight: 0,
+              borderRight: '1px solid #282d33',
+              background: '#15191e',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                padding: '9px 9px 7px',
+                borderBottom: '1px solid #282d33',
+              }}
+            >
               <div
-                className="border rounded shadow-sm"
                 style={{
-                  maxHeight: 'calc(100vh - 360px)',
-                  overflowY: 'auto',
-                  background: '#fff',
+                  color: '#e8bd35',
+                  fontSize: '8px',
+                  fontWeight: 900,
+                  letterSpacing: '1px',
+                  marginBottom: '7px',
                 }}
               >
-                <CTable
-                  hover
-                  responsive
-                  className="mb-0 align-middle"
-                  style={{
-                    fontSize: '14px',
-                  }}
-                >
-                  <thead
+                CATALOG FILTER
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
+                {[
+                  { text: 'Scan Code', icon: cilBarcode, onClick: () => setShowBarcodeModal(true) },
+                  { text: 'New Client', icon: cilUserPlus, onClick: () => setShowNewCustomerModal(true) },
+                  { text: 'Loyalty', icon: cilCreditCard, onClick: () => setShowLoyaltyModal(true) },
+                  { text: 'Reprint', icon: cilPrint, onClick: () => setShowReceiptSearchModal(true) },
+                ].map((action) => (
+                  <button
+                    key={action.text}
+                    type="button"
+                    onClick={action.onClick}
                     style={{
-                      position: 'sticky',
-                      top: 0,
-                      background: '#f8f9fa',
-                      zIndex: 2,
-                      borderBottom: '2px solid #dee2e6',
+                      height: '37px',
+                      border: '1px solid #2c3239',
+                      borderRadius: '4px',
+                      background: '#1b2026',
+                      color: '#aeb4bb',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                      fontSize: '7px',
+                      cursor: 'pointer',
                     }}
                   >
-                    <tr>
-                      <th>#</th>
-                      <th>Item Description</th>
-                      <th className="text-center">Qty</th>
-                      <th className="text-end">Unit Price</th>
-                      <th className="text-end">Amount</th>
-                      <th className="text-center">Action</th>
-                    </tr>
-                  </thead>
+                    <CIcon icon={action.icon} size="sm" style={{ color: '#d5ad32' }} />
+                    {action.text}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-                  <tbody>
-                    {cart.map((item, index) => (
-                      <tr
-                        key={`${item.type}-${item.id}`}
-                        style={{
-                          borderBottom: '1px solid #f1f3f5',
-                        }}
-                      >
-                        <td className="fw-bold text-muted">{index + 1}</td>
+            <div style={{ padding: '9px 9px 4px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '3px',
+                  background: '#0e1114',
+                  border: '1px solid #2b3037',
+                  borderRadius: '5px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('services')}
+                  style={{
+                    flex: 1,
+                    height: '23px',
+                    border: 0,
+                    borderRadius: '3px',
+                    background: activeTab === 'services' ? '#e8bd35' : 'transparent',
+                    color: activeTab === 'services' ? '#111' : '#7e858e',
+                    fontSize: '7px',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                  }}
+                >
+                  SERVICES
+                </button>
 
-                        <td>
-                          <div>
-                            <div className="fw-semibold">{item.name}</div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('products')}
+                  style={{
+                    flex: 1,
+                    height: '23px',
+                    border: 0,
+                    borderRadius: '3px',
+                    background: activeTab === 'products' ? '#e8bd35' : 'transparent',
+                    color: activeTab === 'products' ? '#111' : '#7e858e',
+                    fontSize: '7px',
+                    fontWeight: 900,
+                    cursor: 'pointer',
+                  }}
+                >
+                  PRODUCTS
+                </button>
+              </div>
+            </div>
 
-                            <small
-                              className={`badge ${
-                                item.type === 'service' ? 'bg-primary' : 'bg-success'
-                              }`}
-                            >
-                              {item.type}
-                            </small>
-                          </div>
-                        </td>
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: 'auto',
+                padding: '6px 9px',
+              }}
+            >
+              <div
+                style={{
+                  color: '#e8bd35',
+                  fontSize: '7px',
+                  fontWeight: 900,
+                  letterSpacing: '1px',
+                  padding: '5px 3px 8px',
+                }}
+              >
+                CATEGORIES
+              </div>
 
-                        <td className="text-center">
+              {[
+                ['All Inventory', activeTab === 'services' ? filteredServices.length : filteredProducts.length],
+                ['Hair Styling & Cuts', ''],
+                ['Treatments & Spa', ''],
+                ['Beard & Grooming', ''],
+                ['Coloring & Balayage', ''],
+                ['Retail Haircare & Shampoos', ''],
+                ['Luxury Bundles & Packages', ''],
+              ].map(([label, count], index) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => {
+                    if (index === 0) setSearch('')
+                  }}
+                  style={{
+                    width: '100%',
+                    minHeight: '29px',
+                    padding: '5px 6px',
+                    marginBottom: '2px',
+                    border: 0,
+                    borderRadius: '3px',
+                    background: index === 0 ? '#20252b' : 'transparent',
+                    color: index === 0 ? '#f0f1f2' : '#7d858e',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    textAlign: 'left',
+                    fontSize: '8px',
+                    cursor: index === 0 ? 'pointer' : 'default',
+                  }}
+                >
+                  <span>{label}</span>
+                  {count !== '' && (
+                    <span
+                      style={{
+                        minWidth: '19px',
+                        padding: '2px 4px',
+                        textAlign: 'center',
+                        borderRadius: '8px',
+                        background: '#2b3036',
+                        color: '#c3c7cb',
+                        fontSize: '6px',
+                      }}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* HARDWARE STATUS */}
+            <div
+              style={{
+                margin: '7px 8px 8px',
+                padding: '8px',
+                background: '#0e1114',
+                border: '1px solid #292f35',
+                borderRadius: '4px',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '7px',
+                  fontWeight: 900,
+                  color: '#747c84',
+                  letterSpacing: '.8px',
+                  marginBottom: '6px',
+                }}
+              >
+                HARDWARE
+              </div>
+
+              {[
+                ['Thermal Printer', true],
+                ['Verifone P400 POS', true],
+                ['RJ12 Cash Drawer', true],
+              ].map(([name, connected]) => (
+                <div
+                  key={name}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '3px 0',
+                    fontSize: '7px',
+                    color: '#8d949c',
+                  }}
+                >
+                  <span>{name}</span>
+                  <span style={{ color: connected ? '#63d391' : '#dc6b6b', fontWeight: 800 }}>
+                    {connected ? '● Ready' : '● Offline'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* PRODUCT GRID */}
+          <section
+            style={{
+              minWidth: 0,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                height: '43px',
+                minHeight: '43px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '7px 9px',
+                borderBottom: '1px solid #282d33',
+                background: '#12161a',
+              }}
+            >
+              {['Favorites', 'Hair', 'Beard', 'Spa', 'Retail', 'Packages'].map((item, index) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => index === 0 && setSearch('')}
+                  style={{
+                    height: '27px',
+                    padding: '0 10px',
+                    borderRadius: '4px',
+                    border: '1px solid #2d333a',
+                    background: index === 0 ? '#252b31' : '#181d22',
+                    color: index === 0 ? '#e8bd35' : '#7d858d',
+                    fontSize: '7px',
+                    fontWeight: 800,
+                    cursor: index === 0 ? 'pointer' : 'default',
+                  }}
+                >
+                  {item}
+                </button>
+              ))}
+
+              <div style={{ flex: 1 }} />
+
+              <button
+                type="button"
+                onClick={() => setShowClearCartModal(true)}
+                style={{
+                  height: '27px',
+                  padding: '0 9px',
+                  border: '1px solid #3a2b2b',
+                  borderRadius: '4px',
+                  background: '#21191a',
+                  color: '#d97878',
+                  fontSize: '7px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                CLEAR
+              </button>
+            </div>
+
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                overflowY: 'auto',
+                padding: '8px',
+              }}
+            >
+              {activeTab === 'services' ? (
+                loading ? (
+                  <div
+                    style={{
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#727a83',
+                    }}
+                  >
+                    Loading services...
+                  </div>
+                ) : filteredServices.length > 0 ? (
+                  <>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                        gap: '6px',
+                      }}
+                    >
+                      {currentServices.map((service) => (
+                        <button
+                          key={service.id}
+                          type="button"
+                          onClick={() =>
+                            addToCart({
+                              ...service,
+                              price: service.price,
+                              type: 'service',
+                            })
+                          }
+                          style={{
+                            minHeight: '104px',
+                            padding: '8px',
+                            textAlign: 'left',
+                            border: '1px solid #2b3137',
+                            borderRadius: '5px',
+                            background: '#171b20',
+                            color: '#e7e9eb',
+                            cursor: 'pointer',
+                            position: 'relative',
+                            overflow: 'hidden',
+                          }}
+                        >
                           <div
-                            className="d-inline-flex align-items-center"
                             style={{
-                              border: '1px solid #dee2e6',
-                              borderRadius: '8px',
-                              overflow: 'hidden',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              marginBottom: '7px',
                             }}
                           >
-                            <CButton size="sm" color="light" onClick={() => decreaseQty(item.id)}>
-                              −
-                            </CButton>
+                            <span
+                              style={{
+                                fontSize: '6px',
+                                fontWeight: 900,
+                                color: '#e8bd35',
+                                letterSpacing: '.7px',
+                              }}
+                            >
+                              SERVICE
+                            </span>
 
                             <span
                               style={{
-                                minWidth: '40px',
-                                textAlign: 'center',
-                                fontWeight: '600',
+                                fontSize: '6px',
+                                color: '#6e767f',
+                                padding: '2px 4px',
+                                border: '1px solid #30363d',
+                                borderRadius: '3px',
                               }}
                             >
-                              {item.quantity}
+                              {service.serviceType === 'home_service' ? 'HOME' : 'IN-SALON'}
                             </span>
-
-                            <CButton size="sm" color="light" onClick={() => increaseQty(item.id)}>
-                              +
-                            </CButton>
                           </div>
-                        </td>
 
-                        <td className="text-end">
-                          <div className="d-flex justify-content-end align-items-center gap-2">
-                            <span className="fw-semibold">
-                              ₦{Number(item.price).toLocaleString()}
-                            </span>
-
-                            {item.type === 'service' && (
-                              <CButton
-                                color="light"
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => openPriceModal(item)}
-                              >
-                                <CIcon icon={cilPencil} />
-                              </CButton>
-                            )}
-                          </div>
-                        </td>
-
-                        <td className="text-end">
-                          {item.originalPrice && item.originalPrice !== item.price && (
-                            <small
-                              className="text-danger d-block"
-                              style={{
-                                textDecoration: 'line-through',
-                              }}
-                            >
-                              ₦{Number(item.originalPrice).toLocaleString()}
-                            </small>
-                          )}
-
-                          <span
-                            className="fw-bold"
+                          <div
                             style={{
-                              color: '#198754',
+                              fontSize: '10px',
+                              fontWeight: 800,
+                              lineHeight: 1.25,
+                              minHeight: '28px',
+                              color: '#e9ebed',
                             }}
                           >
-                            ₦{Number(item.price * item.quantity).toLocaleString()}
-                          </span>
-                        </td>
+                            {service.name}
+                          </div>
 
-                        <td className="text-center">
-                          <CButton
-                            size="sm"
-                            color="danger"
-                            variant="ghost"
-                            onClick={() => removeItem(item.id)}
+                          <div
+                            style={{
+                              fontSize: '7px',
+                              color: '#717982',
+                              marginTop: '3px',
+                              minHeight: '12px',
+                            }}
                           >
-                            <CIcon icon={cilTrash} />
-                          </CButton>
-                        </td>
-                      </tr>
-                    ))}
+                            {service.duration ? `${service.duration} min` : 'Salon service'}
+                          </div>
 
-                    {cart.length === 0 && (
-                      <tr>
-                        <td colSpan="6" className="text-center py-5 text-muted">
-                          No items added to cart
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </CTable>
+                          <div
+                            style={{
+                              marginTop: '8px',
+                              paddingTop: '6px',
+                              borderTop: '1px solid #292f35',
+                              color: '#e8bd35',
+                              fontWeight: 900,
+                              fontSize: '10px',
+                            }}
+                          >
+                            ₦{Number(service.price).toLocaleString()}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: '10px',
+                        marginTop: '9px',
+                        color: '#6f7780',
+                        fontSize: '7px',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        disabled={currentPageServices === 1}
+                        onClick={() => setCurrentPageServices((prev) => prev - 1)}
+                        style={{
+                          border: '1px solid #2b3138',
+                          background: '#181d22',
+                          color: '#9aa1a9',
+                          borderRadius: '4px',
+                          padding: '5px 9px',
+                        }}
+                      >
+                        Previous
+                      </button>
+                      <span>
+                        Page {currentPageServices} / {Math.max(totalServicePages, 1)}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={currentPageServices === totalServicePages || totalServicePages === 0}
+                        onClick={() => setCurrentPageServices((prev) => prev + 1)}
+                        style={{
+                          border: '1px solid #2b3138',
+                          background: '#181d22',
+                          color: '#9aa1a9',
+                          borderRadius: '4px',
+                          padding: '5px 9px',
+                        }}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div
+                    style={{
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#6f7780',
+                    }}
+                  >
+                    <CIcon icon={cilCart} size="xl" style={{ color: '#424850', marginBottom: '8px' }} />
+                    <div style={{ fontWeight: 800 }}>No services found</div>
+                    <div style={{ fontSize: '8px', marginTop: '4px' }}>Try another search.</div>
+                  </div>
+                )
+              ) : loadingProducts ? (
+                <div
+                  style={{
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#727a83',
+                  }}
+                >
+                  Loading products...
+                </div>
+              ) : filteredProducts.length > 0 ? (
+                <>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                      gap: '6px',
+                    }}
+                  >
+                    {currentProducts.map((product) => (
+                      <button
+                        key={product.id}
+                        type="button"
+                        disabled={Number(product.quantity || 0) <= 0}
+                        onClick={() =>
+                          addToCart({
+                            ...product,
+                            price: product.sellingPrice,
+                            type: 'product',
+                          })
+                        }
+                        style={{
+                          minHeight: '104px',
+                          padding: '8px',
+                          textAlign: 'left',
+                          border: '1px solid #2b3137',
+                          borderRadius: '5px',
+                          background: Number(product.quantity || 0) <= 0 ? '#14171a' : '#171b20',
+                          color: '#e7e9eb',
+                          cursor: Number(product.quantity || 0) <= 0 ? 'not-allowed' : 'pointer',
+                          opacity: Number(product.quantity || 0) <= 0 ? 0.55 : 1,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'flex-start',
+                            marginBottom: '7px',
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: '6px',
+                              fontWeight: 900,
+                              color: '#8e969f',
+                              letterSpacing: '.7px',
+                            }}
+                          >
+                            RETAIL PRODUCT
+                          </span>
+
+                          <span
+                            style={{
+                              color:
+                                Number(product.quantity || 0) > 10
+                                  ? '#63d391'
+                                  : Number(product.quantity || 0) > 0
+                                    ? '#e8bd35'
+                                    : '#df6e6e',
+                              fontSize: '6px',
+                              fontWeight: 900,
+                            }}
+                          >
+                            {Number(product.quantity || 0) > 0
+                              ? `${product.quantity} IN STOCK`
+                              : 'OUT OF STOCK'}
+                          </span>
+                        </div>
+
+                        <div
+                          style={{
+                            fontSize: '10px',
+                            fontWeight: 800,
+                            lineHeight: 1.25,
+                            minHeight: '28px',
+                          }}
+                        >
+                          {product.name}
+                        </div>
+
+                        <div
+                          style={{
+                            fontSize: '7px',
+                            color: '#717982',
+                            marginTop: '3px',
+                            minHeight: '12px',
+                          }}
+                        >
+                          {product.sku || product.barcode || 'Retail item'}
+                        </div>
+
+                        <div
+                          style={{
+                            marginTop: '8px',
+                            paddingTop: '6px',
+                            borderTop: '1px solid #292f35',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <span style={{ color: '#e8bd35', fontWeight: 900, fontSize: '10px' }}>
+                            ₦{Number(product.sellingPrice).toLocaleString()}
+                          </span>
+                          <CIcon icon={cilPlus} size="sm" style={{ color: '#7c848d' }} />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      gap: '10px',
+                      marginTop: '9px',
+                      color: '#6f7780',
+                      fontSize: '7px',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      disabled={currentPageProducts === 1}
+                      onClick={() => setCurrentPageProducts((prev) => prev - 1)}
+                      style={{
+                        border: '1px solid #2b3138',
+                        background: '#181d22',
+                        color: '#9aa1a9',
+                        borderRadius: '4px',
+                        padding: '5px 9px',
+                      }}
+                    >
+                      Previous
+                    </button>
+                    <span>
+                      Page {currentPageProducts} / {Math.max(totalProductPages, 1)}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={currentPageProducts === totalProductPages || totalProductPages === 0}
+                      onClick={() => setCurrentPageProducts((prev) => prev + 1)}
+                      style={{
+                        border: '1px solid #2b3138',
+                        background: '#181d22',
+                        color: '#9aa1a9',
+                        borderRadius: '4px',
+                        padding: '5px 9px',
+                      }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div
+                  style={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#6f7780',
+                  }}
+                >
+                  <CIcon icon={cilCart} size="xl" style={{ color: '#424850', marginBottom: '8px' }} />
+                  <div style={{ fontWeight: 800 }}>No products found</div>
+                  <div style={{ fontSize: '8px', marginTop: '4px' }}>Try another search.</div>
+                </div>
+              )}
+            </div>
+
+            {/* OPERATOR STATUS BAR */}
+            <div
+              style={{
+                height: '34px',
+                minHeight: '34px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                padding: '0 9px',
+                background: '#0d1013',
+                borderTop: '1px solid #282d33',
+                color: '#666e77',
+                fontSize: '7px',
+              }}
+            >
+              <span>
+                OPERATOR STATE: <b style={{ color: '#63d391' }}>ACTIVE</b>
+              </span>
+              <span>
+                CRM: <b style={{ color: '#63d391' }}>ONLINE</b>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowHoldModal(true)}
+                style={{
+                  border: 0,
+                  background: 'transparent',
+                  color: '#aeb4bb',
+                  fontSize: '7px',
+                  cursor: 'pointer',
+                }}
+              >
+                Hold Sale [F4]
+              </button>
+              <button
+                type="button"
+                onClick={getDailyReport}
+                style={{
+                  border: 0,
+                  background: 'transparent',
+                  color: '#aeb4bb',
+                  fontSize: '7px',
+                  cursor: 'pointer',
+                }}
+              >
+                Daily Report
+              </button>
+              <button
+                type="button"
+                onClick={openHeldSalesModal}
+                style={{
+                  border: 0,
+                  background: 'transparent',
+                  color: '#aeb4bb',
+                  fontSize: '7px',
+                  cursor: 'pointer',
+                }}
+              >
+                Held Sales
+              </button>
+            </div>
+          </section>
+        </main>
+
+        {/* =======================================================
+            CURRENT SALE / CART
+        ======================================================== */}
+        <aside
+          style={{
+            minWidth: 0,
+            minHeight: 0,
+            background: '#15191e',
+            borderLeft: '1px solid #2a2f35',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          {/* SALE HEADER */}
+          <div
+            style={{
+              padding: '9px 10px',
+              borderBottom: '1px solid #2b3036',
+              background: '#171b20',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 900 }}>
+                  SALE #GLM-{String(Date.now()).slice(-4)}
+                </div>
+                <div style={{ fontSize: '7px', color: '#737b84', marginTop: '3px' }}>
+                  TERMINAL • CASHIER
+                </div>
               </div>
 
-              {/* Summary Footer */}
-              <CCard className="border-0 shadow-sm mt-3">
-                <CCardBody>
-                  <div className="d-flex justify-content-between mb-2">
-                    <span>Total Items</span>
-                    <strong>{cart.reduce((sum, item) => sum + item.quantity, 0)}</strong>
-                  </div>
-
-                  <div className="d-flex justify-content-between">
-                    <span>Cart Value</span>
-                    <strong className="text-success">
-                      ₦
-                      {cart
-                        .reduce(
-                          (sum, item) => sum + (item.price || item.sellingPrice) * item.quantity,
-                          0,
-                        )
-                        .toLocaleString()}
-                    </strong>
-                  </div>
-                </CCardBody>
-              </CCard>
-            </CCardBody>
-          </CCard>
-        </CCol>
-      </CRow>
-      <CCard className="border-0 shadow-sm mt-4">
-        <CCardBody>
-          <CRow>
-            {/* Actions */}
-            <CCol md={3}>
-              <CCard
-                className="border-0 shadow h-100"
+              <div
                 style={{
-                  borderRadius: '20px',
-                  background: 'linear-gradient(135deg,#667eea,#764ba2)',
-                  color: '#fff',
+                  padding: '4px 7px',
+                  border: '1px solid #363c43',
+                  borderRadius: '4px',
+                  color: '#d9dde0',
+                  fontSize: '8px',
+                  fontWeight: 800,
                 }}
               >
-                <CCardBody>
-                  <h5 className="fw-bold mb-4">Quick Actions</h5>
+                {cart.reduce((sum, item) => sum + Number(item.quantity || 0), 0)} Items
+              </div>
+            </div>
 
-                  <CButton
-                    color="light"
-                    className="w-100 mb-3 fw-semibold"
-                    onClick={() => setShowHoldModal(true)}
-                  >
-                    Hold Sale
-                  </CButton>
+            {/* CUSTOMER */}
+            <div
+              style={{
+                marginTop: '8px',
+                padding: '7px',
+                background: '#101418',
+                border: '1px solid #292f35',
+                borderRadius: '4px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                <div
+                  style={{
+                    width: '25px',
+                    height: '25px',
+                    borderRadius: '4px',
+                    background: '#242a30',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#e8bd35',
+                  }}
+                >
+                  <CIcon icon={cilUser} size="sm" />
+                </div>
 
-                  <CButton
-                    color="light"
-                    variant="outline"
-                    className="w-100 fw-semibold"
-                    onClick={openHeldSalesModal}
-                  >
-                    Restore Sale
-                  </CButton>
-                </CCardBody>
-              </CCard>
-            </CCol>
-
-            {/* Loyalty */}
-            <CCol md={4}>
-              <CCard
-                className="border-0 shadow h-100"
-                style={{
-                  borderRadius: '20px',
-                  background: 'linear-gradient(135deg,#11998e,#38ef7d)',
-                  color: '#fff',
-                }}
-              >
-                <CCardBody>
-                  <h5 className="fw-bold mb-4">Loyalty & Wallet</h5>
-
-                  {selectedCustomer ? (
-                    <>
-                      <div className="d-flex justify-content-between mb-3">
-                        <span>Loyalty Points</span>
-                        <h5>{selectedCustomer.loyaltyPoints}</h5>
-                      </div>
-
-                      <div className="d-flex justify-content-between mb-4">
-                        <span>Wallet Balance</span>
-                        <h5>₦{Number(selectedCustomer.walletBalance || 0).toLocaleString()}</h5>
-                      </div>
-
-                      <CFormCheck
-                        className="mb-3"
-                        label="Use Loyalty Points"
-                        checked={usePoints}
-                        onChange={(e) => setUsePoints(e.target.checked)}
-                      />
-
-                      <CFormCheck
-                        className="mb-3"
-                        label="Use Wallet Balance"
-                        checked={useWallet}
-                        onChange={(e) => setUseWallet(e.target.checked)}
-                      />
-
-                      <CFormInput
-                        type="number"
-                        label="Redeem Points"
-                        value={redeemPoints}
-                        min={0}
-                        max={selectedCustomer?.loyaltyPoints || 0}
-                        onChange={(e) => setRedeemPoints(Number(e.target.value))}
-                      />
-                    </>
-                  ) : (
-                    <div
-                      className="text-center py-4"
-                      style={{
-                        opacity: 0.9,
-                      }}
-                    >
-                      No customer selected
-                    </div>
-                  )}
-                </CCardBody>
-              </CCard>
-            </CCol>
-
-            {/* Summary */}
-            <CCol md={5}>
-              <CCard
-                className="border-0 shadow h-100"
-                style={{
-                  borderRadius: '20px',
-                  background: 'linear-gradient(135deg,#0f2027,#203a43,#2c5364)',
-                  color: '#fff',
-                }}
-              >
-                <CCardBody>
-                  <h5 className="fw-bold mb-4">Order Summary</h5>
-
-                  <div className="d-flex justify-content-between mb-3">
-                    <span>Subtotal</span>
-
-                    <strong>₦{Number(subtotal).toLocaleString()}</strong>
-                  </div>
-
-                  <div className="mb-3">
-                    <CFormInput
-                      type="number"
-                      label="Discount"
-                      value={discount}
-                      onChange={(e) => setDiscount(Number(e.target.value))}
-                    />
-                  </div>
-
-                  {usePoints && (
-                    <div className="d-flex justify-content-between mb-2 text-warning">
-                      <span>Points Discount</span>
-
-                      <strong>- ₦{Number(pointsDiscount || 0).toLocaleString()}</strong>
-                    </div>
-                  )}
-
-                  {useWallet && (
-                    <div className="d-flex justify-content-between mb-2 text-warning">
-                      <span>Wallet Used</span>
-
-                      <strong>- ₦{Number(walletUsed || 0).toLocaleString()}</strong>
-                    </div>
-                  )}
-
-                  <hr
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
                     style={{
-                      borderColor: 'rgba(255,255,255,.2)',
+                      fontSize: '8px',
+                      color: '#747c84',
+                      marginBottom: '2px',
                     }}
-                  />
+                  >
+                    CUSTOMER
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '9px',
+                      fontWeight: 800,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {selectedCustomer?.fullname || 'Walk-in Customer'}
+                  </div>
+                </div>
 
-                  <div className="d-flex justify-content-between align-items-center">
-                    <span
+                <button
+                  type="button"
+                  onClick={() => setShowCustomerModal(true)}
+                  style={{
+                    border: '1px solid #3a3424',
+                    background: '#241f12',
+                    color: '#e8bd35',
+                    borderRadius: '4px',
+                    padding: '4px 6px',
+                    fontSize: '7px',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  CHANGE
+                </button>
+              </div>
+
+              {selectedCustomer && (
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginTop: '6px',
+                    paddingTop: '5px',
+                    borderTop: '1px solid #252a30',
+                    color: '#7d858e',
+                    fontSize: '7px',
+                  }}
+                >
+                  <span>{selectedCustomer.phone || 'No phone'}</span>
+                  <span style={{ color: '#e8bd35' }}>
+                    {selectedCustomer.loyaltyPoints || 0} pts
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* CART ITEMS */}
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              padding: '7px',
+            }}
+          >
+            {cart.length === 0 ? (
+              <div
+                style={{
+                  height: '100%',
+                  minHeight: '190px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#616a73',
+                  textAlign: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    background: '#1c2127',
+                    border: '1px solid #2c3239',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '9px',
+                  }}
+                >
+                  <CIcon icon={cilCart} size="lg" style={{ color: '#505860' }} />
+                </div>
+                <div style={{ fontSize: '9px', fontWeight: 800 }}>No items in sale</div>
+                <div style={{ fontSize: '7px', marginTop: '4px' }}>
+                  Select a service or product to begin.
+                </div>
+              </div>
+            ) : (
+              cart.map((item, index) => (
+                <div
+                  key={`${item.type}-${item.id}`}
+                  style={{
+                    padding: '8px',
+                    marginBottom: '5px',
+                    background: '#101418',
+                    border: '1px solid #292f35',
+                    borderRadius: '4px',
+                  }}
+                >
+                  <div style={{ display: 'flex', gap: '7px' }}>
+                    <div
                       style={{
-                        fontSize: '18px',
+                        width: '24px',
+                        height: '24px',
+                        minWidth: '24px',
+                        borderRadius: '4px',
+                        background: item.type === 'service' ? '#302a14' : '#1e2924',
+                        color: item.type === 'service' ? '#e8bd35' : '#63d391',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '8px',
+                        fontWeight: 900,
                       }}
                     >
-                      Grand Total
-                    </span>
+                      {index + 1}
+                    </div>
 
-                    <h2 className="fw-bold text-success mb-0">₦{Number(total).toLocaleString()}</h2>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: '9px',
+                          fontWeight: 800,
+                          lineHeight: 1.3,
+                          color: '#e6e8ea',
+                        }}
+                      >
+                        {item.name}
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: '6px',
+                          color: item.type === 'service' ? '#e8bd35' : '#63d391',
+                          textTransform: 'uppercase',
+                          fontWeight: 900,
+                          marginTop: '2px',
+                        }}
+                      >
+                        {item.type}
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ color: '#e8bd35', fontSize: '9px', fontWeight: 900 }}>
+                        ₦{Number(item.price * item.quantity).toLocaleString()}
+                      </div>
+                      <div style={{ color: '#666e77', fontSize: '6px', marginTop: '2px' }}>
+                        ₦{Number(item.price).toLocaleString()} each
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="mt-3">
-                    <small>Loyalty Points Earned</small>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginTop: '7px',
+                      paddingTop: '6px',
+                      borderTop: '1px solid #242a30',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        border: '1px solid #30363d',
+                        borderRadius: '4px',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => decreaseQty(item.id)}
+                        style={{
+                          width: '24px',
+                          height: '22px',
+                          border: 0,
+                          background: '#1b2025',
+                          color: '#c0c5ca',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        −
+                      </button>
 
-                    <h5 className="fw-bold">{Math.floor(total / 1000)}</h5>
+                      <span
+                        style={{
+                          minWidth: '27px',
+                          textAlign: 'center',
+                          color: '#e8eaec',
+                          fontWeight: 800,
+                          fontSize: '8px',
+                        }}
+                      >
+                        {item.quantity}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => increaseQty(item.id)}
+                        style={{
+                          width: '24px',
+                          height: '22px',
+                          border: 0,
+                          background: '#1b2025',
+                          color: '#e8bd35',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '3px' }}>
+                      {item.type === 'service' && (
+                        <button
+                          type="button"
+                          onClick={() => openPriceModal(item)}
+                          style={{
+                            width: '24px',
+                            height: '22px',
+                            border: '1px solid #30363d',
+                            borderRadius: '4px',
+                            background: '#181d22',
+                            color: '#8d959d',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <CIcon icon={cilPencil} size="sm" />
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.id)}
+                        style={{
+                          width: '24px',
+                          height: '22px',
+                          border: '1px solid #40282a',
+                          borderRadius: '4px',
+                          background: '#211719',
+                          color: '#d87070',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <CIcon icon={cilTrash} size="sm" />
+                      </button>
+                    </div>
                   </div>
-                </CCardBody>
-              </CCard>
-            </CCol>
-          </CRow>
+                </div>
+              ))
+            )}
+          </div>
 
-          <hr />
+          {/* SALE FOOTER */}
+          <div
+            style={{
+              padding: '8px',
+              borderTop: '1px solid #2b3036',
+              background: '#101418',
+            }}
+          >
+            {/* Loyalty / Wallet compact controls */}
+            {selectedCustomer && (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '5px',
+                  marginBottom: '6px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setShowLoyaltyModal(true)}
+                  style={{
+                    border: '1px solid #2c3239',
+                    background: '#171c21',
+                    color: '#969ea6',
+                    borderRadius: '4px',
+                    padding: '6px',
+                    fontSize: '7px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ display: 'block', color: '#e8bd35', fontWeight: 900 }}>
+                    {selectedCustomer.loyaltyPoints || 0}
+                  </span>
+                  POINTS / LOYALTY
+                </button>
 
-          {/* Payment Footer */}
-          <CRow className="align-items-end mt-4">
-            <CCol md={4}>
+                <button
+                  type="button"
+                  onClick={() => setUseWallet((prev) => !prev)}
+                  style={{
+                    border: useWallet ? '1px solid #e8bd35' : '1px solid #2c3239',
+                    background: useWallet ? '#292411' : '#171c21',
+                    color: useWallet ? '#e8bd35' : '#969ea6',
+                    borderRadius: '4px',
+                    padding: '6px',
+                    fontSize: '7px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ display: 'block', color: useWallet ? '#e8bd35' : '#c5c9cd', fontWeight: 900 }}>
+                    ₦{Number(selectedCustomer.walletBalance || 0).toLocaleString()}
+                  </span>
+                  {useWallet ? 'WALLET ENABLED' : 'WALLET BALANCE'}
+                </button>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#777f88', fontSize: '8px', marginBottom: '4px' }}>
+              <span>Subtotal</span>
+              <span>₦{Number(subtotal).toLocaleString()}</span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <span style={{ color: '#777f88', fontSize: '8px' }}>Discount</span>
+              <CFormInput
+                type="number"
+                value={discount}
+                onChange={(e) => setDiscount(Number(e.target.value))}
+                style={{
+                  width: '78px',
+                  height: '24px',
+                  padding: '2px 5px',
+                  background: '#171c21',
+                  border: '1px solid #2d333a',
+                  color: '#dce0e3',
+                  fontSize: '8px',
+                  textAlign: 'right',
+                }}
+              />
+            </div>
+
+            {usePoints && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e8bd35', fontSize: '8px', marginBottom: '3px' }}>
+                <span>Points Discount</span>
+                <span>- ₦{Number(pointsDiscount || 0).toLocaleString()}</span>
+              </div>
+            )}
+
+            {useWallet && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e8bd35', fontSize: '8px', marginBottom: '3px' }}>
+                <span>Wallet Used</span>
+                <span>- ₦{Number(walletUsed || 0).toLocaleString()}</span>
+              </div>
+            )}
+
+            <div
+              style={{
+                borderTop: '1px solid #2c3239',
+                marginTop: '6px',
+                paddingTop: '7px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-end',
+              }}
+            >
+              <div>
+                <div style={{ color: '#777f88', fontSize: '7px', textTransform: 'uppercase', letterSpacing: '.8px' }}>
+                  Total Due
+                </div>
+                <div style={{ color: '#e8bd35', fontSize: '21px', lineHeight: 1.1, fontWeight: 900 }}>
+                  ₦{Number(total).toLocaleString()}
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'right', color: '#6e767e', fontSize: '7px' }}>
+                <div>LOYALTY EARNED</div>
+                <div style={{ color: '#c2c7cc', fontWeight: 900 }}>{Math.floor(total / 1000)} pts</div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '96px 1fr',
+                gap: '5px',
+                marginTop: '7px',
+              }}
+            >
               <CFormSelect
-                size="lg"
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
+                style={{
+                  height: '40px',
+                  background: '#171c21',
+                  color: '#dce0e3',
+                  border: '1px solid #30363d',
+                  fontSize: '8px',
+                }}
               >
                 <option value="cash">Cash</option>
                 <option value="transfer">Transfer</option>
                 <option value="pos">POS</option>
                 <option value="mixed">Mixed</option>
               </CFormSelect>
-            </CCol>
 
-            <CCol md={8}>
-              <CButton
-                size="lg"
-                className="w-100 fw-bold shadow"
-                style={{
-                  height: '55px',
-                  borderRadius: '14px',
-                  border: 'none',
-                  background: 'linear-gradient(135deg,#11998e,#38ef7d)',
-                }}
+              <button
+                type="button"
                 onClick={() => setShowPaymentModal(true)}
+                disabled={processingSale || cart.length === 0}
+                style={{
+                  height: '40px',
+                  border: 0,
+                  borderRadius: '4px',
+                  background: cart.length === 0 ? '#4a4637' : '#e8bd35',
+                  color: '#111',
+                  fontSize: '10px',
+                  fontWeight: 900,
+                  letterSpacing: '.2px',
+                  cursor: cart.length === 0 ? 'not-allowed' : 'pointer',
+                  boxShadow: cart.length === 0 ? 'none' : '0 4px 12px rgba(232,189,53,.15)',
+                }}
               >
-                Complete Payment • ₦{Number(total).toLocaleString()}
-              </CButton>
-            </CCol>
-          </CRow>
-        </CCardBody>
-      </CCard>
+                {processingSale ? 'PROCESSING...' : 'PROCEED TO PAYMENT  →'}
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: '6px',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setShowHoldModal(true)}
+                style={{
+                  border: 0,
+                  background: 'transparent',
+                  color: '#737b84',
+                  fontSize: '7px',
+                  cursor: 'pointer',
+                }}
+              >
+                Hold [F6]
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowNewCustomerModal(true)}
+                style={{
+                  border: 0,
+                  background: 'transparent',
+                  color: '#737b84',
+                  fontSize: '7px',
+                  cursor: 'pointer',
+                }}
+              >
+                + Add Note / Customer
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowClearCartModal(true)}
+                style={{
+                  border: 0,
+                  background: 'transparent',
+                  color: '#d16d6d',
+                  fontSize: '7px',
+                  cursor: 'pointer',
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </aside>
+      </div>
+
       <CustomerSearchModal
         show={showCustomerModal}
         onHide={() => setShowCustomerModal(false)}
@@ -2000,7 +2718,7 @@ const POSPage = () => {
           </CButton>
         </CModalFooter>
       </CModal>
-    </CContainer>
+    </div>
   )
 }
 
