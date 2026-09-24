@@ -680,6 +680,334 @@ const POSPage = () => {
     }
   }
 
+  useEffect(() => {
+    const handleKeyboardShortcut = (event) => {
+      const target = event.target
+
+      const isTyping =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable
+
+      // ==========================================
+      // ESCAPE - CLOSE ACTIVE MODAL
+      // ==========================================
+      if (event.key === 'Escape') {
+        if (showNewCustomerModal) {
+          setShowNewCustomerModal(false)
+          return
+        }
+
+        if (showCustomerModal) {
+          setShowCustomerModal(false)
+          return
+        }
+
+        if (showHoldSaleModal) {
+          setShowHoldSaleModal(false)
+          return
+        }
+
+        if (showHeldSalesModal) {
+          setShowHeldSalesModal(false)
+          return
+        }
+
+        if (showReceiptSearchModal) {
+          setShowReceiptSearchModal(false)
+          return
+        }
+
+        if (showBarcodeModal) {
+          setShowBarcodeModal(false)
+          return
+        }
+
+        if (showClearCartModal) {
+          setShowClearCartModal(false)
+          return
+        }
+
+        if (showDailyReportModal) {
+          setShowDailyReportModal(false)
+          return
+        }
+
+        if (showPaymentModal) {
+          setShowPaymentModal(false)
+          return
+        }
+
+        return
+      }
+
+      // ==========================================
+      // DO NOT TRIGGER SHORTCUTS WHILE TYPING
+      // ==========================================
+      if (isTyping) {
+        return
+      }
+
+      // ==========================================
+      // CTRL / CMD SHORTCUTS
+      // ==========================================
+      if (event.ctrlKey || event.metaKey) {
+        const key = event.key.toLowerCase()
+
+        switch (key) {
+          // ------------------------------
+          // CTRL + N
+          // New Customer
+          // ------------------------------
+          case 'n':
+            event.preventDefault()
+
+            setShowNewCustomerModal(true)
+            break
+
+          // ------------------------------
+          // CTRL + F
+          // Customer Search
+          // ------------------------------
+          case 'f':
+            event.preventDefault()
+
+            setShowCustomerModal(true)
+            break
+
+          // ------------------------------
+          // CTRL + SHIFT + F
+          // Product / Service Search
+          // ------------------------------
+          case 'f':
+            if (event.shiftKey) {
+              event.preventDefault()
+
+              document.getElementById('pos-product-search')?.focus()
+            }
+            break
+
+          // ------------------------------
+          // CTRL + H
+          // Hold Sale
+          // ------------------------------
+          case 'h':
+            event.preventDefault()
+
+            if (cart.length > 0) {
+              setShowHoldSaleModal(true)
+            }
+
+            break
+
+          // ------------------------------
+          // CTRL + SHIFT + H
+          // Held Sales
+          // ------------------------------
+          case 'h':
+            if (event.shiftKey) {
+              event.preventDefault()
+
+              fetchHeldSales()
+              setShowHeldSalesModal(true)
+            }
+            break
+
+          // ------------------------------
+          // CTRL + R
+          // Receipt Search
+          // ------------------------------
+          case 'r':
+            event.preventDefault()
+
+            setShowReceiptSearchModal(true)
+            break
+
+          // ------------------------------
+          // CTRL + DELETE
+          // Clear Cart
+          // ------------------------------
+          case 'delete':
+            event.preventDefault()
+
+            if (cart.length > 0) {
+              setShowClearCartModal(true)
+            }
+
+            break
+
+          // ------------------------------
+          // CTRL + B
+          // Barcode
+          // ------------------------------
+          case 'b':
+            event.preventDefault()
+
+            setShowBarcodeModal(true)
+            break
+
+          // ------------------------------
+          // CTRL + D
+          // Daily Report
+          // ------------------------------
+          case 'd':
+            event.preventDefault()
+
+            setShowDailyReportModal(true)
+            break
+
+          // ------------------------------
+          // CTRL + ENTER
+          // Payment
+          // ------------------------------
+          case 'enter':
+            event.preventDefault()
+
+            if (cart.length > 0) {
+              setShowPaymentModal(true)
+            }
+
+            break
+
+          default:
+            break
+        }
+
+        return
+      }
+
+      // ==========================================
+      // FUNCTION KEYS
+      // ==========================================
+      switch (event.key) {
+        // ------------------------------
+        // F1 - New Customer
+        // ------------------------------
+        case 'F1':
+          event.preventDefault()
+
+          setShowNewCustomerModal(true)
+          break
+
+        // ------------------------------
+        // F2 - Customer Search
+        // ------------------------------
+        case 'F2':
+          event.preventDefault()
+
+          setShowCustomerModal(true)
+          break
+
+        // ------------------------------
+        // F3 - Product / Service Search
+        // ------------------------------
+        case 'F3':
+          event.preventDefault()
+
+          document.getElementById('pos-product-search')?.focus()
+
+          break
+
+        // ------------------------------
+        // F4 - Hold Sale
+        // ------------------------------
+        case 'F4':
+          event.preventDefault()
+
+          if (cart.length > 0) {
+            setShowHoldSaleModal(true)
+          }
+
+          break
+
+        // ------------------------------
+        // F5 - Held Sales
+        // ------------------------------
+        case 'F5':
+          event.preventDefault()
+
+          fetchHeldSales()
+          setShowHeldSalesModal(true)
+
+          break
+
+        // ------------------------------
+        // F6 - Receipt Search
+        // ------------------------------
+        case 'F6':
+          event.preventDefault()
+
+          setShowReceiptSearchModal(true)
+          break
+
+        // ------------------------------
+        // F7 - Clear Cart
+        // ------------------------------
+        case 'F7':
+          event.preventDefault()
+
+          if (cart.length > 0) {
+            setShowClearCartModal(true)
+          }
+
+          break
+
+        // ------------------------------
+        // F8 - Barcode
+        // ------------------------------
+        case 'F8':
+          event.preventDefault()
+
+          setShowBarcodeModal(true)
+          break
+
+        // ------------------------------
+        // F9 - Daily Report
+        // ------------------------------
+        case 'F9':
+          event.preventDefault()
+
+          setShowDailyReportModal(true)
+          break
+
+        // ------------------------------
+        // F12 - Payment
+        // ------------------------------
+        case 'F12':
+          event.preventDefault()
+
+          if (cart.length > 0) {
+            setShowPaymentModal(true)
+          }
+
+          break
+
+        default:
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyboardShortcut)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyboardShortcut)
+    }
+  }, [
+    cart,
+    fetchHeldSales,
+
+    showNewCustomerModal,
+    showCustomerModal,
+    showHoldSaleModal,
+    showHeldSalesModal,
+    showReceiptSearchModal,
+    showBarcodeModal,
+    showClearCartModal,
+    showDailyReportModal,
+    showPaymentModal,
+  ])
+
   // hold sales
 
   const holdSale = async (note) => {
