@@ -166,6 +166,10 @@ const ProductConsumption = () => {
     )
   }
 
+  const getApprovedByName = (item) => {
+    return item?.ApprovedBy?.fullname || item?.ApprovedBy?.name || '—'
+  }
+
   const getDate = (item) => {
     return item?.requested_at || item?.requestedAt || item?.createdAt || item?.created_at
   }
@@ -1421,6 +1425,7 @@ const ProductConsumption = () => {
                     <CTableHeaderCell>Reason</CTableHeaderCell>
 
                     <CTableHeaderCell>Date</CTableHeaderCell>
+                    <CTableHeaderCell>Approved By</CTableHeaderCell>
 
                     <CTableHeaderCell>Status</CTableHeaderCell>
 
@@ -1518,6 +1523,22 @@ const ProductConsumption = () => {
                           >
                             {formatDate(getDate(item))}
                           </div>
+                        </CTableDataCell>
+
+                        <CTableDataCell>
+                          {item.status === 'approved' ? (
+                            <div>
+                              <div className="fw-semibold">{getApprovedByName(item)}</div>
+
+                              {item.approved_at && (
+                                <small className="text-medium-emphasis">
+                                  {formatDate(item.approved_at)}
+                                </small>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-medium-emphasis">—</span>
+                          )}
                         </CTableDataCell>
 
                         {/* STATUS */}
@@ -2035,6 +2056,23 @@ const ProductConsumption = () => {
                   <div className="fw-bold">{formatCurrency(getTotalCost(selectedConsumption))}</div>
                 </CCol>
               </CRow>
+              <div className="detail-item">
+                <div className="detail-label">Approved By</div>
+
+                <div className="detail-value">
+                  {selectedConsumption?.ApprovedBy?.fullname || '—'}
+                </div>
+              </div>
+
+              <div className="detail-item">
+                <div className="detail-label">Approved At</div>
+
+                <div className="detail-value">
+                  {selectedConsumption?.approved_at
+                    ? formatDate(selectedConsumption.approved_at)
+                    : '—'}
+                </div>
+              </div>
 
               <h6 className="fw-bold mb-3">Products</h6>
 
