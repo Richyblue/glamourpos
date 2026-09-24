@@ -74,13 +74,11 @@ export default function PaymentModal({
       paymentMethod,
       serviceProviderId,
 
-      // Home service automatically sends empty values
       standTag: isHomeService ? '' : standTag,
       cardNumber: isHomeService ? '' : cardNumber,
 
       note,
 
-      // VERY IMPORTANT
       serviceType,
     })
   }
@@ -94,30 +92,189 @@ export default function PaymentModal({
       (item.User?.isActive === true || item.User?.isActive === 1) && item.User?.fullname?.trim(),
   )
 
+  // =========================================================
+  // STYLES
+  // =========================================================
+
+  const colors = {
+    dark: '#111827',
+    darkSoft: '#1f2937',
+    gold: '#e8bd35',
+    goldDark: '#c9a227',
+    background: '#f5f7fb',
+    border: '#e5e7eb',
+    muted: '#6b7280',
+    text: '#111827',
+    white: '#ffffff',
+    green: '#16a34a',
+  }
+
+  const selectStyle = {
+    minHeight: '48px',
+    borderRadius: '12px',
+    border: `1px solid ${colors.border}`,
+    fontSize: '14px',
+    fontWeight: '500',
+    boxShadow: 'none',
+  }
+
+  const sectionCardStyle = {
+    borderRadius: '16px',
+    border: `1px solid ${colors.border}`,
+    boxShadow: '0 4px 18px rgba(17, 24, 39, 0.05)',
+    background: '#fff',
+  }
+
+  const optionCardStyle = (active) => ({
+    flex: 1,
+    minHeight: '72px',
+    borderRadius: '14px',
+    border: active ? `2px solid ${colors.gold}` : `1px solid ${colors.border}`,
+    background: active ? 'rgba(232, 189, 53, 0.10)' : '#fff',
+    cursor: 'pointer',
+    transition: 'all .2s ease',
+    boxShadow: active ? '0 5px 16px rgba(232, 189, 53, 0.15)' : 'none',
+  })
+
   return (
-    <CModal visible={show} onClose={onHide} alignment="center" size="lg">
-      <CModalHeader>
-        <CModalTitle>Complete Payment</CModalTitle>
+    <CModal visible={show} onClose={onHide} alignment="center" size="lg" backdrop="static">
+      {/* =====================================================
+          HEADER
+      ====================================================== */}
+
+      <CModalHeader
+        style={{
+          background: colors.dark,
+          color: '#fff',
+          borderBottom: 'none',
+          padding: '20px 24px',
+        }}
+      >
+        <div className="w-100">
+          <div className="d-flex justify-content-between align-items-center">
+            <div>
+              <div
+                style={{
+                  fontSize: '11px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1.5px',
+                  color: colors.gold,
+                  fontWeight: '700',
+                  marginBottom: '4px',
+                }}
+              >
+                POS CHECKOUT
+              </div>
+
+              <CModalTitle
+                style={{
+                  color: '#fff',
+                  fontSize: '22px',
+                  fontWeight: '700',
+                  margin: 0,
+                }}
+              >
+                Complete Payment
+              </CModalTitle>
+            </div>
+
+            <div
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '12px',
+                background: 'rgba(232, 189, 53, 0.14)',
+                border: '1px solid rgba(232, 189, 53, 0.35)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '21px',
+              }}
+            >
+              ₦
+            </div>
+          </div>
+        </div>
       </CModalHeader>
 
-      <CModalBody>
+      <CModalBody
+        style={{
+          background: colors.background,
+          padding: '22px',
+        }}
+      >
         {/* =====================================================
             PAYMENT SUMMARY
         ====================================================== */}
 
-        <CCard className="border-0 bg-light mb-4">
-          <CCardBody>
-            <CRow>
-              <CCol md={6}>
-                <small className="text-medium-emphasis">Amount Payable</small>
+        <CCard
+          className="border-0 mb-4"
+          style={{
+            borderRadius: '18px',
+            overflow: 'hidden',
+            background: colors.dark,
+            color: '#fff',
+            boxShadow: '0 10px 30px rgba(17, 24, 39, 0.16)',
+          }}
+        >
+          <CCardBody style={{ padding: '20px' }}>
+            <CRow className="align-items-center">
+              <CCol xs={7}>
+                <div
+                  style={{
+                    fontSize: '11px',
+                    color: '#9ca3af',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                    fontWeight: '700',
+                  }}
+                >
+                  Amount Payable
+                </div>
 
-                <h2 className="fw-bold mt-2 text-success">₦{Number(total).toLocaleString()}</h2>
+                <div
+                  style={{
+                    fontSize: '30px',
+                    fontWeight: '800',
+                    color: colors.gold,
+                    marginTop: '5px',
+                    letterSpacing: '-1px',
+                  }}
+                >
+                  ₦{Number(total).toLocaleString()}
+                </div>
               </CCol>
 
-              <CCol md={6}>
-                <small className="text-medium-emphasis">Sales By</small>
+              <CCol xs={5}>
+                <div
+                  style={{
+                    paddingLeft: '18px',
+                    borderLeft: '1px solid rgba(255,255,255,.12)',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '11px',
+                      color: '#9ca3af',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px',
+                      fontWeight: '700',
+                    }}
+                  >
+                    Sales By
+                  </div>
 
-                <h5 className="mt-2">{currentUser?.fullname || 'Current User'}</h5>
+                  <div
+                    style={{
+                      marginTop: '6px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: '#fff',
+                    }}
+                  >
+                    {currentUser?.fullname || 'Current User'}
+                  </div>
+                </div>
               </CCol>
             </CRow>
           </CCardBody>
@@ -127,78 +284,190 @@ export default function PaymentModal({
             SERVICE TYPE
         ====================================================== */}
 
-        <CRow className="mb-3">
-          <CCol md={12}>
-            <label className="form-label fw-semibold">Service Type</label>
+        <CCard className="border-0 mb-3" style={sectionCardStyle}>
+          <CCardBody style={{ padding: '18px' }}>
+            <div className="mb-3">
+              <div
+                style={{
+                  fontSize: '15px',
+                  fontWeight: '700',
+                  color: colors.text,
+                }}
+              >
+                Service Location
+              </div>
 
-            <CFormSelect value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
-              <option value="in_salon">In-Salon Service</option>
+              <small style={{ color: colors.muted }}>
+                Select where the service will be provided.
+              </small>
+            </div>
 
-              <option value="home_service">Home Service</option>
-            </CFormSelect>
+            <div className="d-flex gap-2">
+              <div
+                style={optionCardStyle(serviceType === 'in_salon')}
+                onClick={() => setServiceType('in_salon')}
+              >
+                <div className="p-3">
+                  <div
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      color: serviceType === 'in_salon' ? colors.dark : colors.text,
+                    }}
+                  >
+                    In-Salon
+                  </div>
 
-            <small className="text-muted">Select where the service will be provided.</small>
-          </CCol>
-        </CRow>
+                  <small style={{ color: colors.muted }}>Service at the salon</small>
+                </div>
+              </div>
+
+              <div
+                style={optionCardStyle(serviceType === 'home_service')}
+                onClick={() => setServiceType('home_service')}
+              >
+                <div className="p-3">
+                  <div
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      color: serviceType === 'home_service' ? colors.dark : colors.text,
+                    }}
+                  >
+                    Home Service
+                  </div>
+
+                  <small style={{ color: colors.muted }}>Service at customer's location</small>
+                </div>
+              </div>
+            </div>
+          </CCardBody>
+        </CCard>
 
         {/* =====================================================
             HOME SERVICE NOTICE
         ====================================================== */}
 
         {isHomeService && (
-          <CAlert color="warning" className="mb-3">
-            <strong>Home Service Selected</strong>
+          <CAlert
+            className="mb-3 border-0"
+            style={{
+              borderRadius: '14px',
+              background: 'rgba(232, 189, 53, 0.12)',
+              border: '1px solid rgba(232, 189, 53, 0.35)',
+              color: colors.dark,
+            }}
+          >
+            <div className="d-flex align-items-start gap-2">
+              <div
+                style={{
+                  width: '30px',
+                  height: '30px',
+                  minWidth: '30px',
+                  borderRadius: '9px',
+                  background: colors.gold,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: '800',
+                }}
+              >
+                !
+              </div>
 
-            <div className="small mt-1">
-              Stand number and card number are not required for home services.
+              <div>
+                <strong>Home Service Selected</strong>
+
+                <div className="small mt-1" style={{ color: colors.muted }}>
+                  Stand number and card number are not required for home services.
+                </div>
+              </div>
             </div>
           </CAlert>
         )}
 
         {/* =====================================================
-            PAYMENT METHOD
+            PAYMENT DETAILS
         ====================================================== */}
 
-        <CRow className="mb-3">
-          <CCol md={12}>
-            <label className="form-label fw-semibold">Payment Method</label>
+        <CCard className="border-0 mb-3" style={sectionCardStyle}>
+          <CCardBody style={{ padding: '18px' }}>
+            <div className="mb-3">
+              <div
+                style={{
+                  fontSize: '15px',
+                  fontWeight: '700',
+                  color: colors.text,
+                }}
+              >
+                Payment Details
+              </div>
 
-            <CFormSelect value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-              <option value="cash">Cash</option>
+              <small style={{ color: colors.muted }}>Select how this sale is being paid.</small>
+            </div>
 
-              <option value="transfer">Bank Transfer</option>
+            <div className="mb-3">
+              <label
+                className="form-label"
+                style={{
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  color: colors.muted,
+                  textTransform: 'uppercase',
+                  letterSpacing: '.5px',
+                }}
+              >
+                Payment Method
+              </label>
 
-              <option value="pos">POS</option>
+              <CFormSelect
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                style={selectStyle}
+              >
+                <option value="cash">Cash</option>
+                <option value="transfer">Bank Transfer</option>
+                <option value="pos">POS</option>
+                <option value="mixed">Mixed Payment</option>
+              </CFormSelect>
+            </div>
 
-              <option value="mixed">Mixed Payment</option>
-            </CFormSelect>
-          </CCol>
-        </CRow>
+            {/* SERVICE PROVIDER */}
 
-        {/* =====================================================
-            SERVICE PROVIDER
-        ====================================================== */}
+            <div>
+              <label
+                className="form-label"
+                style={{
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  color: colors.muted,
+                  textTransform: 'uppercase',
+                  letterSpacing: '.5px',
+                }}
+              >
+                Service Provider
+              </label>
 
-        <CRow className="mb-3">
-          <CCol md={12}>
-            <label className="form-label fw-semibold">Service Provider</label>
+              <CFormSelect
+                value={serviceProviderId}
+                onChange={(e) => setServiceProviderId(e.target.value)}
+                style={selectStyle}
+              >
+                <option value="">Select Staff</option>
 
-            <CFormSelect
-              value={serviceProviderId}
-              onChange={(e) => setServiceProviderId(e.target.value)}
-            >
-              <option value="">Select Staff</option>
+                {activeStaff.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.User.fullname.trim()}
+                  </option>
+                ))}
+              </CFormSelect>
 
-              {activeStaff.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.User.fullname.trim()}
-                </option>
-              ))}
-            </CFormSelect>
-
-            <small className="text-muted">Staff that attended to the customer</small>
-          </CCol>
-        </CRow>
+              <small className="d-block mt-2" style={{ color: colors.muted }}>
+                Staff that attended to the customer.
+              </small>
+            </div>
+          </CCardBody>
+        </CCard>
 
         {/* =====================================================
             STAND + CARD
@@ -206,70 +475,177 @@ export default function PaymentModal({
         ====================================================== */}
 
         {!isHomeService && (
-          <CRow className="mb-3">
-            {/* STAND */}
+          <CCard className="border-0 mb-3" style={sectionCardStyle}>
+            <CCardBody style={{ padding: '18px' }}>
+              <div className="mb-3">
+                <div
+                  style={{
+                    fontSize: '15px',
+                    fontWeight: '700',
+                    color: colors.text,
+                  }}
+                >
+                  Salon Assignment
+                </div>
 
-            <CCol md={6}>
-              <label className="form-label fw-semibold">Stand Tag</label>
+                <small style={{ color: colors.muted }}>Assign the stand and customer card.</small>
+              </div>
 
-              <CFormSelect value={standTag} onChange={(e) => setStandTag(e.target.value)}>
-                <option value="">Select Stand</option>
+              <CRow>
+                {/* STAND */}
 
-                {[...Array(20)].map((_, i) => (
-                  <option key={i + 1} value={`Stand ${i + 1}`}>
-                    Stand {i + 1}
-                  </option>
-                ))}
-              </CFormSelect>
-            </CCol>
+                <CCol md={6} className="mb-3 mb-md-0">
+                  <label
+                    className="form-label"
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      color: colors.muted,
+                      textTransform: 'uppercase',
+                      letterSpacing: '.5px',
+                    }}
+                  >
+                    Stand Tag
+                  </label>
 
-            {/* CARD */}
+                  <CFormSelect
+                    value={standTag}
+                    onChange={(e) => setStandTag(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">Select Stand</option>
 
-            <CCol md={6}>
-              <label className="form-label fw-semibold">Card Number</label>
+                    {[...Array(20)].map((_, i) => (
+                      <option key={i + 1} value={`Stand ${i + 1}`}>
+                        Stand {i + 1}
+                      </option>
+                    ))}
+                  </CFormSelect>
+                </CCol>
 
-              <CFormSelect value={cardNumber} onChange={(e) => setCardNumber(e.target.value)}>
-                <option value="">Select Card</option>
+                {/* CARD */}
 
-                {[...Array(100)].map((_, i) => {
-                  const number = String(i + 1).padStart(3, '0')
+                <CCol md={6}>
+                  <label
+                    className="form-label"
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      color: colors.muted,
+                      textTransform: 'uppercase',
+                      letterSpacing: '.5px',
+                    }}
+                  >
+                    Card Number
+                  </label>
 
-                  return (
-                    <option key={i + 1} value={number}>
-                      Card #{number}
-                    </option>
-                  )
-                })}
-              </CFormSelect>
-            </CCol>
-          </CRow>
+                  <CFormSelect
+                    value={cardNumber}
+                    onChange={(e) => setCardNumber(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">Select Card</option>
+
+                    {[...Array(100)].map((_, i) => {
+                      const number = String(i + 1).padStart(3, '0')
+
+                      return (
+                        <option key={i + 1} value={number}>
+                          Card #{number}
+                        </option>
+                      )
+                    })}
+                  </CFormSelect>
+                </CCol>
+              </CRow>
+            </CCardBody>
+          </CCard>
         )}
 
         {/* =====================================================
             REMARKS
         ====================================================== */}
 
-        <CRow>
-          <CCol md={12}>
-            <label className="form-label fw-semibold">Remarks</label>
+        <CCard className="border-0" style={sectionCardStyle}>
+          <CCardBody style={{ padding: '18px' }}>
+            <label
+              className="form-label"
+              style={{
+                fontSize: '12px',
+                fontWeight: '700',
+                color: colors.muted,
+                textTransform: 'uppercase',
+                letterSpacing: '.5px',
+              }}
+            >
+              Remarks
+            </label>
 
             <CFormTextarea
               rows={3}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder={isHomeService ? 'Optional home service remarks...' : 'Optional note...'}
+              style={{
+                borderRadius: '12px',
+                border: `1px solid ${colors.border}`,
+                resize: 'vertical',
+                boxShadow: 'none',
+              }}
             />
-          </CCol>
-        </CRow>
+          </CCardBody>
+        </CCard>
       </CModalBody>
 
-      <CModalFooter>
-        <CButton color="secondary" variant="outline" onClick={onHide}>
+      {/* =====================================================
+          FOOTER
+      ====================================================== */}
+
+      <CModalFooter
+        style={{
+          background: '#fff',
+          borderTop: `1px solid ${colors.border}`,
+          padding: '16px 22px',
+        }}
+      >
+        <CButton
+          onClick={onHide}
+          disabled={processing}
+          style={{
+            minWidth: '110px',
+            height: '46px',
+            borderRadius: '12px',
+            background: '#fff',
+            color: colors.dark,
+            border: `1px solid ${colors.border}`,
+            fontWeight: '600',
+          }}
+        >
           Cancel
         </CButton>
 
-        <CButton color="success" disabled={processing} onClick={handleSubmit}>
-          {processing ? 'Processing...' : 'Complete Sale'}
+        <CButton
+          disabled={processing}
+          onClick={handleSubmit}
+          style={{
+            minWidth: '190px',
+            height: '46px',
+            borderRadius: '12px',
+            background: `linear-gradient(135deg, ${colors.gold}, ${colors.goldDark})`,
+            border: 'none',
+            color: colors.dark,
+            fontWeight: '800',
+            boxShadow: '0 6px 18px rgba(232, 189, 53, 0.25)',
+          }}
+        >
+          {processing ? (
+            <span className="d-flex align-items-center justify-content-center gap-2">
+              <span className="spinner-border spinner-border-sm" role="status" />
+              Processing...
+            </span>
+          ) : (
+            <>Complete Sale&nbsp; • &nbsp;₦{Number(total).toLocaleString()}</>
+          )}
         </CButton>
       </CModalFooter>
     </CModal>
