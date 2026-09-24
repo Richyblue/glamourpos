@@ -120,50 +120,63 @@ const ProductConsumption = () => {
   // FETCH DATA
   // =========================================================
 
-  const fetchConsumptions = async () => {
+  const getStaff = async () => {
     try {
-      const response = await axios.get(`${API_URL}api/v1/product-consumptions`, authConfig())
+      const token = localStorage.getItem('token')
 
-      setConsumptions(normalizeArray(response))
+      const response = await axios.get(`${API_URL}api/v1/staffs`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      setStaffs(response.data.staffs)
     } catch (error) {
-      console.error('Failed to fetch product consumptions:', error)
+      console.error(error)
     }
   }
 
-  const fetchProducts = async () => {
+  const getProducts = async () => {
     try {
-      const response = await axios.get(`${API_URL}api/v1/products`, authConfig())
+      const token = localStorage.getItem('token')
 
-      setProducts(normalizeArray(response))
+      const response = await axios.get(`${API_URL}api/v1/products`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      setProducts(response.data.products)
     } catch (error) {
-      console.error('Failed to fetch products:', error)
+      console.error(error)
     }
   }
 
-  const fetchStaff = async () => {
+  const getConsumptions = async () => {
     try {
-      const response = await axios.get(`${API_URL}api/v1/staffs`, authConfig())
+      const token = localStorage.getItem('token')
 
-      setStaff(normalizeArray(response))
+      const response = await axios.get(`${API_URL}api/v1/product-consumptions`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      setConsumptions(response.data.consumptions)
     } catch (error) {
-      console.error('Failed to fetch staff:', error)
-    }
-  }
-
-  const loadData = async () => {
-    setLoading(true)
-
-    try {
-      await Promise.all([fetchConsumptions(), fetchProducts(), fetchStaff()])
-    } finally {
-      setLoading(false)
+      console.error(error)
     }
   }
 
   useEffect(() => {
-    loadData()
-  }, [])
+    const fetchData = async () => {
+      await getStaff()
+      await getProducts()
+      await getConsumptions()
+    }
 
+    fetchData()
+  }, [])
   // =========================================================
   // FILTERED DATA
   // =========================================================
@@ -280,74 +293,32 @@ const ProductConsumption = () => {
   // =========================================================
 
   const handleCreateConsumption = async () => {
-    if (!form.staff_id) {
-      alert('Please select a staff member.')
-      return
-    }
-
-    const validItems = formItems.filter((item) => item.product_id && Number(item.quantity) > 0)
-
-    if (validItems.length === 0) {
-      alert('Please add at least one product.')
-      return
-    }
-
-    // Check duplicate products
-    const productIds = validItems.map((item) => String(item.product_id))
-
-    const hasDuplicate = new Set(productIds).size !== productIds.length
-
-    if (hasDuplicate) {
-      alert('The same product cannot be added twice. Please combine the quantities.')
-      return
-    }
-
-    // Check stock
-    for (const item of validItems) {
-      const product = products.find((p) => String(p.id) === String(item.product_id))
-
-      if (!product) {
-        alert('One of the selected products no longer exists.')
-        return
-      }
-
-      if (Number(item.quantity) > Number(product.quantity || 0)) {
-        alert(`${product.name} only has ${product.quantity} in stock.`)
-        return
-      }
-    }
-
     try {
-      setSaving(true)
+      const token = localStorage.getItem('token')
 
-      await axios.post(
+      const response = await axios.post(
         `${API_URL}api/v1/product-consumptions`,
         {
           staff_id: form.staff_id,
-
-          items: validItems.map((item) => ({
+          items: form.items.map((item) => ({
             product_id: Number(item.product_id),
             quantity: Number(item.quantity),
           })),
-
           reason: form.reason,
           notes: form.notes,
         },
-        authConfig(),
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
       )
 
-      setShowCreateModal(false)
-      resetForm()
+      console.log(response.data)
 
-      await fetchConsumptions()
-
-      alert('Product consumption request submitted successfully.')
+      await getConsumptions()
     } catch (error) {
-      console.error('Create consumption error:', error)
-
-      alert(error?.response?.data?.message || 'Failed to create product consumption request.')
-    } finally {
-      setSaving(false)
+      console.error(error)
     }
   }
 
@@ -356,26 +327,25 @@ const ProductConsumption = () => {
   // =========================================================
 
   const handleApprove = async (id) => {
-    const confirmed = window.confirm(
-      'Approve this product consumption request? Stock will be deducted immediately.',
-    )
-
-    if (!confirmed) return
-
     try {
-      setSaving(true)
+      const token = localStorage.getItem('token')
 
-      await axios.patch(`${API_URL}api/v1/product-consumptions/${id}/approve`, {}, authConfig())
+      const response = await axios.patch(
+        `${API_URL}api/v1/product-consumptions/${id}/approve`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
 
-      await loadData()
+      console.log(response.data)
 
-      setShowDetailsModal(false)
+      await getConsumptions()
+      await getProducts()
     } catch (error) {
-      console.error('Approve consumption error:', error)
-
-      alert(error?.response?.data?.message || 'Failed to approve request.')
-    } finally {
-      setSaving(false)
+      console.error(error)
     }
   }
 
@@ -393,35 +363,27 @@ const ProductConsumption = () => {
   // REJECT
   // =========================================================
 
-  const handleReject = async () => {
-    if (!selectedConsumption) return
-
-    if (!rejectionReason.trim()) {
-      alert('Please provide a rejection reason.')
-      return
-    }
-
+  const handleReject = async (id) => {
     try {
-      setSaving(true)
+      const token = localStorage.getItem('token')
 
-      await axios.patch(
-        `${API_URL}api/v1/product-consumptions/${selectedConsumption.id}/reject`,
+      const response = await axios.patch(
+        `${API_URL}api/v1/product-consumptions/${id}/reject`,
         {
-          rejection_reason: rejectionReason.trim(),
+          rejection_reason: rejectionReason,
         },
-        authConfig(),
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
       )
 
-      setShowRejectModal(false)
-      setShowDetailsModal(false)
+      console.log(response.data)
 
-      await fetchConsumptions()
+      await getConsumptions()
     } catch (error) {
-      console.error('Reject consumption error:', error)
-
-      alert(error?.response?.data?.message || 'Failed to reject request.')
-    } finally {
-      setSaving(false)
+      console.error(error)
     }
   }
 
