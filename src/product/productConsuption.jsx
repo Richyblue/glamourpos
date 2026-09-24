@@ -30,43 +30,82 @@ import {
 } from '@coreui/react'
 
 import CIcon from '@coreui/icons-react'
-import { cilCheck, cilPlus, cilTrash, cilX, cilSearch, cilInfo, cilWarning } from '@coreui/icons'
+
+import {
+  cilCheck,
+  cilCheckCircle,
+  cilInfo,
+  cilLayers,
+  cilPeople,
+  cilPlus,
+  cilReload,
+  cilSearch,
+  cilTrash,
+  cilWarning,
+  cilX,
+} from '@coreui/icons'
 
 const API_URL = import.meta.env.VITE_BACKEND_URL
 
 const ProductConsumption = () => {
   // ============================================================
-  // STATE
+  // DATA
   // ============================================================
 
   const [consumptions, setConsumptions] = useState([])
   const [products, setProducts] = useState([])
   const [staff, setStaff] = useState([])
 
+  // ============================================================
+  // LOADING
+  // ============================================================
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+
+  // ============================================================
+  // ALERTS
+  // ============================================================
 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [staffFilter, setStaffFilter] = useState('all')
+  // ============================================================
+  // FILTERS
+  // ============================================================
 
-  // Create modal
+  const [search, setSearch] = useState('')
+  const [staffFilter, setStaffFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [dateFilter, setDateFilter] = useState('all')
+
+  // ============================================================
+  // CREATE MODAL
+  // ============================================================
+
   const [showCreateModal, setShowCreateModal] = useState(false)
 
-  // Details modal
+  // ============================================================
+  // DETAILS MODAL
+  // ============================================================
+
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [selectedConsumption, setSelectedConsumption] = useState(null)
 
-  // Reject modal
-  const [showRejectModal, setShowRejectModal] = useState(false)
-  const [rejectReason, setRejectReason] = useState('')
-  const [rejectingId, setRejectingId] = useState(null)
+  // ============================================================
+  // REJECT MODAL
+  // ============================================================
 
-  // Form
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [rejectingId, setRejectingId] = useState(null)
+  const [rejectReason, setRejectReason] = useState('')
+
+  // ============================================================
+  // FORM
+  // ============================================================
+
   const [form, setForm] = useState({
     staff_id: '',
     reason: '',
@@ -107,78 +146,99 @@ const ProductConsumption = () => {
     return product.name || product.Product?.name || `Product #${product.id}`
   }
 
-  const formatCurrency = (value) => {
-    return `₦${Number(value || 0).toLocaleString()}`
+  const getItems = (consumption) => {
+    if (!consumption) return []
+
+    return consumption.Items || consumption.items || consumption.ConsumptionItems || []
   }
 
-  const formatDate = (date) => {
-    if (!date) return '-'
+  const getStaffObject = (consumption) => {
+    return consumption?.Staff || consumption?.staff || null
+  }
 
-    return new Date(date).toLocaleString('en-NG', {
-      year: 'numeric',
+  const getProductObject = (item) => {
+    return item?.Product || item?.product || null
+  }
+
+  const getReference = (item) => {
+    return (
+      item?.reference_number || item?.referenceNumber || item?.reference || `#${item?.id || ''}`
+    )
+  }
+
+  const getDate = (item) => {
+    return item?.requested_at || item?.requestedAt || item?.createdAt || item?.created_at
+  }
+
+  const formatCurrency = (value) => {
+    return `₦${Number(value || 0).toLocaleString('en-NG', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    })}`
+  }
+
+  const formatDate = (value) => {
+    if (!value) return '-'
+
+    const date = new Date(value)
+
+    if (Number.isNaN(date.getTime())) {
+      return '-'
+    }
+
+    return date.toLocaleString('en-NG', {
+      day: '2-digit',
       month: 'short',
-      day: 'numeric',
+      year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     })
   }
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'approved':
-        return <CBadge color="success">Approved</CBadge>
+  const getTotalCost = (consumption) => {
+    const items = getItems(consumption)
 
-      case 'rejected':
-        return <CBadge color="danger">Rejected</CBadge>
+    return items.reduce((total, item) => {
+      const quantity = Number(item.quantity || 0)
 
-      case 'pending':
-        return <CBadge color="warning">Pending</CBadge>
+      const product = getProductObject(item)
 
-      default:
-        return <CBadge color="secondary">{status || 'Unknown'}</CBadge>
+      const unitCost = Number(item.unit_cost || item.unitCost || product?.costPrice || 0)
+
+      const totalCost = Number(item.total_cost || item.totalCost || quantity * unitCost)
+
+      return total + totalCost
+    }, 0)
+  }
+
+  // ============================================================
+  // API ARRAY HANDLER
+  // ============================================================
+
+  const extractArray = (data, keys = []) => {
+    if (Array.isArray(data)) {
+      return data
     }
-  }
 
-  // ============================================================
-  // FORM HANDLERS
-  // ============================================================
+    if (!data || typeof data !== 'object') {
+      return []
+    }
 
-  const handleFormChange = (field, value) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
-  }
-
-  const handleItemChange = (index, field, value) => {
-    setFormItems((prev) => {
-      const updated = [...prev]
-
-      updated[index] = {
-        ...updated[index],
-        [field]: value,
+    for (const key of keys) {
+      if (Array.isArray(data[key])) {
+        return data[key]
       }
-
-      return updated
-    })
-  }
-
-  const addItem = () => {
-    setFormItems((prev) => [
-      ...prev,
-      {
-        product_id: '',
-        quantity: 1,
-      },
-    ])
-  }
-
-  const removeItem = (index) => {
-    if (formItems.length === 1) {
-      return
     }
 
-    setFormItems((prev) => prev.filter((_, i) => i !== index))
+    if (Array.isArray(data.data)) {
+      return data.data
+    }
+
+    if (data.data && Array.isArray(data.data.data)) {
+      return data.data.data
+    }
+
+    return []
   }
 
   // ============================================================
@@ -197,7 +257,9 @@ const ProductConsumption = () => {
 
       console.log('Staff API response:', response.data)
 
-      setStaff(response.data.staffs || [])
+      const staffList = extractArray(response.data, ['staffs', 'staff', 'users'])
+
+      setStaff(staffList)
     } catch (error) {
       console.error('Staff Error:', error)
 
@@ -221,7 +283,9 @@ const ProductConsumption = () => {
 
       console.log('Products API response:', response.data)
 
-      setProducts(response.data.products || [])
+      const productList = extractArray(response.data, ['products', 'product'])
+
+      setProducts(productList)
     } catch (error) {
       console.error('Products Error:', error)
 
@@ -233,8 +297,12 @@ const ProductConsumption = () => {
   // GET CONSUMPTIONS
   // ============================================================
 
-  const getConsumptions = async () => {
+  const getConsumptions = async (showRefresh = false) => {
     try {
+      if (showRefresh) {
+        setRefreshing(true)
+      }
+
       const token = getToken()
 
       const response = await axios.get(`${API_URL}api/v1/product-consumptions`, {
@@ -245,11 +313,22 @@ const ProductConsumption = () => {
 
       console.log('Consumption API response:', response.data)
 
-      setConsumptions(response.data.consumptions || [])
+      const records = extractArray(response.data, [
+        'consumptions',
+        'consumption',
+        'records',
+        'items',
+      ])
+
+      console.log('Consumption records:', records)
+
+      setConsumptions(records)
     } catch (error) {
       console.error('Consumption Error:', error)
 
       setError(error.response?.data?.message || 'Unable to load product consumption records.')
+    } finally {
+      setRefreshing(false)
     }
   }
 
@@ -260,37 +339,104 @@ const ProductConsumption = () => {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
-      setError('')
 
-      try {
-        await Promise.all([getConsumptions(), getProducts(), getStaff()])
-      } catch (error) {
-        console.error(error)
-      } finally {
-        setLoading(false)
-      }
+      await Promise.all([getConsumptions(), getProducts(), getStaff()])
+
+      setLoading(false)
     }
 
     fetchData()
   }, [])
 
   // ============================================================
+  // FORM HANDLERS
+  // ============================================================
+
+  const handleFormChange = (field, value) => {
+    setForm((previous) => ({
+      ...previous,
+      [field]: value,
+    }))
+  }
+
+  const handleItemChange = (index, field, value) => {
+    setFormItems((previous) => {
+      const updated = [...previous]
+
+      updated[index] = {
+        ...updated[index],
+        [field]: value,
+      }
+
+      return updated
+    })
+  }
+
+  const addItem = () => {
+    setFormItems((previous) => [
+      ...previous,
+      {
+        product_id: '',
+        quantity: 1,
+      },
+    ])
+  }
+
+  const removeItem = (index) => {
+    if (formItems.length <= 1) {
+      return
+    }
+
+    setFormItems((previous) => previous.filter((_, itemIndex) => itemIndex !== index))
+  }
+
+  // ============================================================
+  // OPEN CREATE MODAL
+  // ============================================================
+
+  const openCreateModal = () => {
+    setError('')
+    setSuccess('')
+
+    setForm({
+      staff_id: '',
+      reason: '',
+      notes: '',
+    })
+
+    setFormItems([
+      {
+        product_id: '',
+        quantity: 1,
+      },
+    ])
+
+    setShowCreateModal(true)
+  }
+
+  // ============================================================
   // CREATE CONSUMPTION
   // ============================================================
 
-  const handleCreate = async (e) => {
-    e.preventDefault()
+  const handleCreate = async (event) => {
+    event.preventDefault()
 
     setError('')
     setSuccess('')
 
-    // Staff validation
+    // ----------------------------------------------------------
+    // STAFF VALIDATION
+    // ----------------------------------------------------------
+
     if (!form.staff_id) {
       setError('Please select a staff member.')
       return
     }
 
-    // Product validation
+    // ----------------------------------------------------------
+    // PRODUCT VALIDATION
+    // ----------------------------------------------------------
+
     const validItems = formItems.filter((item) => item.product_id && Number(item.quantity) > 0)
 
     if (validItems.length === 0) {
@@ -298,15 +444,44 @@ const ProductConsumption = () => {
       return
     }
 
-    // Check duplicate products
+    // ----------------------------------------------------------
+    // DUPLICATE PRODUCTS
+    // ----------------------------------------------------------
+
     const productIds = validItems.map((item) => String(item.product_id))
 
-    const hasDuplicates = new Set(productIds).size !== productIds.length
-
-    if (hasDuplicates) {
-      setError('You cannot add the same product more than once.')
+    if (new Set(productIds).size !== productIds.length) {
+      setError('The same product cannot be added more than once.')
       return
     }
+
+    // ----------------------------------------------------------
+    // STOCK CHECK
+    // ----------------------------------------------------------
+
+    for (const item of validItems) {
+      const product = products.find(
+        (productItem) => String(productItem.id) === String(item.product_id),
+      )
+
+      if (!product) {
+        setError('One of the selected products could not be found.')
+        return
+      }
+
+      const requestedQuantity = Number(item.quantity)
+
+      const availableQuantity = Number(product.quantity || 0)
+
+      if (requestedQuantity > availableQuantity) {
+        setError(`${product.name} only has ${availableQuantity} in stock.`)
+        return
+      }
+    }
+
+    // ----------------------------------------------------------
+    // SUBMIT
+    // ----------------------------------------------------------
 
     try {
       setSaving(true)
@@ -316,9 +491,9 @@ const ProductConsumption = () => {
       const payload = {
         staff_id: Number(form.staff_id),
 
-        reason: form.reason,
+        reason: form.reason?.trim() || null,
 
-        notes: form.notes,
+        notes: form.notes?.trim() || null,
 
         items: validItems.map((item) => ({
           product_id: Number(item.product_id),
@@ -326,17 +501,26 @@ const ProductConsumption = () => {
         })),
       }
 
-      console.log('Creating consumption:', payload)
+      console.log('Creating product consumption:', payload)
 
       const response = await axios.post(`${API_URL}api/v1/product-consumptions`, payload, {
         headers: {
           Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       })
 
       console.log('Create consumption response:', response.data)
 
-      setSuccess(response.data.message || 'Product consumption request created successfully.')
+      // --------------------------------------------------------
+      // CLOSE MODAL
+      // --------------------------------------------------------
+
+      setShowCreateModal(false)
+
+      // --------------------------------------------------------
+      // RESET FORM
+      // --------------------------------------------------------
 
       setForm({
         staff_id: '',
@@ -351,13 +535,26 @@ const ProductConsumption = () => {
         },
       ])
 
-      setShowCreateModal(false)
+      // --------------------------------------------------------
+      // SUCCESS MESSAGE
+      // --------------------------------------------------------
 
-      await getConsumptions()
+      setSuccess(response.data?.message || 'Product consumption request created successfully.')
+
+      // --------------------------------------------------------
+      // VERY IMPORTANT:
+      // REFRESH RECORDS AFTER SUCCESSFUL CREATE
+      // --------------------------------------------------------
+
+      await Promise.all([getConsumptions(), getProducts()])
     } catch (error) {
       console.error('Create Consumption Error:', error)
 
-      setError(error.response?.data?.message || 'Unable to create product consumption request.')
+      setError(
+        error.response?.data?.message ||
+          error.response?.data?.error ||
+          'Unable to create product consumption request.',
+      )
     } finally {
       setSaving(false)
     }
@@ -381,13 +578,25 @@ const ProductConsumption = () => {
 
       console.log('Consumption details:', response.data)
 
-      setSelectedConsumption(response.data.consumption || response.data)
+      const consumption = response.data?.consumption || response.data?.data || response.data
 
+      setSelectedConsumption(consumption)
       setShowDetailsModal(true)
     } catch (error) {
-      console.error('Get Consumption Error:', error)
+      console.error('Consumption details error:', error)
 
-      setError(error.response?.data?.message || 'Unable to load consumption details.')
+      // --------------------------------------------------------
+      // FALLBACK TO EXISTING RECORD
+      // --------------------------------------------------------
+
+      const existing = consumptions.find((item) => String(item.id) === String(id))
+
+      if (existing) {
+        setSelectedConsumption(existing)
+        setShowDetailsModal(true)
+      } else {
+        setError(error.response?.data?.message || 'Unable to load consumption details.')
+      }
     }
   }
 
@@ -397,7 +606,7 @@ const ProductConsumption = () => {
 
   const handleApprove = async (id) => {
     const confirmed = window.confirm(
-      'Are you sure you want to approve this product consumption request? Stock will be deducted.',
+      'Are you sure you want to approve this consumption request? Stock will be deducted.',
     )
 
     if (!confirmed) {
@@ -422,11 +631,13 @@ const ProductConsumption = () => {
         },
       )
 
-      setSuccess(response.data.message || 'Product consumption approved successfully.')
+      setSuccess(response.data?.message || 'Product consumption approved successfully.')
 
-      await getConsumptions()
+      // Refresh both records and stock
+      await Promise.all([getConsumptions(), getProducts()])
 
-      if (selectedConsumption?.id === id) {
+      // Refresh open details
+      if (selectedConsumption?.id && String(selectedConsumption.id) === String(id)) {
         await handleView(id)
       }
     } catch (error) {
@@ -445,6 +656,7 @@ const ProductConsumption = () => {
   const openRejectModal = (id) => {
     setRejectingId(id)
     setRejectReason('')
+    setError('')
     setShowRejectModal(true)
   }
 
@@ -482,7 +694,7 @@ const ProductConsumption = () => {
         },
       )
 
-      setSuccess(response.data.message || 'Product consumption request rejected.')
+      setSuccess(response.data?.message || 'Product consumption request rejected.')
 
       setShowRejectModal(false)
       setRejectingId(null)
@@ -490,7 +702,7 @@ const ProductConsumption = () => {
 
       await getConsumptions()
 
-      if (selectedConsumption?.id === rejectingId) {
+      if (selectedConsumption?.id && String(selectedConsumption.id) === String(rejectingId)) {
         await handleView(rejectingId)
       }
     } catch (error) {
@@ -503,32 +715,67 @@ const ProductConsumption = () => {
   }
 
   // ============================================================
-  // FILTER DATA
+  // FILTERED RECORDS
   // ============================================================
 
   const filteredConsumptions = useMemo(() => {
     return consumptions.filter((item) => {
-      const staffName = getStaffName(item.Staff).toLowerCase()
+      const staffName = getStaffName(getStaffObject(item)).toLowerCase()
 
-      const referenceNumber = String(item.reference_number || '').toLowerCase()
+      const reference = String(getReference(item)).toLowerCase()
 
       const reason = String(item.reason || '').toLowerCase()
 
-      const searchValue = search.toLowerCase()
+      const searchValue = search.trim().toLowerCase()
 
       const matchesSearch =
         !searchValue ||
         staffName.includes(searchValue) ||
-        referenceNumber.includes(searchValue) ||
+        reference.includes(searchValue) ||
         reason.includes(searchValue)
 
-      const matchesStatus = statusFilter === 'all' || item.status === statusFilter
+      const itemStaffId = item.staff_id || item.staffId
 
-      const matchesStaff = staffFilter === 'all' || String(item.staff_id) === String(staffFilter)
+      const matchesStaff = staffFilter === 'all' || String(itemStaffId) === String(staffFilter)
 
-      return matchesSearch && matchesStatus && matchesStaff
+      const status = item.status || 'pending'
+
+      const matchesStatus = statusFilter === 'all' || status === statusFilter
+
+      let matchesDate = true
+
+      if (dateFilter !== 'all') {
+        const rawDate = getDate(item)
+
+        if (rawDate) {
+          const itemDate = new Date(rawDate)
+          const today = new Date()
+
+          if (dateFilter === 'today') {
+            matchesDate = itemDate.toDateString() === today.toDateString()
+          }
+
+          if (dateFilter === 'week') {
+            const sevenDaysAgo = new Date()
+
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+            matchesDate = itemDate >= sevenDaysAgo
+          }
+
+          if (dateFilter === 'month') {
+            matchesDate =
+              itemDate.getMonth() === today.getMonth() &&
+              itemDate.getFullYear() === today.getFullYear()
+          }
+        } else {
+          matchesDate = false
+        }
+      }
+
+      return matchesSearch && matchesStaff && matchesStatus && matchesDate
     })
-  }, [consumptions, search, statusFilter, staffFilter])
+  }, [consumptions, search, staffFilter, statusFilter, dateFilter])
 
   // ============================================================
   // SUMMARY
@@ -537,79 +784,120 @@ const ProductConsumption = () => {
   const summary = useMemo(() => {
     const total = consumptions.length
 
-    const pending = consumptions.filter((item) => item.status === 'pending').length
+    const pending = consumptions.filter((item) => (item.status || 'pending') === 'pending').length
 
     const approved = consumptions.filter((item) => item.status === 'approved').length
 
     const rejected = consumptions.filter((item) => item.status === 'rejected').length
+
+    const totalItems = consumptions.reduce((totalQuantity, consumption) => {
+      const items = getItems(consumption)
+
+      return totalQuantity + items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+    }, 0)
+
+    const totalCost = consumptions.reduce(
+      (totalValue, consumption) => totalValue + getTotalCost(consumption),
+      0,
+    )
+
+    const staffCount = new Set(
+      consumptions.map((item) => item.staff_id || item.staffId).filter(Boolean),
+    ).size
 
     return {
       total,
       pending,
       approved,
       rejected,
+      totalItems,
+      totalCost,
+      staffCount,
     }
   }, [consumptions])
-
-  // ============================================================
-  // RESET CREATE FORM
-  // ============================================================
-
-  const openCreateModal = () => {
-    setError('')
-
-    setForm({
-      staff_id: '',
-      reason: '',
-      notes: '',
-    })
-
-    setFormItems([
-      {
-        product_id: '',
-        quantity: 1,
-      },
-    ])
-
-    setShowCreateModal(true)
-  }
 
   // ============================================================
   // RENDER
   // ============================================================
 
   return (
-    <div className="product-consumption-page">
-      {/* ======================================================
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#f5f7fb',
+        padding: '24px',
+      }}
+    >
+      {/* ========================================================
           HEADER
-      ====================================================== */}
+      ======================================================== */}
 
-      <CCard className="border-0 shadow-sm mb-4">
-        <CCardBody className="p-4">
-          <CRow className="align-items-center">
-            <CCol md={8}>
+      <div className="mb-4">
+        <CRow className="align-items-center">
+          <CCol md={8}>
+            <div className="d-flex align-items-center gap-3">
+              <div
+                style={{
+                  width: 54,
+                  height: 54,
+                  borderRadius: 15,
+                  background: 'linear-gradient(135deg, #111827, #1f2937)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#e8bd35',
+                  boxShadow: '0 8px 20px rgba(17,24,39,.12)',
+                }}
+              >
+                <CIcon icon={cilLayers} size="xl" />
+              </div>
+
               <div>
-                <h3 className="fw-bold mb-1">Staff Product Consumption</h3>
+                <h2
+                  className="fw-bold mb-1"
+                  style={{
+                    color: '#111827',
+                    letterSpacing: '-0.5px',
+                  }}
+                >
+                  Product Consumption
+                </h2>
 
-                <p className="text-medium-emphasis mb-0">
-                  Manage products taken by staff for business use.
+                <p
+                  className="mb-0"
+                  style={{
+                    color: '#6b7280',
+                  }}
+                >
+                  Track and manage products taken by staff for salon use.
                 </p>
               </div>
-            </CCol>
+            </div>
+          </CCol>
 
-            <CCol md={4} className="text-md-end mt-3 mt-md-0">
-              <CButton color="primary" className="px-4" onClick={openCreateModal}>
-                <CIcon icon={cilPlus} className="me-2" />
-                New Consumption
-              </CButton>
-            </CCol>
-          </CRow>
-        </CCardBody>
-      </CCard>
+          <CCol md={4} className="text-md-end mt-3 mt-md-0">
+            <CButton
+              onClick={openCreateModal}
+              style={{
+                background: 'linear-gradient(135deg, #e8bd35, #c9a227)',
+                border: 'none',
+                color: '#111827',
+                fontWeight: 700,
+                borderRadius: 10,
+                padding: '11px 18px',
+                boxShadow: '0 5px 15px rgba(201,162,39,.25)',
+              }}
+            >
+              <CIcon icon={cilPlus} className="me-2" />
+              New Consumption
+            </CButton>
+          </CCol>
+        </CRow>
+      </div>
 
-      {/* ======================================================
+      {/* ========================================================
           ALERTS
-      ====================================================== */}
+      ======================================================== */}
 
       {error && (
         <CAlert color="danger" dismissible onClose={() => setError('')}>
@@ -619,79 +907,315 @@ const ProductConsumption = () => {
 
       {success && (
         <CAlert color="success" dismissible onClose={() => setSuccess('')}>
+          <CIcon icon={cilCheckCircle} className="me-2" />
+
           {success}
         </CAlert>
       )}
 
-      {/* ======================================================
-          SUMMARY CARDS
-      ====================================================== */}
+      {/* ========================================================
+          KPI CARDS
+      ======================================================== */}
 
       <CRow className="mb-4">
-        <CCol md={3} sm={6} className="mb-3">
-          <CCard className="border-0 shadow-sm h-100">
-            <CCardBody>
-              <div className="text-medium-emphasis small mb-1">Total Requests</div>
+        {/* TOTAL */}
 
-              <h3 className="fw-bold mb-0">{summary.total}</h3>
+        <CCol xl={3} md={6} className="mb-3">
+          <CCard
+            className="border-0 h-100"
+            style={{
+              borderRadius: 16,
+              boxShadow: '0 4px 20px rgba(17,24,39,.06)',
+            }}
+          >
+            <CCardBody className="p-4">
+              <div className="d-flex justify-content-between">
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: '#6b7280',
+                      letterSpacing: '.5px',
+                    }}
+                  >
+                    TOTAL REQUESTS
+                  </div>
+
+                  <div
+                    className="fw-bold mt-2"
+                    style={{
+                      fontSize: 29,
+                      color: '#111827',
+                    }}
+                  >
+                    {summary.total}
+                  </div>
+
+                  <small
+                    style={{
+                      color: '#9ca3af',
+                    }}
+                  >
+                    All consumption requests
+                  </small>
+                </div>
+
+                <div
+                  style={{
+                    width: 46,
+                    height: 46,
+                    borderRadius: 13,
+                    background: '#f3f4f6',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <CIcon icon={cilLayers} />
+                </div>
+              </div>
             </CCardBody>
           </CCard>
         </CCol>
 
-        <CCol md={3} sm={6} className="mb-3">
-          <CCard className="border-0 shadow-sm h-100">
-            <CCardBody>
-              <div className="text-medium-emphasis small mb-1">Pending</div>
+        {/* PENDING */}
 
-              <h3 className="fw-bold text-warning mb-0">{summary.pending}</h3>
+        <CCol xl={3} md={6} className="mb-3">
+          <CCard
+            className="border-0 h-100"
+            style={{
+              borderRadius: 16,
+              boxShadow: '0 4px 20px rgba(17,24,39,.06)',
+            }}
+          >
+            <CCardBody className="p-4">
+              <div className="d-flex justify-content-between">
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: '#6b7280',
+                      letterSpacing: '.5px',
+                    }}
+                  >
+                    PENDING
+                  </div>
+
+                  <div
+                    className="fw-bold mt-2"
+                    style={{
+                      fontSize: 29,
+                      color: '#d97706',
+                    }}
+                  >
+                    {summary.pending}
+                  </div>
+
+                  <small
+                    style={{
+                      color: '#9ca3af',
+                    }}
+                  >
+                    Awaiting approval
+                  </small>
+                </div>
+
+                <div
+                  style={{
+                    width: 46,
+                    height: 46,
+                    borderRadius: 13,
+                    background: '#fff7ed',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <CIcon icon={cilWarning} />
+                </div>
+              </div>
             </CCardBody>
           </CCard>
         </CCol>
 
-        <CCol md={3} sm={6} className="mb-3">
-          <CCard className="border-0 shadow-sm h-100">
-            <CCardBody>
-              <div className="text-medium-emphasis small mb-1">Approved</div>
+        {/* APPROVED */}
 
-              <h3 className="fw-bold text-success mb-0">{summary.approved}</h3>
+        <CCol xl={3} md={6} className="mb-3">
+          <CCard
+            className="border-0 h-100"
+            style={{
+              borderRadius: 16,
+              boxShadow: '0 4px 20px rgba(17,24,39,.06)',
+            }}
+          >
+            <CCardBody className="p-4">
+              <div className="d-flex justify-content-between">
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: '#6b7280',
+                      letterSpacing: '.5px',
+                    }}
+                  >
+                    APPROVED
+                  </div>
+
+                  <div
+                    className="fw-bold mt-2"
+                    style={{
+                      fontSize: 29,
+                      color: '#059669',
+                    }}
+                  >
+                    {summary.approved}
+                  </div>
+
+                  <small
+                    style={{
+                      color: '#9ca3af',
+                    }}
+                  >
+                    Completed usage
+                  </small>
+                </div>
+
+                <div
+                  style={{
+                    width: 46,
+                    height: 46,
+                    borderRadius: 13,
+                    background: '#ecfdf5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <CIcon icon={cilCheckCircle} />
+                </div>
+              </div>
             </CCardBody>
           </CCard>
         </CCol>
 
-        <CCol md={3} sm={6} className="mb-3">
-          <CCard className="border-0 shadow-sm h-100">
-            <CCardBody>
-              <div className="text-medium-emphasis small mb-1">Rejected</div>
+        {/* UNITS */}
 
-              <h3 className="fw-bold text-danger mb-0">{summary.rejected}</h3>
+        <CCol xl={3} md={6} className="mb-3">
+          <CCard
+            className="border-0 h-100"
+            style={{
+              borderRadius: 16,
+              boxShadow: '0 4px 20px rgba(17,24,39,.06)',
+            }}
+          >
+            <CCardBody className="p-4">
+              <div className="d-flex justify-content-between">
+                <div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: '#6b7280',
+                      letterSpacing: '.5px',
+                    }}
+                  >
+                    UNITS REQUESTED
+                  </div>
+
+                  <div
+                    className="fw-bold mt-2"
+                    style={{
+                      fontSize: 29,
+                      color: '#111827',
+                    }}
+                  >
+                    {summary.totalItems}
+                  </div>
+
+                  <small
+                    style={{
+                      color: '#9ca3af',
+                    }}
+                  >
+                    Total product quantity
+                  </small>
+                </div>
+
+                <div
+                  style={{
+                    width: 46,
+                    height: 46,
+                    borderRadius: 13,
+                    background: '#eff6ff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <CIcon icon={cilPeople} />
+                </div>
+              </div>
             </CCardBody>
           </CCard>
         </CCol>
       </CRow>
 
-      {/* ======================================================
+      {/* ========================================================
           FILTERS
-      ====================================================== */}
+      ======================================================== */}
 
-      <CCard className="border-0 shadow-sm mb-4">
-        <CCardBody>
+      <CCard
+        className="border-0 mb-4"
+        style={{
+          borderRadius: 16,
+          boxShadow: '0 4px 20px rgba(17,24,39,.06)',
+        }}
+      >
+        <CCardBody className="p-4">
           <CRow className="align-items-end">
-            <CCol lg={4} md={6} className="mb-3">
-              <CFormLabel>Search</CFormLabel>
+            <CCol xl={4} lg={4} md={6} className="mb-3 mb-xl-0">
+              <CFormLabel className="fw-semibold">Search</CFormLabel>
 
-              <div className="position-relative">
+              <div
+                style={{
+                  position: 'relative',
+                }}
+              >
+                <CIcon
+                  icon={cilSearch}
+                  style={{
+                    position: 'absolute',
+                    left: 14,
+                    top: 12,
+                    color: '#9ca3af',
+                  }}
+                />
+
                 <CFormInput
-                  placeholder="Search reference, staff or reason..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search staff, reference or reason..."
+                  style={{
+                    paddingLeft: 42,
+                    borderRadius: 10,
+                  }}
                 />
               </div>
             </CCol>
 
-            <CCol lg={3} md={6} className="mb-3">
-              <CFormLabel>Staff</CFormLabel>
+            <CCol xl={3} lg={3} md={6} className="mb-3 mb-xl-0">
+              <CFormLabel className="fw-semibold">Staff</CFormLabel>
 
-              <CFormSelect value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)}>
+              <CFormSelect
+                value={staffFilter}
+                onChange={(e) => setStaffFilter(e.target.value)}
+                style={{
+                  borderRadius: 10,
+                }}
+              >
                 <option value="all">All Staff</option>
 
                 {staff.map((person) => (
@@ -702,10 +1226,16 @@ const ProductConsumption = () => {
               </CFormSelect>
             </CCol>
 
-            <CCol lg={3} md={6} className="mb-3">
-              <CFormLabel>Status</CFormLabel>
+            <CCol xl={2} lg={2} md={6} className="mb-3 mb-xl-0">
+              <CFormLabel className="fw-semibold">Status</CFormLabel>
 
-              <CFormSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <CFormSelect
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{
+                  borderRadius: 10,
+                }}
+              >
                 <option value="all">All Status</option>
 
                 <option value="pending">Pending</option>
@@ -716,64 +1246,173 @@ const ProductConsumption = () => {
               </CFormSelect>
             </CCol>
 
-            <CCol lg={2} md={6} className="mb-3">
+            <CCol xl={2} lg={2} md={6} className="mb-3 mb-xl-0">
+              <CFormLabel className="fw-semibold">Period</CFormLabel>
+
+              <CFormSelect
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                style={{
+                  borderRadius: 10,
+                }}
+              >
+                <option value="all">All Time</option>
+
+                <option value="today">Today</option>
+
+                <option value="week">Last 7 Days</option>
+
+                <option value="month">This Month</option>
+              </CFormSelect>
+            </CCol>
+
+            <CCol xl={1} lg={1} md={6}>
               <CButton
                 color="light"
                 className="w-100"
-                onClick={() => {
-                  setSearch('')
-                  setStatusFilter('all')
-                  setStaffFilter('all')
+                disabled={refreshing}
+                onClick={() => getConsumptions(true)}
+                style={{
+                  borderRadius: 10,
+                  height: 38,
                 }}
               >
-                Clear Filters
+                {refreshing ? <CSpinner size="sm" /> : <CIcon icon={cilReload} />}
               </CButton>
             </CCol>
           </CRow>
         </CCardBody>
       </CCard>
 
-      {/* ======================================================
-          TABLE
-      ====================================================== */}
+      {/* ========================================================
+          RECORD TABLE
+      ======================================================== */}
 
-      <CCard className="border-0 shadow-sm">
-        <CCardHeader className="bg-white border-0 p-4">
+      <CCard
+        className="border-0"
+        style={{
+          borderRadius: 16,
+          boxShadow: '0 4px 20px rgba(17,24,39,.06)',
+        }}
+      >
+        <CCardHeader
+          className="bg-white border-0 p-4"
+          style={{
+            borderRadius: '16px 16px 0 0',
+          }}
+        >
           <div className="d-flex justify-content-between align-items-center">
             <div>
-              <h5 className="fw-bold mb-1">Consumption Requests</h5>
+              <h5
+                className="fw-bold mb-1"
+                style={{
+                  color: '#111827',
+                }}
+              >
+                Consumption Requests
+              </h5>
 
-              <small className="text-medium-emphasis">
-                {filteredConsumptions.length} request
-                {filteredConsumptions.length !== 1 ? 's' : ''}
+              <small
+                style={{
+                  color: '#6b7280',
+                }}
+              >
+                {filteredConsumptions.length} record
+                {filteredConsumptions.length !== 1 ? 's' : ''} found
               </small>
             </div>
+
+            <CBadge
+              style={{
+                background: '#f3f4f6',
+                color: '#374151',
+                padding: '7px 11px',
+                borderRadius: 20,
+              }}
+            >
+              {summary.pending} Pending
+            </CBadge>
           </div>
         </CCardHeader>
 
         <CCardBody className="p-0">
           {loading ? (
-            <div className="text-center py-5">
+            <div
+              className="text-center"
+              style={{
+                padding: 70,
+              }}
+            >
               <CSpinner />
 
-              <div className="mt-2 text-medium-emphasis">Loading records...</div>
+              <div
+                className="mt-3"
+                style={{
+                  color: '#6b7280',
+                }}
+              >
+                Loading consumption records...
+              </div>
             </div>
           ) : filteredConsumptions.length === 0 ? (
-            <div className="text-center py-5">
-              <CIcon icon={cilInfo} size="xl" className="text-medium-emphasis mb-3" />
+            <div
+              className="text-center"
+              style={{
+                padding: 70,
+              }}
+            >
+              <div
+                style={{
+                  width: 68,
+                  height: 68,
+                  borderRadius: 18,
+                  background: '#f3f4f6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 18px',
+                }}
+              >
+                <CIcon
+                  icon={cilLayers}
+                  size="xl"
+                  style={{
+                    color: '#9ca3af',
+                  }}
+                />
+              </div>
 
-              <h5>No consumption records</h5>
+              <h5 className="fw-bold">No records found</h5>
 
-              <p className="text-medium-emphasis mb-0">
-                No product consumption records match your search.
+              <p
+                style={{
+                  color: '#6b7280',
+                  maxWidth: 430,
+                  margin: '0 auto 20px',
+                }}
+              >
+                No product consumption records match your current filters.
               </p>
+
+              <CButton
+                onClick={openCreateModal}
+                style={{
+                  background: '#111827',
+                  border: 'none',
+                  color: '#fff',
+                  borderRadius: 10,
+                }}
+              >
+                <CIcon icon={cilPlus} className="me-2" />
+                New Consumption
+              </CButton>
             </div>
           ) : (
             <div className="table-responsive">
               <CTable hover align="middle" className="mb-0">
                 <CTableHead>
                   <CTableRow>
-                    <CTableHeaderCell>Reference</CTableHeaderCell>
+                    <CTableHeaderCell className="px-4 py-3">Reference</CTableHeaderCell>
 
                     <CTableHeaderCell>Staff</CTableHeaderCell>
 
@@ -785,84 +1424,198 @@ const ProductConsumption = () => {
 
                     <CTableHeaderCell>Status</CTableHeaderCell>
 
-                    <CTableHeaderCell className="text-end">Actions</CTableHeaderCell>
+                    <CTableHeaderCell className="text-end px-4">Action</CTableHeaderCell>
                   </CTableRow>
                 </CTableHead>
 
                 <CTableBody>
-                  {filteredConsumptions.map((item) => (
-                    <CTableRow key={item.id}>
-                      <CTableDataCell>
-                        <span className="fw-semibold">
-                          {item.reference_number || `#${item.id}`}
-                        </span>
-                      </CTableDataCell>
+                  {filteredConsumptions.map((item) => {
+                    const items = getItems(item)
 
-                      <CTableDataCell>{getStaffName(item.Staff)}</CTableDataCell>
+                    const status = item.status || 'pending'
 
-                      <CTableDataCell>
-                        <div>
-                          {item.Items?.length || 0} product
-                          {item.Items?.length !== 1 ? 's' : ''}
-                        </div>
+                    return (
+                      <CTableRow key={item.id}>
+                        {/* REFERENCE */}
 
-                        {item.Items?.slice(0, 2).map((consumptionItem, index) => (
-                          <small
-                            key={consumptionItem.id || index}
-                            className="d-block text-medium-emphasis"
+                        <CTableDataCell className="px-4">
+                          <div
+                            className="fw-bold"
+                            style={{
+                              color: '#111827',
+                            }}
                           >
-                            {getProductName(consumptionItem.Product)} × {consumptionItem.quantity}
+                            {getReference(item)}
+                          </div>
+
+                          <small
+                            style={{
+                              color: '#9ca3af',
+                            }}
+                          >
+                            ID #{item.id}
                           </small>
-                        ))}
+                        </CTableDataCell>
 
-                        {item.Items?.length > 2 && (
-                          <small className="text-primary">+{item.Items.length - 2} more</small>
-                        )}
-                      </CTableDataCell>
+                        {/* STAFF */}
 
-                      <CTableDataCell>{item.reason || '-'}</CTableDataCell>
+                        <CTableDataCell>
+                          <div className="fw-semibold">{getStaffName(getStaffObject(item))}</div>
+                        </CTableDataCell>
 
-                      <CTableDataCell>
-                        {formatDate(item.requested_at || item.createdAt)}
-                      </CTableDataCell>
+                        {/* PRODUCTS */}
 
-                      <CTableDataCell>{getStatusBadge(item.status)}</CTableDataCell>
+                        <CTableDataCell>
+                          <div className="fw-semibold">
+                            {items.length} product
+                            {items.length !== 1 ? 's' : ''}
+                          </div>
 
-                      <CTableDataCell>
-                        <div className="d-flex justify-content-end gap-2">
-                          <CButton size="sm" color="light" onClick={() => handleView(item.id)}>
-                            View
-                          </CButton>
+                          {items.slice(0, 2).map((consumptionItem, index) => (
+                            <small
+                              key={consumptionItem.id || index}
+                              className="d-block"
+                              style={{
+                                color: '#6b7280',
+                              }}
+                            >
+                              {getProductName(getProductObject(consumptionItem))} ×{' '}
+                              {consumptionItem.quantity}
+                            </small>
+                          ))}
 
-                          {item.status === 'pending' && (
-                            <>
-                              <CButton
-                                size="sm"
-                                color="success"
-                                variant="outline"
-                                disabled={actionLoading}
-                                onClick={() => handleApprove(item.id)}
-                              >
-                                <CIcon icon={cilCheck} className="me-1" />
-                                Approve
-                              </CButton>
-
-                              <CButton
-                                size="sm"
-                                color="danger"
-                                variant="outline"
-                                disabled={actionLoading}
-                                onClick={() => openRejectModal(item.id)}
-                              >
-                                <CIcon icon={cilX} className="me-1" />
-                                Reject
-                              </CButton>
-                            </>
+                          {items.length > 2 && (
+                            <small
+                              style={{
+                                color: '#c9a227',
+                                fontWeight: 600,
+                              }}
+                            >
+                              +{items.length - 2} more
+                            </small>
                           )}
-                        </div>
-                      </CTableDataCell>
-                    </CTableRow>
-                  ))}
+                        </CTableDataCell>
+
+                        {/* REASON */}
+
+                        <CTableDataCell>
+                          <span
+                            style={{
+                              color: '#4b5563',
+                            }}
+                          >
+                            {item.reason || '—'}
+                          </span>
+                        </CTableDataCell>
+
+                        {/* DATE */}
+
+                        <CTableDataCell>
+                          <div
+                            style={{
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {formatDate(getDate(item))}
+                          </div>
+                        </CTableDataCell>
+
+                        {/* STATUS */}
+
+                        <CTableDataCell>
+                          {status === 'pending' && (
+                            <CBadge
+                              style={{
+                                background: '#fff7ed',
+                                color: '#c2410c',
+                                padding: '7px 10px',
+                                borderRadius: 20,
+                              }}
+                            >
+                              Pending
+                            </CBadge>
+                          )}
+
+                          {status === 'approved' && (
+                            <CBadge
+                              style={{
+                                background: '#ecfdf5',
+                                color: '#047857',
+                                padding: '7px 10px',
+                                borderRadius: 20,
+                              }}
+                            >
+                              <CIcon icon={cilCheckCircle} className="me-1" />
+                              Approved
+                            </CBadge>
+                          )}
+
+                          {status === 'rejected' && (
+                            <CBadge
+                              style={{
+                                background: '#fef2f2',
+                                color: '#b91c1c',
+                                padding: '7px 10px',
+                                borderRadius: 20,
+                              }}
+                            >
+                              Rejected
+                            </CBadge>
+                          )}
+                        </CTableDataCell>
+
+                        {/* ACTIONS */}
+
+                        <CTableDataCell className="text-end px-4">
+                          <div className="d-flex justify-content-end gap-2">
+                            <CButton
+                              size="sm"
+                              color="light"
+                              onClick={() => handleView(item.id)}
+                              style={{
+                                borderRadius: 8,
+                                fontWeight: 600,
+                              }}
+                            >
+                              View
+                            </CButton>
+
+                            {status === 'pending' && (
+                              <>
+                                <CButton
+                                  size="sm"
+                                  color="success"
+                                  variant="outline"
+                                  disabled={actionLoading}
+                                  onClick={() => handleApprove(item.id)}
+                                  style={{
+                                    borderRadius: 8,
+                                  }}
+                                >
+                                  <CIcon icon={cilCheck} className="me-1" />
+                                  Approve
+                                </CButton>
+
+                                <CButton
+                                  size="sm"
+                                  color="danger"
+                                  variant="outline"
+                                  disabled={actionLoading}
+                                  onClick={() => openRejectModal(item.id)}
+                                  style={{
+                                    borderRadius: 8,
+                                  }}
+                                >
+                                  <CIcon icon={cilX} className="me-1" />
+                                  Reject
+                                </CButton>
+                              </>
+                            )}
+                          </div>
+                        </CTableDataCell>
+                      </CTableRow>
+                    )
+                  })}
                 </CTableBody>
               </CTable>
             </div>
@@ -870,9 +1623,9 @@ const ProductConsumption = () => {
         </CCardBody>
       </CCard>
 
-      {/* ======================================================
+      {/* ========================================================
           CREATE MODAL
-      ====================================================== */}
+      ======================================================== */}
 
       <CModal
         visible={showCreateModal}
@@ -880,29 +1633,68 @@ const ProductConsumption = () => {
         size="lg"
         backdrop="static"
       >
-        <CModalHeader>
+        <CModalHeader
+          style={{
+            background: '#111827',
+            color: '#fff',
+          }}
+        >
           <CModalTitle className="fw-bold">New Product Consumption</CModalTitle>
         </CModalHeader>
 
         <CForm onSubmit={handleCreate}>
-          <CModalBody>
-            {error && (
-              <CAlert color="danger" dismissible onClose={() => setError('')}>
-                {error}
-              </CAlert>
-            )}
+          <CModalBody
+            style={{
+              background: '#f8fafc',
+            }}
+          >
+            <div
+              className="mb-4 p-3"
+              style={{
+                background: '#fff8df',
+                border: '1px solid #f0d978',
+                borderRadius: 12,
+              }}
+            >
+              <div className="d-flex">
+                <CIcon
+                  icon={cilInfo}
+                  className="me-2 mt-1"
+                  style={{
+                    color: '#a17d00',
+                  }}
+                />
+
+                <div>
+                  <strong>Approval Required</strong>
+
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: '#6b7280',
+                    }}
+                  >
+                    This request will be saved as Pending. Stock will only be deducted after
+                    approval.
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <CRow>
               {/* STAFF */}
 
               <CCol md={6} className="mb-3">
-                <CFormLabel>
+                <CFormLabel className="fw-semibold">
                   Staff Member <span className="text-danger">*</span>
                 </CFormLabel>
 
                 <CFormSelect
                   value={form.staff_id}
                   onChange={(e) => handleFormChange('staff_id', e.target.value)}
+                  style={{
+                    borderRadius: 10,
+                  }}
                 >
                   <option value="">Select staff member</option>
 
@@ -921,124 +1713,179 @@ const ProductConsumption = () => {
               {/* REASON */}
 
               <CCol md={6} className="mb-3">
-                <CFormLabel>Reason</CFormLabel>
+                <CFormLabel className="fw-semibold">Reason</CFormLabel>
 
                 <CFormInput
-                  placeholder="e.g. Product used for client service"
                   value={form.reason}
                   onChange={(e) => handleFormChange('reason', e.target.value)}
+                  placeholder="e.g. Used for client service"
+                  style={{
+                    borderRadius: 10,
+                  }}
                 />
               </CCol>
             </CRow>
 
             {/* PRODUCTS */}
 
-            <div className="border rounded p-3 mb-3">
+            <div className="mt-3">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <div>
-                  <h6 className="fw-bold mb-0">Products</h6>
+                  <h6 className="fw-bold mb-1">Products</h6>
 
-                  <small className="text-medium-emphasis">
-                    Select products and the quantities taken.
+                  <small
+                    style={{
+                      color: '#6b7280',
+                    }}
+                  >
+                    Add the products taken by the staff member.
                   </small>
                 </div>
 
                 <CButton
-                  size="sm"
-                  color="primary"
-                  variant="outline"
                   type="button"
+                  size="sm"
                   onClick={addItem}
+                  style={{
+                    background: '#111827',
+                    border: 'none',
+                    color: '#fff',
+                    borderRadius: 8,
+                  }}
                 >
                   <CIcon icon={cilPlus} className="me-1" />
                   Add Product
                 </CButton>
               </div>
 
-              {formItems.map((item, index) => (
-                <CRow key={index} className="align-items-end mb-3">
-                  <CCol md={7}>
-                    <CFormLabel>Product</CFormLabel>
+              {formItems.map((item, index) => {
+                const selectedProduct = products.find(
+                  (product) => String(product.id) === String(item.product_id),
+                )
 
-                    <CFormSelect
-                      value={item.product_id}
-                      onChange={(e) => handleItemChange(index, 'product_id', e.target.value)}
-                    >
-                      <option value="">Select product</option>
+                return (
+                  <div
+                    key={index}
+                    className="mb-3 p-3"
+                    style={{
+                      background: '#fff',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 12,
+                    }}
+                  >
+                    <CRow className="align-items-end">
+                      <CCol md={7}>
+                        <CFormLabel className="fw-semibold">Product</CFormLabel>
 
-                      {products.map((product) => (
-                        <option
-                          key={product.id}
-                          value={product.id}
-                          disabled={Number(product.quantity) <= 0}
+                        <CFormSelect
+                          value={item.product_id}
+                          onChange={(e) => handleItemChange(index, 'product_id', e.target.value)}
+                          style={{
+                            borderRadius: 10,
+                          }}
                         >
-                          {product.name} — Stock: {product.quantity}
-                        </option>
-                      ))}
-                    </CFormSelect>
-                  </CCol>
+                          <option value="">Select product</option>
 
-                  <CCol md={3}>
-                    <CFormLabel>Quantity</CFormLabel>
+                          {products.map((product) => {
+                            const stock = Number(product.quantity || 0)
 
-                    <CFormInput
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      value={item.quantity}
-                      onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
-                    />
-                  </CCol>
+                            return (
+                              <option key={product.id} value={product.id} disabled={stock <= 0}>
+                                {product.name} — Stock: {stock}
+                              </option>
+                            )
+                          })}
+                        </CFormSelect>
 
-                  <CCol md={2}>
-                    <CButton
-                      type="button"
-                      color="danger"
-                      variant="outline"
-                      className="w-100"
-                      disabled={formItems.length === 1}
-                      onClick={() => removeItem(index)}
-                    >
-                      <CIcon icon={cilTrash} />
-                    </CButton>
-                  </CCol>
-                </CRow>
-              ))}
+                        {selectedProduct && (
+                          <small
+                            style={{
+                              color: '#6b7280',
+                            }}
+                          >
+                            Available stock: {selectedProduct.quantity}
+                          </small>
+                        )}
+                      </CCol>
+
+                      <CCol md={3}>
+                        <CFormLabel className="fw-semibold">Quantity</CFormLabel>
+
+                        <CFormInput
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={item.quantity}
+                          onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                          style={{
+                            borderRadius: 10,
+                          }}
+                        />
+                      </CCol>
+
+                      <CCol md={2}>
+                        <CButton
+                          type="button"
+                          color="danger"
+                          variant="outline"
+                          className="w-100"
+                          disabled={formItems.length === 1}
+                          onClick={() => removeItem(index)}
+                          style={{
+                            borderRadius: 10,
+                          }}
+                        >
+                          <CIcon icon={cilTrash} />
+                        </CButton>
+                      </CCol>
+                    </CRow>
+                  </div>
+                )
+              })}
             </div>
 
             {/* NOTES */}
 
-            <div className="mb-3">
-              <CFormLabel>Notes</CFormLabel>
+            <div className="mt-4">
+              <CFormLabel className="fw-semibold">Notes</CFormLabel>
 
               <CFormTextarea
                 rows={3}
-                placeholder="Additional notes..."
                 value={form.notes}
                 onChange={(e) => handleFormChange('notes', e.target.value)}
+                placeholder="Additional notes..."
+                style={{
+                  borderRadius: 10,
+                }}
               />
             </div>
-
-            {/* INFO */}
-
-            <CAlert color="info" className="mb-0">
-              <CIcon icon={cilInfo} className="me-2" />
-              Stock will only be deducted after the request is approved.
-            </CAlert>
           </CModalBody>
 
           <CModalFooter>
             <CButton
-              color="secondary"
-              variant="outline"
+              color="light"
               type="button"
               disabled={saving}
               onClick={() => setShowCreateModal(false)}
+              style={{
+                borderRadius: 10,
+              }}
             >
               Cancel
             </CButton>
 
-            <CButton color="primary" type="submit" disabled={saving}>
+            <CButton
+              type="submit"
+              disabled={saving}
+              style={{
+                background: 'linear-gradient(135deg, #e8bd35, #c9a227)',
+                border: 'none',
+                color: '#111827',
+                fontWeight: 700,
+                borderRadius: 10,
+                padding: '10px 20px',
+              }}
+            >
               {saving ? (
                 <>
                   <CSpinner size="sm" className="me-2" />
@@ -1046,7 +1893,7 @@ const ProductConsumption = () => {
                 </>
               ) : (
                 <>
-                  <CIcon icon={cilCheck} className="me-2" />
+                  <CIcon icon={cilCheckCircle} className="me-2" />
                   Submit Request
                 </>
               )}
@@ -1055,12 +1902,17 @@ const ProductConsumption = () => {
         </CForm>
       </CModal>
 
-      {/* ======================================================
+      {/* ========================================================
           DETAILS MODAL
-      ====================================================== */}
+      ======================================================== */}
 
       <CModal visible={showDetailsModal} onClose={() => setShowDetailsModal(false)} size="lg">
-        <CModalHeader>
+        <CModalHeader
+          style={{
+            background: '#111827',
+            color: '#fff',
+          }}
+        >
           <CModalTitle className="fw-bold">Consumption Details</CModalTitle>
         </CModalHeader>
 
@@ -1069,91 +1921,195 @@ const ProductConsumption = () => {
             <>
               <CRow className="mb-4">
                 <CCol md={6}>
-                  <small className="text-medium-emphasis">Reference</small>
+                  <small
+                    style={{
+                      color: '#6b7280',
+                    }}
+                  >
+                    Reference
+                  </small>
 
-                  <div className="fw-bold">
-                    {selectedConsumption.reference_number || `#${selectedConsumption.id}`}
-                  </div>
+                  <h5 className="fw-bold mb-0">{getReference(selectedConsumption)}</h5>
                 </CCol>
 
                 <CCol md={6}>
-                  <small className="text-medium-emphasis">Status</small>
+                  <small
+                    style={{
+                      color: '#6b7280',
+                    }}
+                  >
+                    Status
+                  </small>
 
-                  <div className="mt-1">{getStatusBadge(selectedConsumption.status)}</div>
+                  <div className="mt-1">
+                    {selectedConsumption.status === 'pending' && (
+                      <CBadge
+                        style={{
+                          background: '#fff7ed',
+                          color: '#c2410c',
+                          padding: '7px 11px',
+                          borderRadius: 20,
+                        }}
+                      >
+                        Pending
+                      </CBadge>
+                    )}
+
+                    {selectedConsumption.status === 'approved' && (
+                      <CBadge
+                        style={{
+                          background: '#ecfdf5',
+                          color: '#047857',
+                          padding: '7px 11px',
+                          borderRadius: 20,
+                        }}
+                      >
+                        Approved
+                      </CBadge>
+                    )}
+
+                    {selectedConsumption.status === 'rejected' && (
+                      <CBadge
+                        style={{
+                          background: '#fef2f2',
+                          color: '#b91c1c',
+                          padding: '7px 11px',
+                          borderRadius: 20,
+                        }}
+                      >
+                        Rejected
+                      </CBadge>
+                    )}
+                  </div>
                 </CCol>
               </CRow>
 
               <CRow className="mb-4">
                 <CCol md={6}>
-                  <small className="text-medium-emphasis">Staff</small>
+                  <small
+                    style={{
+                      color: '#6b7280',
+                    }}
+                  >
+                    Staff
+                  </small>
 
-                  <div className="fw-semibold">{getStaffName(selectedConsumption.Staff)}</div>
+                  <div className="fw-bold">{getStaffName(getStaffObject(selectedConsumption))}</div>
                 </CCol>
 
                 <CCol md={6}>
-                  <small className="text-medium-emphasis">Requested At</small>
+                  <small
+                    style={{
+                      color: '#6b7280',
+                    }}
+                  >
+                    Requested At
+                  </small>
 
-                  <div className="fw-semibold">
-                    {formatDate(selectedConsumption.requested_at || selectedConsumption.createdAt)}
-                  </div>
+                  <div className="fw-semibold">{formatDate(getDate(selectedConsumption))}</div>
                 </CCol>
               </CRow>
 
-              <div className="mb-4">
-                <small className="text-medium-emphasis">Reason</small>
+              <CRow className="mb-4">
+                <CCol md={6}>
+                  <small
+                    style={{
+                      color: '#6b7280',
+                    }}
+                  >
+                    Reason
+                  </small>
 
-                <div className="fw-semibold">{selectedConsumption.reason || '-'}</div>
-              </div>
+                  <div>{selectedConsumption.reason || '-'}</div>
+                </CCol>
 
-              <div className="mb-4">
-                <small className="text-medium-emphasis">Notes</small>
+                <CCol md={6}>
+                  <small
+                    style={{
+                      color: '#6b7280',
+                    }}
+                  >
+                    Total Cost
+                  </small>
 
-                <div>{selectedConsumption.notes || '-'}</div>
-              </div>
+                  <div className="fw-bold">{formatCurrency(getTotalCost(selectedConsumption))}</div>
+                </CCol>
+              </CRow>
 
               <h6 className="fw-bold mb-3">Products</h6>
 
-              <CTable bordered hover responsive>
-                <CTableHead>
-                  <CTableRow>
-                    <CTableHeaderCell>Product</CTableHeaderCell>
+              <div className="table-responsive">
+                <CTable bordered hover align="middle">
+                  <CTableHead>
+                    <CTableRow>
+                      <CTableHeaderCell>Product</CTableHeaderCell>
 
-                    <CTableHeaderCell>Quantity</CTableHeaderCell>
+                      <CTableHeaderCell>Quantity</CTableHeaderCell>
 
-                    <CTableHeaderCell>Unit Cost</CTableHeaderCell>
+                      <CTableHeaderCell>Unit Cost</CTableHeaderCell>
 
-                    <CTableHeaderCell>Total Cost</CTableHeaderCell>
-                  </CTableRow>
-                </CTableHead>
-
-                <CTableBody>
-                  {selectedConsumption.Items?.map((consumptionItem) => (
-                    <CTableRow key={consumptionItem.id}>
-                      <CTableDataCell>{getProductName(consumptionItem.Product)}</CTableDataCell>
-
-                      <CTableDataCell>{consumptionItem.quantity}</CTableDataCell>
-
-                      <CTableDataCell>{formatCurrency(consumptionItem.unit_cost)}</CTableDataCell>
-
-                      <CTableDataCell>{formatCurrency(consumptionItem.total_cost)}</CTableDataCell>
+                      <CTableHeaderCell>Total</CTableHeaderCell>
                     </CTableRow>
-                  ))}
-                </CTableBody>
-              </CTable>
+                  </CTableHead>
 
-              {selectedConsumption.status === 'rejected' && (
-                <CAlert color="danger" className="mt-4 mb-0">
-                  <strong>Rejection Reason:</strong>{' '}
-                  {selectedConsumption.rejection_reason || 'No reason provided.'}
-                </CAlert>
+                  <CTableBody>
+                    {getItems(selectedConsumption).map((item, index) => {
+                      const product = getProductObject(item)
+
+                      const quantity = Number(item.quantity || 0)
+
+                      const unitCost = Number(
+                        item.unit_cost || item.unitCost || product?.costPrice || 0,
+                      )
+
+                      const total = Number(item.total_cost || item.totalCost || quantity * unitCost)
+
+                      return (
+                        <CTableRow key={item.id || index}>
+                          <CTableDataCell>
+                            <span className="fw-semibold">{getProductName(product)}</span>
+                          </CTableDataCell>
+
+                          <CTableDataCell>{quantity}</CTableDataCell>
+
+                          <CTableDataCell>{formatCurrency(unitCost)}</CTableDataCell>
+
+                          <CTableDataCell>
+                            <strong>{formatCurrency(total)}</strong>
+                          </CTableDataCell>
+                        </CTableRow>
+                      )
+                    })}
+                  </CTableBody>
+                </CTable>
+              </div>
+
+              {selectedConsumption.notes && (
+                <div
+                  className="mt-4 p-3"
+                  style={{
+                    background: '#f8fafc',
+                    borderRadius: 10,
+                  }}
+                >
+                  <div className="fw-bold mb-1">Notes</div>
+
+                  <div
+                    style={{
+                      color: '#6b7280',
+                    }}
+                  >
+                    {selectedConsumption.notes}
+                  </div>
+                </div>
               )}
 
-              {selectedConsumption.status === 'approved' && (
-                <CAlert color="success" className="mt-4 mb-0">
-                  <CIcon icon={cilCheck} className="me-2" />
-                  This request has been approved and the product stock was deducted.
-                </CAlert>
-              )}
+              {selectedConsumption.status === 'rejected' &&
+                selectedConsumption.rejection_reason && (
+                  <CAlert color="danger" className="mt-4 mb-0">
+                    <strong>Rejection Reason:</strong> {selectedConsumption.rejection_reason}
+                  </CAlert>
+                )}
             </>
           )}
         </CModalBody>
@@ -1166,6 +2122,9 @@ const ProductConsumption = () => {
                 variant="outline"
                 disabled={actionLoading}
                 onClick={() => openRejectModal(selectedConsumption.id)}
+                style={{
+                  borderRadius: 9,
+                }}
               >
                 <CIcon icon={cilX} className="me-2" />
                 Reject
@@ -1175,6 +2134,9 @@ const ProductConsumption = () => {
                 color="success"
                 disabled={actionLoading}
                 onClick={() => handleApprove(selectedConsumption.id)}
+                style={{
+                  borderRadius: 9,
+                }}
               >
                 {actionLoading ? (
                   <CSpinner size="sm" />
@@ -1188,54 +2150,78 @@ const ProductConsumption = () => {
             </>
           )}
 
-          <CButton color="secondary" onClick={() => setShowDetailsModal(false)}>
+          <CButton
+            color="light"
+            onClick={() => setShowDetailsModal(false)}
+            style={{
+              borderRadius: 9,
+            }}
+          >
             Close
           </CButton>
         </CModalFooter>
       </CModal>
 
-      {/* ======================================================
+      {/* ========================================================
           REJECT MODAL
-      ====================================================== */}
+      ======================================================== */}
 
       <CModal
         visible={showRejectModal}
         onClose={() => !actionLoading && setShowRejectModal(false)}
         backdrop="static"
       >
-        <CModalHeader>
+        <CModalHeader
+          style={{
+            background: '#111827',
+            color: '#fff',
+          }}
+        >
           <CModalTitle className="fw-bold">Reject Consumption Request</CModalTitle>
         </CModalHeader>
 
         <CModalBody>
           <CAlert color="warning">
             <CIcon icon={cilWarning} className="me-2" />
-            Rejecting this request will not deduct any stock.
+            The request will be marked as rejected and stock will not be deducted.
           </CAlert>
 
-          <CFormLabel>
-            Rejection Reason <span className="text-danger">*</span>
+          <CFormLabel className="fw-semibold">
+            Rejection Reason
+            <span className="text-danger"> *</span>
           </CFormLabel>
 
           <CFormTextarea
             rows={4}
-            placeholder="Enter the reason for rejecting this request..."
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Enter the reason for rejecting this request..."
+            style={{
+              borderRadius: 10,
+            }}
           />
         </CModalBody>
 
         <CModalFooter>
           <CButton
-            color="secondary"
-            variant="outline"
+            color="light"
             disabled={actionLoading}
             onClick={() => setShowRejectModal(false)}
+            style={{
+              borderRadius: 9,
+            }}
           >
             Cancel
           </CButton>
 
-          <CButton color="danger" disabled={actionLoading} onClick={handleReject}>
+          <CButton
+            color="danger"
+            disabled={actionLoading}
+            onClick={handleReject}
+            style={{
+              borderRadius: 9,
+            }}
+          >
             {actionLoading ? (
               <>
                 <CSpinner size="sm" className="me-2" />
