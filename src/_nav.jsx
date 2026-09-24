@@ -29,6 +29,7 @@ import {
   cilCreditCard,
   cilSettings,
   cilAccountLogout,
+  cilAppsSettings,
 } from '@coreui/icons'
 import { CNavGroup, CNavItem, CNavTitle } from '@coreui/react'
 
@@ -255,6 +256,12 @@ const _nav = [
     name: 'Settings',
     to: '/setting',
     icon: <CIcon icon={cilSettings} customClassName="nav-icon" />,
+  },
+  {
+    component: CNavItem,
+    name: 'Hardware Settings',
+    to: '/hardwareSetting',
+    icon: <CIcon icon={cilAppsSettings} customClassName="nav-icon" />,
   },
   {
     component: CNavItem,

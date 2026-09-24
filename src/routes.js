@@ -38,6 +38,7 @@ const LoyaltyCard = React.lazy(() => import('./customers/LoyaltyCards'))
 const Commission = React.lazy(() => import('./staff/Commission'))
 const Reports = React.lazy(() => import('./pos/Report'))
 const Settings = React.lazy(() => import('./Settings'))
+const hardwareSettingardwareSettings = React.lazy(() => import('./HardwareSettings'))
 const Logout = React.lazy(() => import('./auth/logout'))
 
 // Buttons
@@ -97,6 +98,12 @@ export const routes = [
   { path: '/charts', name: 'Charts', element: Charts },
   { path: '/forms/select', name: 'Select', element: Select },
   { path: '/setting', name: 'Settings', element: Settings, roles: ['admin'] },
+  {
+    path: '/hardwareSetting',
+    name: 'Hardware Settings',
+    element: hardwareSettings,
+    roles: ['admin', 'manager'],
+  },
   { path: '/report', name: 'Report', element: Reports, roles: ['admin'] },
   {
     path: '/commission',
