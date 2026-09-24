@@ -15,7 +15,7 @@ import {
   CSpinner,
 } from '@coreui/react'
 import CIcon from '@coreui/icons-react'
-import { cilLockLocked, cilUser, cilEye, cilEyeSlash, cilCheckCircle } from '@coreui/icons'
+import { cilLockLocked, cilUser, cilCheckCircle } from '@coreui/icons'
 
 const Login = () => {
   const [email, setEmail] = useState('')
@@ -275,7 +275,15 @@ const Login = () => {
                           className="password-toggle"
                           onClick={() => setShowPassword(!showPassword)}
                         >
-                          <CIcon icon={showPassword ? cilEyeSlash : cilEye} />
+                          <span
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {showPassword ? 'HIDE' : 'SHOW'}
+                          </span>
                         </CInputGroupText>
                       </CInputGroup>
                     </div>
