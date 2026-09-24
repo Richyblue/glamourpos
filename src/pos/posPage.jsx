@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useDispatch } from 'react-redux'
 import CIcon from '@coreui/icons-react'
+import { useNavigate } from 'react-router-dom'
 import {
   cilPlus,
   cilUserPlus,
@@ -65,6 +66,7 @@ const POSPage = () => {
   const [services, setService] = useState([])
   const API_URL = import.meta.env.VITE_BACKEND_URL
   const [discount, setDiscount] = useState(0)
+  const navigate = useNavigate()
 
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [showCustomerModal, setShowCustomerModal] = useState(false)
@@ -1446,8 +1448,8 @@ const POSPage = () => {
         }}
       >
         {/* =======================================================
-            LEFT NAVIGATION RAIL
-        ======================================================== */}
+    LEFT NAVIGATION RAIL
+======================================================== */}
         <aside
           style={{
             background: '#0a0c0f',
@@ -1460,10 +1462,27 @@ const POSPage = () => {
           }}
         >
           {[
-            { label: 'REG', icon: cilCart, active: true },
-            { label: 'BOOK', icon: cilNotes },
-            { label: 'CLIENT', icon: cilPeople, onClick: () => setShowCustomerModal(true) },
-            { label: 'LEDGER', icon: cilChart, onClick: () => setShowDailyReportModal(true) },
+            {
+              label: 'REG',
+              icon: cilCart,
+              active: true,
+              onClick: () => navigate('/dashboard'),
+            },
+            {
+              label: 'BOOK',
+              icon: cilNotes,
+              onClick: () => navigate('/salesReport'),
+            },
+            {
+              label: 'CLIENT',
+              icon: cilPeople,
+              onClick: () => setShowCustomerModal(true),
+            },
+            {
+              label: 'LEDGER',
+              icon: cilChart,
+              onClick: () => setShowDailyReportModal(true),
+            },
           ].map((item) => (
             <button
               key={item.label}
@@ -1486,7 +1505,14 @@ const POSPage = () => {
               }}
             >
               <CIcon icon={item.icon} size="sm" />
-              <span style={{ fontSize: '6px', fontWeight: 900, letterSpacing: '.5px' }}>
+
+              <span
+                style={{
+                  fontSize: '6px',
+                  fontWeight: 900,
+                  letterSpacing: '.5px',
+                }}
+              >
                 {item.label}
               </span>
             </button>
@@ -1512,16 +1538,34 @@ const POSPage = () => {
             }}
           >
             <CIcon icon={cilBarcode} size="sm" />
-            <span style={{ fontSize: '6px', fontWeight: 900 }}>SCAN</span>
+
+            <span
+              style={{
+                fontSize: '6px',
+                fontWeight: 900,
+              }}
+            >
+              SCAN
+            </span>
           </button>
 
-          <div style={{ width: '38px', margin: '3px 0 6px', borderTop: '1px solid #252a30' }} />
+          <div
+            style={{
+              width: '38px',
+              margin: '3px 0 6px',
+              borderTop: '1px solid #252a30',
+            }}
+          />
 
-          <div style={{ transform: 'scale(.72)', transformOrigin: 'bottom center' }}>
+          <div
+            style={{
+              transform: 'scale(.72)',
+              transformOrigin: 'bottom center',
+            }}
+          >
             <LogoutButton />
           </div>
         </aside>
-
         {/* =======================================================
             CATALOG
         ======================================================== */}
