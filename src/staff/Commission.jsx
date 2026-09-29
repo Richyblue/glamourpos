@@ -914,6 +914,154 @@ const Commission = () => {
       </CRow>
 
       {/* =====================================================
+          FILTERS
+      ====================================================== */}
+
+      <CCard className="border-0 shadow-sm mb-4">
+        <CCardHeader className="bg-white border-0 pt-4 px-4">
+          <div className="d-flex justify-content-between align-items-center">
+            <div className="d-flex align-items-center">
+              <CIcon icon={cilFilter} className="me-2 text-primary" />
+
+              <strong>Commission Filters</strong>
+            </div>
+
+            {hasFilters && (
+              <CButton color="light" size="sm" className="border" onClick={resetFilters}>
+                <CIcon icon={cilX} className="me-1" />
+                Clear Filters
+              </CButton>
+            )}
+          </div>
+        </CCardHeader>
+
+        <CCardBody className="px-4 pb-4">
+          <CRow className="g-3">
+            {/* SEARCH */}
+
+            <CCol xs={12} lg={4}>
+              <label className="form-label small fw-semibold">Search</label>
+
+              <CInputGroup>
+                <CInputGroupText>
+                  <CIcon icon={cilSearch} />
+                </CInputGroupText>
+
+                <CFormInput
+                  placeholder="Staff name or receipt number..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </CInputGroup>
+            </CCol>
+
+            {/* STAFF */}
+
+            <CCol xs={12} sm={6} lg={2}>
+              <label className="form-label small fw-semibold">Staff</label>
+
+              <CFormSelect value={selectedStaff} onChange={(e) => setSelectedStaff(e.target.value)}>
+                <option value="">All Staff</option>
+
+                {staffs.map((staff) => (
+                  <option key={staff.id} value={staff.id}>
+                    {staff.User?.fullname || staff.User?.name || staff.name || `Staff #${staff.id}`}
+                  </option>
+                ))}
+              </CFormSelect>
+            </CCol>
+
+            {/* STATUS */}
+
+            <CCol xs={12} sm={6} lg={2}>
+              <label className="form-label small fw-semibold">Status</label>
+
+              <CFormSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="">All Status</option>
+
+                <option value="pending">Pending</option>
+
+                <option value="paid">Paid</option>
+              </CFormSelect>
+            </CCol>
+            {/* FROM DATE */}
+
+            <CCol xs={12} sm={6} lg={2}>
+              <label className="form-label small fw-semibold">From Date</label>
+
+              <CFormInput
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </CCol>
+
+            {/* TO DATE */}
+
+            <CCol xs={12} sm={6} lg={2}>
+              <label className="form-label small fw-semibold">To Date</label>
+
+              <CFormInput
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </CCol>
+
+            {/* MONTH */}
+
+            <CCol xs={12} sm={6} lg={2}>
+              <label className="form-label small fw-semibold">Month</label>
+
+              <CFormSelect value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}>
+                <option value="">All Months</option>
+
+                {[
+                  'January',
+                  'February',
+                  'March',
+                  'April',
+                  'May',
+                  'June',
+                  'July',
+                  'August',
+                  'September',
+                  'October',
+                  'November',
+                  'December',
+                ].map((month, index) => (
+                  <option key={month} value={index + 1}>
+                    {month}
+                  </option>
+                ))}
+              </CFormSelect>
+            </CCol>
+
+            {/* YEAR */}
+
+            <CCol xs={12} sm={6} lg={2}>
+              <label className="form-label small fw-semibold">Year</label>
+
+              <CFormSelect value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+                <option value="">All Years</option>
+
+                {Array.from(
+                  {
+                    length: 7,
+                  },
+                  (_, index) => new Date().getFullYear() - index,
+                ).map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </CFormSelect>
+            </CCol>
+          </CRow>
+        </CCardBody>
+      </CCard>
+      {/* =====================================================
     STAFF TIPS
 ====================================================== */}
 
@@ -1157,155 +1305,6 @@ const Commission = () => {
               </CTable>
             </div>
           )}
-        </CCardBody>
-      </CCard>
-
-      {/* =====================================================
-          FILTERS
-      ====================================================== */}
-
-      <CCard className="border-0 shadow-sm mb-4">
-        <CCardHeader className="bg-white border-0 pt-4 px-4">
-          <div className="d-flex justify-content-between align-items-center">
-            <div className="d-flex align-items-center">
-              <CIcon icon={cilFilter} className="me-2 text-primary" />
-
-              <strong>Commission Filters</strong>
-            </div>
-
-            {hasFilters && (
-              <CButton color="light" size="sm" className="border" onClick={resetFilters}>
-                <CIcon icon={cilX} className="me-1" />
-                Clear Filters
-              </CButton>
-            )}
-          </div>
-        </CCardHeader>
-
-        <CCardBody className="px-4 pb-4">
-          <CRow className="g-3">
-            {/* SEARCH */}
-
-            <CCol xs={12} lg={4}>
-              <label className="form-label small fw-semibold">Search</label>
-
-              <CInputGroup>
-                <CInputGroupText>
-                  <CIcon icon={cilSearch} />
-                </CInputGroupText>
-
-                <CFormInput
-                  placeholder="Staff name or receipt number..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </CInputGroup>
-            </CCol>
-
-            {/* STAFF */}
-
-            <CCol xs={12} sm={6} lg={2}>
-              <label className="form-label small fw-semibold">Staff</label>
-
-              <CFormSelect value={selectedStaff} onChange={(e) => setSelectedStaff(e.target.value)}>
-                <option value="">All Staff</option>
-
-                {staffs.map((staff) => (
-                  <option key={staff.id} value={staff.id}>
-                    {staff.User?.fullname || staff.User?.name || staff.name || `Staff #${staff.id}`}
-                  </option>
-                ))}
-              </CFormSelect>
-            </CCol>
-
-            {/* STATUS */}
-
-            <CCol xs={12} sm={6} lg={2}>
-              <label className="form-label small fw-semibold">Status</label>
-
-              <CFormSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="">All Status</option>
-
-                <option value="pending">Pending</option>
-
-                <option value="paid">Paid</option>
-              </CFormSelect>
-            </CCol>
-            {/* FROM DATE */}
-
-            <CCol xs={12} sm={6} lg={2}>
-              <label className="form-label small fw-semibold">From Date</label>
-
-              <CFormInput
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-              />
-            </CCol>
-
-            {/* TO DATE */}
-
-            <CCol xs={12} sm={6} lg={2}>
-              <label className="form-label small fw-semibold">To Date</label>
-
-              <CFormInput
-                type="date"
-                value={dateTo}
-                min={dateFrom || undefined}
-                onChange={(e) => setDateTo(e.target.value)}
-              />
-            </CCol>
-
-            {/* MONTH */}
-
-            <CCol xs={12} sm={6} lg={2}>
-              <label className="form-label small fw-semibold">Month</label>
-
-              <CFormSelect value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}>
-                <option value="">All Months</option>
-
-                {[
-                  'January',
-                  'February',
-                  'March',
-                  'April',
-                  'May',
-                  'June',
-                  'July',
-                  'August',
-                  'September',
-                  'October',
-                  'November',
-                  'December',
-                ].map((month, index) => (
-                  <option key={month} value={index + 1}>
-                    {month}
-                  </option>
-                ))}
-              </CFormSelect>
-            </CCol>
-
-            {/* YEAR */}
-
-            <CCol xs={12} sm={6} lg={2}>
-              <label className="form-label small fw-semibold">Year</label>
-
-              <CFormSelect value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
-                <option value="">All Years</option>
-
-                {Array.from(
-                  {
-                    length: 7,
-                  },
-                  (_, index) => new Date().getFullYear() - index,
-                ).map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </CFormSelect>
-            </CCol>
-          </CRow>
         </CCardBody>
       </CCard>
 
