@@ -121,6 +121,19 @@ const POSPage = () => {
       connected: false,
     },
   })
+  // ==========================================================
+  // STAFF TIP
+  // ==========================================================
+  const [showStaffTipModal, setShowStaffTipModal] = useState(false)
+  const [staffTipLoading, setStaffTipLoading] = useState(false)
+
+  const [staffTipForm, setStaffTipForm] = useState({
+    staffId: '',
+    amount: '',
+    paymentMethod: 'cash',
+    customerId: '',
+    note: '',
+  })
   const currentUser = JSON.parse(localStorage.getItem('user'))
 
   const CART_KEY = `pos_cart_${currentUser.id}`
@@ -303,7 +316,75 @@ const POSPage = () => {
   }, [])
 
   // product ends
+  // ==========================================================
+  // RECORD STAFF TIP
+  // ==========================================================
+  const handleRecordStaffTip = async () => {
+    try {
+      // ------------------------------------------------------
+      // Validation
+      // ------------------------------------------------------
+      if (!staffTipForm.staffId) {
+        alert('Please select a staff member')
+        return
+      }
 
+      if (!staffTipForm.amount || Number(staffTipForm.amount) <= 0) {
+        alert('Please enter a valid tip amount')
+        return
+      }
+
+      if (!staffTipForm.paymentMethod) {
+        alert('Please select a payment method')
+        return
+      }
+
+      setStaffTipLoading(true)
+
+      const token = localStorage.getItem('token')
+
+      const payload = {
+        staffId: Number(staffTipForm.staffId),
+
+        amount: Number(staffTipForm.amount),
+
+        paymentMethod: staffTipForm.paymentMethod,
+
+        customerId: staffTipForm.customerId ? Number(staffTipForm.customerId) : null,
+
+        note: staffTipForm.note?.trim() || null,
+      }
+
+      const response = await axios.post(`${API_URL}api/v1/staff-tips`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      console.log('STAFF TIP CREATED:', response.data)
+
+      alert('Staff tip recorded successfully')
+
+      // ------------------------------------------------------
+      // Reset
+      // ------------------------------------------------------
+      setStaffTipForm({
+        staffId: '',
+        amount: '',
+        paymentMethod: 'cash',
+        customerId: '',
+        note: '',
+      })
+
+      setShowStaffTipModal(false)
+    } catch (error) {
+      console.error('STAFF TIP ERROR:', error)
+
+      alert(error.response?.data?.message || 'Failed to record staff tip')
+    } finally {
+      setStaffTipLoading(false)
+    }
+  }
   // Daily Sales
   const getDailyReport = async () => {
     try {
@@ -1608,23 +1689,43 @@ const POSPage = () => {
                 CATALOG FILTER
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '5px',
+                }}
+              >
                 {[
-                  { text: 'Scan Code', icon: cilBarcode, onClick: () => setShowBarcodeModal(true) },
+                  {
+                    text: 'Scan Code',
+                    icon: cilBarcode,
+                    onClick: () => setShowBarcodeModal(true),
+                  },
+
                   {
                     text: 'New Client',
                     icon: cilUserPlus,
                     onClick: () => setShowNewCustomerModal(true),
                   },
+
                   {
                     text: 'Loyalty',
                     icon: cilCreditCard,
                     onClick: () => setShowLoyaltyModal(true),
                   },
+
                   {
                     text: 'Reprint',
                     icon: cilPrint,
                     onClick: () => setShowReceiptSearchModal(true),
+                  },
+
+                  {
+                    text: 'Staff Tip',
+                    icon: cilCreditCard,
+                    onClick: () => setShowStaffTipModal(true),
+                    fullWidth: true,
                   },
                 ].map((action) => (
                   <button
@@ -1633,19 +1734,49 @@ const POSPage = () => {
                     onClick={action.onClick}
                     style={{
                       height: '37px',
-                      border: '1px solid #2c3239',
+
+                      gridColumn: action.fullWidth ? '1 / -1' : 'auto',
+
+                      border: action.fullWidth ? '1px solid #6d5b22' : '1px solid #2c3239',
+
                       borderRadius: '4px',
-                      background: '#1b2026',
-                      color: '#aeb4bb',
+
+                      background: action.fullWidth ? '#211e15' : '#1b2026',
+
+                      color: action.fullWidth ? '#e8bd35' : '#aeb4bb',
+
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: '4px',
+
                       fontSize: '7px',
+                      fontWeight: action.fullWidth ? 800 : 500,
+
+                      letterSpacing: action.fullWidth ? '.5px' : '0',
+
                       cursor: 'pointer',
+
+                      transition: 'all .15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#e8bd35'
+                      e.currentTarget.style.background = '#292411'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = action.fullWidth ? '#6d5b22' : '#2c3239'
+
+                      e.currentTarget.style.background = action.fullWidth ? '#211e15' : '#1b2026'
                     }}
                   >
-                    <CIcon icon={action.icon} size="sm" style={{ color: '#d5ad32' }} />
+                    <CIcon
+                      icon={action.icon}
+                      size="sm"
+                      style={{
+                        color: '#e8bd35',
+                      }}
+                    />
+
                     {action.text}
                   </button>
                 ))}
@@ -2987,6 +3118,399 @@ const POSPage = () => {
         staff={staff}
         currentUser={currentUser}
       />
+
+      {/* ==========================================================
+    STAFF TIP MODAL
+========================================================== */}
+
+      <CModal
+        visible={showStaffTipModal}
+        onClose={() => {
+          if (!staffTipLoading) {
+            setShowStaffTipModal(false)
+          }
+        }}
+        alignment="center"
+        size="sm"
+        backdrop="static"
+      >
+        <CModalHeader
+          style={{
+            background: '#15191e',
+            borderBottom: '1px solid #2b3037',
+          }}
+        >
+          <CModalTitle
+            style={{
+              color: '#f4f5f6',
+              fontSize: '13px',
+              fontWeight: 900,
+              letterSpacing: '.5px',
+            }}
+          >
+            <CIcon
+              icon={cilCreditCard}
+              className="me-2"
+              style={{
+                color: '#e8bd35',
+              }}
+            />
+            RECORD STAFF TIP
+          </CModalTitle>
+        </CModalHeader>
+
+        <CModalBody
+          style={{
+            background: '#111418',
+            padding: '18px',
+          }}
+        >
+          {/* INFO HEADER */}
+          <div
+            style={{
+              padding: '12px',
+              marginBottom: '15px',
+              borderRadius: '6px',
+              border: '1px solid #3a3420',
+              background: '#1c1912',
+            }}
+          >
+            <div
+              style={{
+                color: '#e8bd35',
+                fontSize: '8px',
+                fontWeight: 900,
+                letterSpacing: '.8px',
+              }}
+            >
+              STAFF APPRECIATION
+            </div>
+
+            <div
+              style={{
+                marginTop: '4px',
+                color: '#7f8790',
+                fontSize: '8px',
+                lineHeight: 1.5,
+              }}
+            >
+              Record money given directly by a customer to a staff member as a tip.
+            </div>
+          </div>
+
+          {/* STAFF */}
+          <div style={{ marginBottom: '12px' }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: '5px',
+                color: '#8d959d',
+                fontSize: '8px',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+              }}
+            >
+              Staff Member
+            </label>
+
+            <CFormSelect
+              value={staffTipForm.staffId}
+              onChange={(e) =>
+                setStaffTipForm((prev) => ({
+                  ...prev,
+                  staffId: e.target.value,
+                }))
+              }
+              disabled={staffTipLoading}
+              style={{
+                height: '38px',
+                background: '#181d22',
+                color: '#dce0e3',
+                border: '1px solid #30363d',
+                fontSize: '9px',
+                boxShadow: 'none',
+              }}
+            >
+              <option value="">Select staff member...</option>
+
+              {Array.isArray(staff) &&
+                staff.map((member) => {
+                  const user = member.User || member.user
+
+                  return (
+                    <option key={member.id} value={member.id}>
+                      {user?.fullname || member.fullname || `Staff #${member.id}`}
+                    </option>
+                  )
+                })}
+            </CFormSelect>
+          </div>
+
+          {/* AMOUNT */}
+          <div style={{ marginBottom: '12px' }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: '5px',
+                color: '#8d959d',
+                fontSize: '8px',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+              }}
+            >
+              Tip Amount
+            </label>
+
+            <div
+              style={{
+                position: 'relative',
+              }}
+            >
+              <span
+                style={{
+                  position: 'absolute',
+                  left: '11px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#e8bd35',
+                  fontSize: '13px',
+                  fontWeight: 900,
+                  zIndex: 2,
+                }}
+              >
+                ₦
+              </span>
+
+              <CFormInput
+                type="number"
+                min="0"
+                step="100"
+                value={staffTipForm.amount}
+                onChange={(e) =>
+                  setStaffTipForm((prev) => ({
+                    ...prev,
+                    amount: e.target.value,
+                  }))
+                }
+                placeholder="0.00"
+                disabled={staffTipLoading}
+                style={{
+                  height: '42px',
+                  paddingLeft: '30px',
+                  background: '#181d22',
+                  color: '#f4f5f6',
+                  border: '1px solid #30363d',
+                  fontSize: '14px',
+                  fontWeight: 900,
+                  boxShadow: 'none',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* PAYMENT METHOD */}
+          <div style={{ marginBottom: '12px' }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: '5px',
+                color: '#8d959d',
+                fontSize: '8px',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+              }}
+            >
+              Payment Method
+            </label>
+
+            <CFormSelect
+              value={staffTipForm.paymentMethod}
+              onChange={(e) =>
+                setStaffTipForm((prev) => ({
+                  ...prev,
+                  paymentMethod: e.target.value,
+                }))
+              }
+              disabled={staffTipLoading}
+              style={{
+                height: '38px',
+                background: '#181d22',
+                color: '#dce0e3',
+                border: '1px solid #30363d',
+                fontSize: '9px',
+                boxShadow: 'none',
+              }}
+            >
+              <option value="cash">Cash</option>
+              <option value="pos">POS</option>
+              <option value="transfer">Transfer</option>
+            </CFormSelect>
+          </div>
+
+          {/* CUSTOMER */}
+          <div style={{ marginBottom: '12px' }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: '5px',
+                color: '#8d959d',
+                fontSize: '8px',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+              }}
+            >
+              Customer
+              <span
+                style={{
+                  marginLeft: '5px',
+                  color: '#555d65',
+                  fontSize: '7px',
+                  fontWeight: 500,
+                }}
+              >
+                OPTIONAL
+              </span>
+            </label>
+
+            <CFormSelect
+              value={staffTipForm.customerId}
+              onChange={(e) =>
+                setStaffTipForm((prev) => ({
+                  ...prev,
+                  customerId: e.target.value,
+                }))
+              }
+              disabled={staffTipLoading}
+              style={{
+                height: '38px',
+                background: '#181d22',
+                color: '#dce0e3',
+                border: '1px solid #30363d',
+                fontSize: '9px',
+                boxShadow: 'none',
+              }}
+            >
+              <option value="">Walk-in / Not specified</option>
+
+              {Array.isArray(customerss) &&
+                customerss.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.fullname}
+                    {customer.phone ? ` — ${customer.phone}` : ''}
+                  </option>
+                ))}
+            </CFormSelect>
+          </div>
+
+          {/* NOTE */}
+          <div style={{ marginBottom: '4px' }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: '5px',
+                color: '#8d959d',
+                fontSize: '8px',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+              }}
+            >
+              Note
+              <span
+                style={{
+                  marginLeft: '5px',
+                  color: '#555d65',
+                  fontSize: '7px',
+                  fontWeight: 500,
+                }}
+              >
+                OPTIONAL
+              </span>
+            </label>
+
+            <textarea
+              value={staffTipForm.note}
+              onChange={(e) =>
+                setStaffTipForm((prev) => ({
+                  ...prev,
+                  note: e.target.value,
+                }))
+              }
+              disabled={staffTipLoading}
+              placeholder="Customer appreciation..."
+              rows={3}
+              style={{
+                width: '100%',
+                resize: 'none',
+                background: '#181d22',
+                color: '#dce0e3',
+                border: '1px solid #30363d',
+                borderRadius: '4px',
+                padding: '9px',
+                fontSize: '9px',
+                outline: 'none',
+              }}
+            />
+          </div>
+        </CModalBody>
+
+        <CModalFooter
+          style={{
+            background: '#15191e',
+            borderTop: '1px solid #2b3037',
+            padding: '10px 18px',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setStaffTipForm({
+                staffId: '',
+                amount: '',
+                paymentMethod: 'cash',
+                customerId: '',
+                note: '',
+              })
+
+              setShowStaffTipModal(false)
+            }}
+            disabled={staffTipLoading}
+            style={{
+              height: '36px',
+              padding: '0 15px',
+              border: '1px solid #30363d',
+              borderRadius: '4px',
+              background: '#1b2026',
+              color: '#8d959d',
+              fontSize: '8px',
+              fontWeight: 800,
+              cursor: staffTipLoading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            CANCEL
+          </button>
+
+          <button
+            type="button"
+            onClick={handleRecordStaffTip}
+            disabled={staffTipLoading}
+            style={{
+              height: '36px',
+              minWidth: '125px',
+              padding: '0 15px',
+              border: 0,
+              borderRadius: '4px',
+              background: staffTipLoading ? '#75631f' : '#e8bd35',
+              color: '#111',
+              fontSize: '8px',
+              fontWeight: 900,
+              cursor: staffTipLoading ? 'not-allowed' : 'pointer',
+              boxShadow: '0 4px 12px rgba(232,189,53,.12)',
+            }}
+          >
+            {staffTipLoading ? 'RECORDING...' : 'RECORD TIP'}
+          </button>
+        </CModalFooter>
+      </CModal>
 
       <CModal
         visible={showReceiptSearchModal}
