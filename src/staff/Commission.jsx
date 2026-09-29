@@ -52,6 +52,12 @@ const Commission = () => {
   const [dateTo, setDateTo] = useState('')
   const [selectedStaff, setSelectedStaff] = useState('')
   const [staffs, setStaffs] = useState([])
+  // =========================================================
+  // STAFF TIPS
+  // =========================================================
+
+  const [staffTips, setStaffTips] = useState([])
+  const [tipsLoading, setTipsLoading] = useState(false)
 
   // =========================================================
   // FORMAT CURRENCY
@@ -120,12 +126,86 @@ const Commission = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      await Promise.all([getCommissions(), getStaffs()])
+      await Promise.all([getCommissions(), getStaffs(), getStaffTips()])
     }
 
     fetchData()
   }, [])
+  // =========================================================
+  // REFRESH TIPS WHEN STAFF / DATE FILTER CHANGES
+  // =========================================================
 
+  useEffect(() => {
+    getStaffTips()
+  }, [selectedStaff, dateFrom, dateTo])
+  // =========================================================
+  // GET STAFF TIPS
+  // =========================================================
+
+  const getStaffTips = async () => {
+    try {
+      setTipsLoading(true)
+
+      const token = localStorage.getItem('token')
+
+      const params = new URLSearchParams()
+
+      // -----------------------------------------------------
+      // STAFF FILTER
+      // -----------------------------------------------------
+
+      if (selectedStaff) {
+        params.append('staffId', selectedStaff)
+      }
+
+      // -----------------------------------------------------
+      // STATUS
+      // -----------------------------------------------------
+
+      // Don't send commission status directly because:
+      //
+      // commission:
+      // pending / paid
+      //
+      // tips:
+      // recorded / paid / voided
+      //
+      // We therefore handle tip status separately below.
+      // -----------------------------------------------------
+
+      // -----------------------------------------------------
+      // DATE FILTER
+      // -----------------------------------------------------
+
+      if (dateFrom) {
+        params.append('startDate', dateFrom)
+      }
+
+      if (dateTo) {
+        params.append('endDate', dateTo)
+      }
+
+      const query = params.toString()
+
+      const response = await axios.get(`${API_URL}api/v1/staff-tips${query ? `?${query}` : ''}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      setStaffTips(response.data.tips || [])
+    } catch (error) {
+      console.error('Staff Tips Error:', error)
+
+      Swal.fire({
+        icon: 'error',
+        title: 'Unable to Load Staff Tips',
+        text: error?.response?.data?.message || 'There was a problem loading staff tip records.',
+      })
+    } finally {
+      setTipsLoading(false)
+    }
+  }
   // =========================================================
   // COMMISSION HELPERS
   // =========================================================
@@ -307,6 +387,56 @@ const Commission = () => {
   }, 0)
 
   // =========================================================
+  // STAFF TIP TOTALS
+  // =========================================================
+
+  // Exclude voided tips from earnings.
+  const validTips = staffTips.filter((tip) => tip.status !== 'voided')
+
+  // ---------------------------------------------------------
+  // TOTAL TIPS
+  // ---------------------------------------------------------
+
+  const totalTips = validTips.reduce((sum, tip) => {
+    return sum + Number(tip.amount || 0)
+  }, 0)
+
+  // ---------------------------------------------------------
+  // PENDING TIPS
+  // ---------------------------------------------------------
+
+  const pendingTips = validTips.reduce((sum, tip) => {
+    if (tip.status !== 'recorded') {
+      return sum
+    }
+
+    return sum + Number(tip.amount || 0)
+  }, 0)
+
+  // ---------------------------------------------------------
+  // PAID TIPS
+  // ---------------------------------------------------------
+
+  const paidTips = validTips.reduce((sum, tip) => {
+    if (tip.status !== 'paid') {
+      return sum
+    }
+
+    return sum + Number(tip.amount || 0)
+  }, 0)
+
+  // ---------------------------------------------------------
+  // TOTAL STAFF EARNINGS
+  // ---------------------------------------------------------
+
+  const totalStaffEarnings = totalCommission + totalTips
+
+  // ---------------------------------------------------------
+  // TOTAL CURRENT AMOUNT PAYABLE
+  // ---------------------------------------------------------
+
+  const totalPayable = pendingCommission + pendingTips
+  // =========================================================
   // RESET FILTERS
   // =========================================================
 
@@ -316,6 +446,8 @@ const Commission = () => {
     setMonthFilter('')
     setYearFilter('')
     setSelectedStaff('')
+    setDateFrom('')
+    setDateTo('')
   }
 
   const hasFilters = search || statusFilter || monthFilter || yearFilter || selectedStaff
@@ -376,6 +508,72 @@ const Commission = () => {
         icon: 'error',
         title: 'Payment Failed',
         text: error?.response?.data?.message || 'Unable to mark commission as paid.',
+      })
+    }
+  }
+
+  // =========================================================
+  // PAY STAFF TIP
+  // =========================================================
+
+  const payStaffTip = async (id, amount) => {
+    if (Number(amount || 0) <= 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Invalid Tip',
+        text: 'This tip has no valid amount.',
+      })
+
+      return
+    }
+
+    const result = await Swal.fire({
+      title: 'Pay Staff Tip?',
+      text: `You are about to pay ${formatCurrency(amount)}.`,
+      icon: 'question',
+
+      showCancelButton: true,
+
+      confirmButtonText: 'Yes, Pay Tip',
+
+      cancelButtonText: 'Cancel',
+
+      confirmButtonColor: '#198754',
+    })
+
+    if (!result.isConfirmed) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('token')
+
+      await axios.put(
+        `${API_URL}api/v1/staff-tips/${id}/pay`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Tip Paid',
+        text: 'Staff tip has been marked as paid.',
+        timer: 1800,
+        showConfirmButton: false,
+      })
+
+      await getStaffTips()
+    } catch (error) {
+      console.error('Pay Staff Tip Error:', error)
+
+      Swal.fire({
+        icon: 'error',
+        title: 'Payment Failed',
+        text: error?.response?.data?.message || 'Unable to pay staff tip.',
       })
     }
   }
@@ -625,6 +823,342 @@ const Commission = () => {
           </CCard>
         </CCol>
       </CRow>
+
+      {/* =====================================================
+    STAFF EARNINGS SUMMARY
+====================================================== */}
+
+      <CRow className="mb-4">
+        <CCol xs={12}>
+          <CCard className="border-0 shadow-sm">
+            <CCardBody className="p-4">
+              <CRow className="align-items-center">
+                {/* TITLE */}
+
+                <CCol md={4} className="mb-3 mb-md-0">
+                  <div className="d-flex align-items-center">
+                    <div
+                      className="rounded-circle d-flex align-items-center justify-content-center me-3"
+                      style={{
+                        width: 48,
+                        height: 48,
+                        background: 'rgba(232,189,53,.12)',
+                      }}
+                    >
+                      <CIcon
+                        icon={cilMoney}
+                        style={{
+                          color: '#e8bd35',
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <h5 className="fw-bold mb-1">Staff Earnings</h5>
+
+                      <small className="text-body-secondary">Commission and customer tips</small>
+                    </div>
+                  </div>
+                </CCol>
+
+                {/* COMMISSION */}
+
+                <CCol sm={4} md={2}>
+                  <div className="text-body-secondary small fw-semibold">COMMISSION</div>
+
+                  <div className="fw-bold mt-1">{formatCurrency(totalCommission)}</div>
+                </CCol>
+
+                {/* TIPS */}
+
+                <CCol sm={4} md={2}>
+                  <div className="text-body-secondary small fw-semibold">TIPS</div>
+
+                  <div
+                    className="fw-bold mt-1"
+                    style={{
+                      color: '#e8bd35',
+                    }}
+                  >
+                    {formatCurrency(totalTips)}
+                  </div>
+                </CCol>
+
+                {/* PAYABLE */}
+
+                <CCol sm={4} md={2}>
+                  <div className="text-body-secondary small fw-semibold">PAYABLE</div>
+
+                  <div className="fw-bold text-warning mt-1">{formatCurrency(totalPayable)}</div>
+                </CCol>
+
+                {/* TOTAL */}
+
+                <CCol sm={12} md={2}>
+                  <div className="text-body-secondary small fw-semibold">TOTAL EARNINGS</div>
+
+                  <div
+                    className="fw-bold mt-1"
+                    style={{
+                      fontSize: '18px',
+                      color: '#198754',
+                    }}
+                  >
+                    {formatCurrency(totalStaffEarnings)}
+                  </div>
+                </CCol>
+              </CRow>
+            </CCardBody>
+          </CCard>
+        </CCol>
+      </CRow>
+
+      {/* =====================================================
+    STAFF TIPS
+====================================================== */}
+
+      <CCard className="border-0 shadow-sm mt-4">
+        <CCardHeader className="bg-white border-0 p-4">
+          <CRow className="align-items-center">
+            <CCol md={7}>
+              <div className="d-flex align-items-center">
+                <div
+                  className="rounded-circle d-flex align-items-center justify-content-center me-3"
+                  style={{
+                    width: 42,
+                    height: 42,
+                    background: 'rgba(232,189,53,.12)',
+                  }}
+                >
+                  <CIcon
+                    icon={cilMoney}
+                    style={{
+                      color: '#e8bd35',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <h5 className="fw-bold mb-1">Staff Tips</h5>
+
+                  <div className="text-body-secondary small">
+                    Customer tips recorded for staff members
+                  </div>
+                </div>
+              </div>
+            </CCol>
+
+            <CCol md={5} className="text-md-end mt-3 mt-md-0">
+              <span className="me-3">
+                <small className="text-body-secondary">Total Tips</small>
+
+                <strong
+                  className="ms-2"
+                  style={{
+                    color: '#e8bd35',
+                  }}
+                >
+                  {formatCurrency(totalTips)}
+                </strong>
+              </span>
+
+              <CBadge color="warning" className="px-3 py-2">
+                Pending: {formatCurrency(pendingTips)}
+              </CBadge>
+            </CCol>
+          </CRow>
+        </CCardHeader>
+
+        <CCardBody className="p-0">
+          {tipsLoading ? (
+            <div className="text-center py-5">
+              <CSpinner color="primary" />
+
+              <div className="text-body-secondary mt-3">Loading staff tips...</div>
+            </div>
+          ) : staffTips.length === 0 ? (
+            <div className="text-center py-5 px-3">
+              <div
+                className="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-3"
+                style={{
+                  width: 65,
+                  height: 65,
+                }}
+              >
+                <CIcon icon={cilMoney} size="xl" className="text-body-secondary" />
+              </div>
+
+              <h5 className="fw-bold">No Staff Tips</h5>
+
+              <p className="text-body-secondary mb-0">
+                No tips have been recorded for the selected filters.
+              </p>
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <CTable hover align="middle" className="mb-0">
+                <CTableHead>
+                  <CTableRow>
+                    <CTableHeaderCell className="px-4">#</CTableHeaderCell>
+
+                    <CTableHeaderCell>Staff</CTableHeaderCell>
+
+                    <CTableHeaderCell>Customer</CTableHeaderCell>
+
+                    <CTableHeaderCell>Payment</CTableHeaderCell>
+
+                    <CTableHeaderCell className="text-end">Amount</CTableHeaderCell>
+
+                    <CTableHeaderCell>Date</CTableHeaderCell>
+
+                    <CTableHeaderCell>Status</CTableHeaderCell>
+
+                    <CTableHeaderCell className="text-end px-4">Action</CTableHeaderCell>
+                  </CTableRow>
+                </CTableHead>
+
+                <CTableBody>
+                  {staffTips.map((tip, index) => {
+                    const staffName =
+                      tip.Staff?.User?.fullname ||
+                      tip.Staff?.User?.name ||
+                      tip.Staff?.name ||
+                      'Unknown Staff'
+
+                    const customerName = tip.Customer?.fullname || 'Walk-in Customer'
+
+                    return (
+                      <CTableRow key={tip.id}>
+                        {/* NUMBER */}
+
+                        <CTableDataCell className="px-4 text-body-secondary">
+                          {index + 1}
+                        </CTableDataCell>
+
+                        {/* STAFF */}
+
+                        <CTableDataCell>
+                          <div className="d-flex align-items-center">
+                            <div
+                              className="rounded-circle d-flex align-items-center justify-content-center me-2 fw-bold"
+                              style={{
+                                width: 36,
+                                height: 36,
+                                background: 'rgba(13,110,253,.1)',
+                                color: '#0d6efd',
+                              }}
+                            >
+                              {staffName.charAt(0).toUpperCase()}
+                            </div>
+
+                            <div>
+                              <div className="fw-semibold">{staffName}</div>
+
+                              {tip.note && (
+                                <small className="text-body-secondary">{tip.note}</small>
+                              )}
+                            </div>
+                          </div>
+                        </CTableDataCell>
+
+                        {/* CUSTOMER */}
+
+                        <CTableDataCell>
+                          <div className="fw-semibold">{customerName}</div>
+
+                          {tip.Customer?.phone && (
+                            <small className="text-body-secondary">{tip.Customer.phone}</small>
+                          )}
+                        </CTableDataCell>
+
+                        {/* PAYMENT METHOD */}
+
+                        <CTableDataCell>
+                          <CBadge color="secondary" className="px-2 py-1">
+                            {String(tip.paymentMethod || '').toUpperCase()}
+                          </CBadge>
+                        </CTableDataCell>
+
+                        {/* AMOUNT */}
+
+                        <CTableDataCell className="text-end">
+                          <span
+                            className="fw-bold"
+                            style={{
+                              color: tip.status === 'voided' ? '#dc3545' : '#e8bd35',
+                            }}
+                          >
+                            {formatCurrency(tip.amount)}
+                          </span>
+                        </CTableDataCell>
+
+                        {/* DATE */}
+
+                        <CTableDataCell>
+                          {tip.createdAt
+                            ? new Date(tip.createdAt).toLocaleDateString('en-NG', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })
+                            : '-'}
+                        </CTableDataCell>
+
+                        {/* STATUS */}
+
+                        <CTableDataCell>
+                          {tip.status === 'paid' && (
+                            <CBadge color="success" className="px-3 py-2">
+                              <CIcon icon={cilCheckCircle} size="sm" className="me-1" />
+                              PAID
+                            </CBadge>
+                          )}
+
+                          {tip.status === 'recorded' && (
+                            <CBadge color="warning" className="px-3 py-2">
+                              <CIcon icon={cilClock} size="sm" className="me-1" />
+                              PENDING
+                            </CBadge>
+                          )}
+
+                          {tip.status === 'voided' && (
+                            <CBadge color="danger" className="px-3 py-2">
+                              VOIDED
+                            </CBadge>
+                          )}
+                        </CTableDataCell>
+
+                        {/* ACTION */}
+
+                        <CTableDataCell className="text-end px-4">
+                          {tip.status === 'recorded' ? (
+                            <CButton
+                              size="sm"
+                              color="success"
+                              variant="outline"
+                              onClick={() => payStaffTip(tip.id, tip.amount)}
+                            >
+                              <CIcon icon={cilCheckCircle} className="me-1" />
+                              Pay
+                            </CButton>
+                          ) : tip.status === 'paid' ? (
+                            <span className="text-success small fw-semibold">
+                              <CIcon icon={cilCheckCircle} size="sm" className="me-1" />
+                              Paid
+                            </span>
+                          ) : (
+                            <span className="text-danger small fw-semibold">Voided</span>
+                          )}
+                        </CTableDataCell>
+                      </CTableRow>
+                    )
+                  })}
+                </CTableBody>
+              </CTable>
+            </div>
+          )}
+        </CCardBody>
+      </CCard>
 
       {/* =====================================================
           FILTERS
