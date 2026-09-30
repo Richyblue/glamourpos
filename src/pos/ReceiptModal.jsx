@@ -22,11 +22,9 @@ const ReceiptModal = ({ show, onHide, sale }) => {
   const [settingsError, setSettingsError] = useState('')
   const [printing, setPrinting] = useState(false)
 
-  /*
-  ==========================================
-  FETCH COMPANY SETTINGS
-  ==========================================
-  */
+  // ==========================================================
+  // FETCH COMPANY SETTINGS
+  // ==========================================================
 
   useEffect(() => {
     let mounted = true
@@ -38,16 +36,13 @@ const ReceiptModal = ({ show, onHide, sale }) => {
 
         const token = localStorage.getItem('token')
 
-        const response = await axios.get(
-          `${API_URL}api/v1/settings`,
-          {
-            headers: token
-              ? {
-                  Authorization: `Bearer ${token}`,
-                }
-              : {},
-          },
-        )
+        const response = await axios.get(`${API_URL}api/v1/settings`, {
+          headers: token
+            ? {
+                Authorization: `Bearer ${token}`,
+              }
+            : {},
+        })
 
         console.log('Settings API response:', response.data)
 
@@ -55,16 +50,10 @@ const ReceiptModal = ({ show, onHide, sale }) => {
           setSettings(response.data?.settings || {})
         }
       } catch (error) {
-        console.error(
-          'Failed to fetch settings:',
-          error.response?.data || error.message,
-        )
+        console.error('Failed to fetch settings:', error.response?.data || error.message)
 
         if (mounted) {
-          setSettingsError(
-            error.response?.data?.message ||
-              'Unable to load company settings.',
-          )
+          setSettingsError(error.response?.data?.message || 'Unable to load company settings.')
 
           setSettings({})
         }
@@ -84,74 +73,48 @@ const ReceiptModal = ({ show, onHide, sale }) => {
     }
   }, [show, API_URL])
 
-  /*
-  ==========================================
-  SETTINGS VALUES
-  ==========================================
-  */
+  // ==========================================================
+  // SETTINGS VALUES
+  // ==========================================================
 
-  const companyName =
-    settings?.companyName || 'GLAMOUR UNISEX SALON'
+  const companyName = settings?.companyName || 'GLAMOUR UNISEX SALON'
 
-  const companyPhone =
-    settings?.companyPhone || ''
+  const companyPhone = settings?.companyPhone || ''
 
-  const companyEmail =
-    settings?.companyEmail || ''
+  const companyEmail = settings?.companyEmail || ''
 
-  const companyAddress =
-    settings?.companyAddress || ''
+  const companyAddress = settings?.companyAddress || ''
 
-  const currencySymbol =
-    settings?.currencySymbol || '₦'
+  const currencySymbol = settings?.currencySymbol || '₦'
 
-  const receiptFooter =
-    settings?.receiptFooter ||
-    'Thank You For Your Patronage'
+  const receiptFooter = settings?.receiptFooter || 'Thank You For Your Patronage'
 
-  /*
-  ==========================================
-  FORMAT MONEY
-  ==========================================
-  */
+  // ==========================================================
+  // FORMAT MONEY
+  // ==========================================================
 
   const formatAmount = (amount) => {
-    return `${currencySymbol}${Number(
-      amount || 0,
-    ).toLocaleString()}`
+    return `${currencySymbol}${Number(amount || 0).toLocaleString()}`
   }
 
-  /*
-  ==========================================
-  GENERATE RECEIPT CONTENT
-  ==========================================
-  */
+  // ==========================================================
+  // GENERATE SINGLE RECEIPT
+  // ==========================================================
 
-  const generateReceiptContent = (copyType) => {
+  const generateReceiptContent = () => {
     const items = sale?.items || []
 
     return `
       <div class="receipt">
+
         <div class="company-header">
           <h2>${companyName}</h2>
 
-          ${
-            companyAddress
-              ? `<p class="address">${companyAddress}</p>`
-              : ''
-          }
+          ${companyAddress ? `<p class="address">${companyAddress}</p>` : ''}
 
-          ${
-            companyPhone
-              ? `<p>Tel: ${companyPhone}</p>`
-              : ''
-          }
+          ${companyPhone ? `<p>Tel: ${companyPhone}</p>` : ''}
 
-          ${
-            companyEmail
-              ? `<p>${companyEmail}</p>`
-              : ''
-          }
+          ${companyEmail ? `<p>${companyEmail}</p>` : ''}
         </div>
 
         <div class="separator"></div>
@@ -168,13 +131,7 @@ const ReceiptModal = ({ show, onHide, sale }) => {
 
         <p>
           <strong>Date:</strong>
-          ${
-            sale?.createdAt
-              ? new Date(
-                  sale.createdAt,
-                ).toLocaleString()
-              : '-'
-          }
+          ${sale?.createdAt ? new Date(sale.createdAt).toLocaleString() : '-'}
         </p>
 
         <p>
@@ -196,16 +153,20 @@ const ReceiptModal = ({ show, onHide, sale }) => {
           <tbody>
             ${items
               .map((item) => {
-                const quantity =
-                  item.quantity || item.qty || 1
+                const quantity = item.quantity || item.qty || 1
 
-                const amount =
-                  item.subtotal || 0
+                const amount = item.subtotal || 0
 
                 return `
                   <tr>
-                    <td>${item.name || '-'}</td>
-                    <td align="center">${quantity}</td>
+                    <td>
+                      ${item.name || '-'}
+                    </td>
+
+                    <td align="center">
+                      ${quantity}
+                    </td>
+
                     <td align="right">
                       ${formatAmount(amount)}
                     </td>
@@ -220,15 +181,15 @@ const ReceiptModal = ({ show, onHide, sale }) => {
 
         <div class="total-row">
           <span>Subtotal:</span>
+
           <strong>
-            ${formatAmount(
-              sale?.subtotal || sale?.totalAmount,
-            )}
+            ${formatAmount(sale?.subtotal || sale?.totalAmount)}
           </strong>
         </div>
 
         <div class="total-row">
           <span>Discount:</span>
+
           <strong>
             ${formatAmount(sale?.discount)}
           </strong>
@@ -236,6 +197,7 @@ const ReceiptModal = ({ show, onHide, sale }) => {
 
         <div class="total-row grand-total">
           <span>TOTAL:</span>
+
           <strong>
             ${formatAmount(sale?.totalAmount)}
           </strong>
@@ -244,46 +206,63 @@ const ReceiptModal = ({ show, onHide, sale }) => {
         <div class="separator"></div>
 
         <div class="receipt-footer">
-          <p>${receiptFooter}</p>
-          <p>Please Visit Again</p>
+          <p>
+            ${receiptFooter}
+          </p>
+
+          <p>
+            Please Visit Again
+          </p>
         </div>
 
-        <div class="copy-label">
-          ${copyType}
-        </div>
       </div>
     `
   }
 
-  /*
-  ==========================================
-  PRINT TWO RECEIPTS
-  ==========================================
-  */
+  // ==========================================================
+  // PRINT SINGLE RECEIPT
+  // ==========================================================
 
   const handlePrint = async () => {
-    if (printing) return
+    if (printing) {
+      return
+    }
 
     try {
-      if (!window.electronAPI?.printReceipt) {
+      // ======================================================
+      // CHECK ELECTRON
+      // ======================================================
+
+      if (!window.electron?.printReceipt) {
         alert('Electron printing is not available.')
+
         return
       }
 
       setPrinting(true)
 
-      const customerReceipt =
-        generateReceiptContent('CUSTOMER COPY')
+      // ======================================================
+      // GENERATE ONE RECEIPT ONLY
+      // ======================================================
 
-      const cashierReceipt =
-        generateReceiptContent('CASHIER COPY')
+      const receipt = generateReceiptContent()
+
+      // ======================================================
+      // RECEIPT HTML
+      // ======================================================
 
       const html = `
+        <!DOCTYPE html>
+
         <html>
           <head>
+
+            <meta charset="UTF-8" />
+
             <style>
+
               @page {
-                size: 60mm auto;
+                size: 80mm auto;
                 margin: 0;
               }
 
@@ -291,23 +270,24 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                 box-sizing: border-box;
               }
 
+              html,
               body {
-                width: 60mm;
                 margin: 0;
                 padding: 0;
+                width: 80mm;
+                background: #ffffff;
+              }
+
+              body {
+                width: 80mm;
                 font-family: monospace;
-                font-size: 8px;
+                font-size: 9px;
                 color: #000;
               }
 
               .receipt {
-                width: 60mm;
+                width: 80mm;
                 padding: 5px;
-                page-break-after: always;
-              }
-
-              .receipt:last-child {
-                page-break-after: auto;
               }
 
               .company-header {
@@ -315,7 +295,7 @@ const ReceiptModal = ({ show, onHide, sale }) => {
               }
 
               .company-header h2 {
-                font-size: 13px;
+                font-size: 14px;
                 margin: 2px 0;
                 font-weight: bold;
               }
@@ -341,7 +321,7 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                 width: 100%;
                 border-collapse: collapse;
                 table-layout: fixed;
-                font-size: 8px;
+                font-size: 9px;
               }
 
               th,
@@ -373,7 +353,7 @@ const ReceiptModal = ({ show, onHide, sale }) => {
               }
 
               .grand-total {
-                font-size: 11px;
+                font-size: 12px;
                 font-weight: bold;
               }
 
@@ -387,55 +367,63 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                 white-space: pre-line;
               }
 
-              .copy-label {
-                text-align: center;
-                font-weight: bold;
-                margin-top: 12px;
-                font-size: 9px;
-              }
             </style>
+
           </head>
 
           <body>
-            ${customerReceipt}
-            ${cashierReceipt}
+            ${receipt}
           </body>
+
         </html>
       `
 
-      const result =
-        await window.electronAPI.printReceipt(html)
+      // ======================================================
+      // SEND TO ELECTRON
+      // ======================================================
+
+      const result = await window.electron.printReceipt(html)
+
+      // ======================================================
+      // HANDLE ELECTRON RESULT
+      // ======================================================
 
       if (result?.success === false) {
-        throw new Error(
-          result.message || 'Printing failed',
-        )
+        throw new Error(result.message || 'Printing failed.')
       }
 
-      alert(
-        'Customer and cashier receipts printed successfully.',
-      )
+      console.log('Receipt printed successfully.')
+
+      // ======================================================
+      // CLOSE MODAL AFTER PRINT
+      // ======================================================
+
+      if (onHide) {
+        onHide()
+      }
     } catch (error) {
       console.error('Printer Error:', error)
 
-      alert(
-        error.message ||
-          'Unable to print customer and cashier receipts.',
-      )
+      alert(error.message || 'Unable to print receipt.')
     } finally {
       setPrinting(false)
     }
   }
 
-  if (!sale) return null
+  // ==========================================================
+  // NO SALE
+  // ==========================================================
+
+  if (!sale) {
+    return null
+  }
+
+  // ==========================================================
+  // MODAL
+  // ==========================================================
 
   return (
-    <CModal
-      visible={show}
-      onClose={printing ? undefined : onHide}
-      alignment="center"
-      size="lg"
-    >
+    <CModal visible={show} onClose={printing ? undefined : onHide} alignment="center" size="lg">
       <CModalHeader>
         <CModalTitle>Receipt Preview</CModalTitle>
       </CModalHeader>
@@ -444,24 +432,23 @@ const ReceiptModal = ({ show, onHide, sale }) => {
         {loadingSettings ? (
           <div className="text-center py-4">
             <CSpinner />
-            <p className="mt-2 mb-0">
-              Loading company information...
-            </p>
+
+            <p className="mt-2 mb-0">Loading company information...</p>
           </div>
         ) : (
           <>
-            {settingsError && (
-              <CAlert color="warning">
-                {settingsError}
-              </CAlert>
-            )}
+            {settingsError && <CAlert color="warning">{settingsError}</CAlert>}
+
+            {/* =================================================
+                RECEIPT PREVIEW
+            ================================================= */}
 
             <CCard>
               <CCardBody>
                 <div
                   ref={receiptRef}
                   style={{
-                    width: '60mm',
+                    width: '80mm',
                     margin: '0 auto',
                     padding: '5px',
                     fontSize: '9px',
@@ -469,6 +456,8 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                     color: '#000',
                   }}
                 >
+                  {/* COMPANY */}
+
                   <div
                     style={{
                       textAlign: 'center',
@@ -496,13 +485,21 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                     )}
 
                     {companyPhone && (
-                      <p style={{ margin: '2px 0' }}>
+                      <p
+                        style={{
+                          margin: '2px 0',
+                        }}
+                      >
                         Tel: {companyPhone}
                       </p>
                     )}
 
                     {companyEmail && (
-                      <p style={{ margin: '2px 0' }}>
+                      <p
+                        style={{
+                          margin: '2px 0',
+                        }}
+                      >
                         {companyEmail}
                       </p>
                     )}
@@ -514,29 +511,23 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                     }}
                   />
 
+                  {/* RECEIPT INFORMATION */}
+
                   <p>
-                    <strong>Receipt No:</strong>{' '}
-                    {sale.receiptNumber || sale.id}
+                    <strong>Receipt No:</strong> {sale.receiptNumber || sale.id}
                   </p>
 
                   <p>
-                    <strong>Customer:</strong>{' '}
-                    {sale.customer ||
-                      'Walk-in Customer'}
+                    <strong>Customer:</strong> {sale.customer || 'Walk-in Customer'}
                   </p>
 
                   <p>
                     <strong>Date:</strong>{' '}
-                    {sale.createdAt
-                      ? new Date(
-                          sale.createdAt,
-                        ).toLocaleString()
-                      : '-'}
+                    {sale.createdAt ? new Date(sale.createdAt).toLocaleString() : '-'}
                   </p>
 
                   <p>
-                    <strong>Cashier:</strong>{' '}
-                    {sale.recordedBy || 'Admin'}
+                    <strong>Cashier:</strong> {sale.recordedBy || 'Admin'}
                   </p>
 
                   <hr
@@ -544,6 +535,8 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                       borderTop: '1px dashed #000',
                     }}
                   />
+
+                  {/* ITEMS */}
 
                   <table
                     style={{
@@ -554,7 +547,9 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                     <thead>
                       <tr>
                         <th align="left">Item</th>
+
                         <th align="center">Qty</th>
+
                         <th align="right">Amt</th>
                       </tr>
                     </thead>
@@ -562,21 +557,11 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                     <tbody>
                       {sale.items?.map((item, index) => (
                         <tr key={index}>
-                          <td>
-                            {item.name}
-                          </td>
+                          <td>{item.name}</td>
 
-                          <td align="center">
-                            {item.quantity ||
-                              item.qty ||
-                              1}
-                          </td>
+                          <td align="center">{item.quantity || item.qty || 1}</td>
 
-                          <td align="right">
-                            {formatAmount(
-                              item.subtotal,
-                            )}
-                          </td>
+                          <td align="right">{formatAmount(item.subtotal)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -588,58 +573,44 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                     }}
                   />
 
+                  {/* TOTALS */}
+
                   <div>
                     <p
                       style={{
                         display: 'flex',
-                        justifyContent:
-                          'space-between',
+                        justifyContent: 'space-between',
                         margin: '4px 0',
                       }}
                     >
                       <span>Subtotal:</span>
 
-                      <strong>
-                        {formatAmount(
-                          sale.subtotal ||
-                            sale.totalAmount,
-                        )}
-                      </strong>
+                      <strong>{formatAmount(sale.subtotal || sale.totalAmount)}</strong>
                     </p>
 
                     <p
                       style={{
                         display: 'flex',
-                        justifyContent:
-                          'space-between',
+                        justifyContent: 'space-between',
                         margin: '4px 0',
                       }}
                     >
                       <span>Discount:</span>
 
-                      <strong>
-                        {formatAmount(
-                          sale.discount,
-                        )}
-                      </strong>
+                      <strong>{formatAmount(sale.discount)}</strong>
                     </p>
 
                     <p
                       style={{
                         display: 'flex',
-                        justifyContent:
-                          'space-between',
-                        fontSize: '11px',
+                        justifyContent: 'space-between',
+                        fontSize: '12px',
                         margin: '4px 0',
                       }}
                     >
                       <span>TOTAL:</span>
 
-                      <strong>
-                        {formatAmount(
-                          sale.totalAmount,
-                        )}
-                      </strong>
+                      <strong>{formatAmount(sale.totalAmount)}</strong>
                     </p>
                   </div>
 
@@ -648,6 +619,8 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                       borderTop: '1px dashed #000',
                     }}
                   />
+
+                  {/* FOOTER */}
 
                   <div
                     style={{
@@ -664,7 +637,11 @@ const ReceiptModal = ({ show, onHide, sale }) => {
                       {receiptFooter}
                     </p>
 
-                    <p style={{ margin: '3px 0' }}>
+                    <p
+                      style={{
+                        margin: '3px 0',
+                      }}
+                    >
                       Please Visit Again
                     </p>
                   </div>
@@ -672,22 +649,19 @@ const ReceiptModal = ({ show, onHide, sale }) => {
               </CCardBody>
             </CCard>
 
+            {/* =================================================
+                PRINT BUTTON
+            ================================================= */}
+
             <div className="text-center mt-3">
-              <CButton
-                color="primary"
-                onClick={handlePrint}
-                disabled={printing || loadingSettings}
-              >
+              <CButton color="primary" onClick={handlePrint} disabled={printing || loadingSettings}>
                 {printing ? (
                   <>
-                    <CSpinner
-                      size="sm"
-                      className="me-2"
-                    />
-                    Printing Two Receipts...
+                    <CSpinner size="sm" className="me-2" />
+                    Printing Receipt...
                   </>
                 ) : (
-                  'Print Customer & Cashier Receipts'
+                  'Print Receipt'
                 )}
               </CButton>
             </div>
