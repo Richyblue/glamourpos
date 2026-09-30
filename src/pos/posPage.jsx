@@ -121,6 +121,19 @@ const POSPage = () => {
       connected: false,
     },
   })
+  // ==========================================================
+  // STAFF TIP
+  // ==========================================================
+  const [showStaffTipModal, setShowStaffTipModal] = useState(false)
+  const [staffTipLoading, setStaffTipLoading] = useState(false)
+
+  const [staffTipForm, setStaffTipForm] = useState({
+    staffId: '',
+    amount: '',
+    paymentMethod: 'cash',
+    customerId: '',
+    note: '',
+  })
   const currentUser = JSON.parse(localStorage.getItem('user'))
 
   const CART_KEY = `pos_cart_${currentUser.id}`
@@ -328,10 +341,7 @@ const POSPage = () => {
       })
 
       const records =
-        response.data?.consumptions ||
-        response.data?.records ||
-        response.data?.data ||
-        []
+        response.data?.consumptions || response.data?.records || response.data?.data || []
 
       // Only consumptions that have not yet been linked to a sale.
       setConsumptions(
@@ -410,6 +420,75 @@ const POSPage = () => {
     setConsumptionSearch('')
   }
 
+  // ==========================================================
+  // RECORD STAFF TIP
+  // ==========================================================
+  const handleRecordStaffTip = async () => {
+    try {
+      // ------------------------------------------------------
+      // Validation
+      // ------------------------------------------------------
+      if (!staffTipForm.staffId) {
+        alert('Please select a staff member')
+        return
+      }
+
+      if (!staffTipForm.amount || Number(staffTipForm.amount) <= 0) {
+        alert('Please enter a valid tip amount')
+        return
+      }
+
+      if (!staffTipForm.paymentMethod) {
+        alert('Please select a payment method')
+        return
+      }
+
+      setStaffTipLoading(true)
+
+      const token = localStorage.getItem('token')
+
+      const payload = {
+        staffId: Number(staffTipForm.staffId),
+
+        amount: Number(staffTipForm.amount),
+
+        paymentMethod: staffTipForm.paymentMethod,
+
+        customerId: staffTipForm.customerId ? Number(staffTipForm.customerId) : null,
+
+        note: staffTipForm.note?.trim() || null,
+      }
+
+      const response = await axios.post(`${API_URL}api/v1/staff-tips`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      console.log('STAFF TIP CREATED:', response.data)
+
+      alert('Staff tip recorded successfully')
+
+      // ------------------------------------------------------
+      // Reset
+      // ------------------------------------------------------
+      setStaffTipForm({
+        staffId: '',
+        amount: '',
+        paymentMethod: 'cash',
+        customerId: '',
+        note: '',
+      })
+
+      setShowStaffTipModal(false)
+    } catch (error) {
+      console.error('STAFF TIP ERROR:', error)
+
+      alert(error.response?.data?.message || 'Failed to record staff tip')
+    } finally {
+      setStaffTipLoading(false)
+    }
+  }
   // Daily Sales
   const getDailyReport = async () => {
     try {
@@ -1201,8 +1280,7 @@ const POSPage = () => {
     }
   }
 
-  const getCartItemKey = (item) =>
-    `${item.type}:${item.id}:${item.consumptionId || 'normal'}`
+  const getCartItemKey = (item) => `${item.type}:${item.id}:${item.consumptionId || 'normal'}`
 
   const addToCart = (item) => {
     playAddSound()
@@ -1801,6 +1879,12 @@ const POSPage = () => {
                     icon: cilPrint,
                     onClick: () => setShowReceiptSearchModal(true),
                   },
+                  {
+                    text: 'Staff Tip',
+                    icon: cilCreditCard,
+                    onClick: () => setShowStaffTipModal(true),
+                    fullWidth: true,
+                  },
                 ].map((action) => (
                   <button
                     key={action.text}
@@ -1808,10 +1892,11 @@ const POSPage = () => {
                     onClick={action.onClick}
                     style={{
                       height: '37px',
-                      border: '1px solid #2c3239',
+                      gridColumn: action.fullWidth ? '1 / -1' : 'auto',
+                      border: action.fullWidth ? '1px solid #6d5b22' : '1px solid #2c3239',
                       borderRadius: '4px',
-                      background: '#1b2026',
-                      color: '#aeb4bb',
+                      background: action.fullWidth ? '#211e15' : '#1b2026',
+                      color: action.fullWidth ? '#e8bd35' : '#aeb4bb',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1853,7 +1938,14 @@ const POSPage = () => {
                     <span style={{ display: 'block', fontSize: '7px', fontWeight: 900 }}>
                       STAFF CONSUMPTION
                     </span>
-                    <span style={{ display: 'block', marginTop: '2px', color: '#82795f', fontSize: '6px' }}>
+                    <span
+                      style={{
+                        display: 'block',
+                        marginTop: '2px',
+                        color: '#82795f',
+                        fontSize: '6px',
+                      }}
+                    >
                       Approved collections ready for billing
                     </span>
                   </span>
@@ -2802,8 +2894,16 @@ const POSPage = () => {
                             border: '1px solid #5b4d22',
                           }}
                         >
-                          <div style={{ color: '#e8bd35', fontSize: '6px', fontWeight: 900, letterSpacing: '.5px' }}>
-                            STAFF CONSUMPTION • {item.consumptionReference || `#${item.consumptionId}`}
+                          <div
+                            style={{
+                              color: '#e8bd35',
+                              fontSize: '6px',
+                              fontWeight: 900,
+                              letterSpacing: '.5px',
+                            }}
+                          >
+                            STAFF CONSUMPTION •{' '}
+                            {item.consumptionReference || `#${item.consumptionId}`}
                           </div>
                           <div style={{ color: '#81795f', fontSize: '6px', marginTop: '2px' }}>
                             Collected by: {item.consumedByStaffName || 'Staff'}
@@ -2864,16 +2964,42 @@ const POSPage = () => {
                         <button
                           type="button"
                           onClick={() => decreaseQty(item.id, item.consumptionId, item.type)}
-                          style={{ width: '24px', height: '22px', border: 0, background: '#1b2025', color: '#c0c5ca', cursor: 'pointer' }}
-                        >−</button>
-                        <span style={{ minWidth: '27px', textAlign: 'center', color: '#e8eaec', fontWeight: 800, fontSize: '8px' }}>
+                          style={{
+                            width: '24px',
+                            height: '22px',
+                            border: 0,
+                            background: '#1b2025',
+                            color: '#c0c5ca',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          −
+                        </button>
+                        <span
+                          style={{
+                            minWidth: '27px',
+                            textAlign: 'center',
+                            color: '#e8eaec',
+                            fontWeight: 800,
+                            fontSize: '8px',
+                          }}
+                        >
                           {item.quantity}
                         </span>
                         <button
                           type="button"
                           onClick={() => increaseQty(item.id, item.consumptionId, item.type)}
-                          style={{ width: '24px', height: '22px', border: 0, background: '#1b2025', color: '#e8bd35', cursor: 'pointer' }}
-                        >+</button>
+                          style={{
+                            width: '24px',
+                            height: '22px',
+                            border: 0,
+                            background: '#1b2025',
+                            color: '#e8bd35',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          +
+                        </button>
                       </div>
                     )}
 
@@ -2928,11 +3054,19 @@ const POSPage = () => {
                 border: '1px solid #4f4320',
               }}
             >
-              <div style={{ color: '#e8bd35', fontSize: '7px', fontWeight: 900, letterSpacing: '.6px' }}>
+              <div
+                style={{
+                  color: '#e8bd35',
+                  fontSize: '7px',
+                  fontWeight: 900,
+                  letterSpacing: '.6px',
+                }}
+              >
                 STAFF CONSUMPTION LINKED
               </div>
               <div style={{ marginTop: '4px', color: '#aaa080', fontSize: '6px', lineHeight: 1.5 }}>
-                Inventory was deducted when approved. The complete issued quantity will be billed in this sale.
+                Inventory was deducted when approved. The complete issued quantity will be billed in
+                this sale.
               </div>
             </div>
           )}
@@ -3256,7 +3390,9 @@ const POSPage = () => {
               lineHeight: 1.5,
             }}
           >
-            Select an approved staff collection to add the complete issued quantity to the current sale. Inventory was already deducted at approval, so this step does not deduct stock again.
+            Select an approved staff collection to add the complete issued quantity to the current
+            sale. Inventory was already deducted at approval, so this step does not deduct stock
+            again.
           </div>
 
           <CFormInput
@@ -3273,7 +3409,9 @@ const POSPage = () => {
           />
 
           {consumptionLoading ? (
-            <div style={{ padding: '30px', textAlign: 'center', color: '#777f88', fontSize: '9px' }}>
+            <div
+              style={{ padding: '30px', textAlign: 'center', color: '#777f88', fontSize: '9px' }}
+            >
               Loading approved consumptions...
             </div>
           ) : (
@@ -3292,16 +3430,14 @@ const POSPage = () => {
                     .join(' ')
                     .toLowerCase()
 
-                  return (
-                    reference.includes(q) ||
-                    staffName.includes(q) ||
-                    productNames.includes(q)
-                  )
+                  return reference.includes(q) || staffName.includes(q) || productNames.includes(q)
                 })
                 .map((consumption) => {
                   const items = getConsumptionItems(consumption)
                   const reference =
-                    consumption.reference_number || consumption.referenceNumber || `#${consumption.id}`
+                    consumption.reference_number ||
+                    consumption.referenceNumber ||
+                    `#${consumption.id}`
 
                   return (
                     <button
@@ -3319,12 +3455,21 @@ const POSPage = () => {
                         cursor: 'pointer',
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                      <div
+                        style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}
+                      >
                         <div>
                           <div style={{ color: '#e8bd35', fontSize: '9px', fontWeight: 900 }}>
                             {reference}
                           </div>
-                          <div style={{ marginTop: '3px', color: '#dce0e3', fontSize: '9px', fontWeight: 800 }}>
+                          <div
+                            style={{
+                              marginTop: '3px',
+                              color: '#dce0e3',
+                              fontSize: '9px',
+                              fontWeight: 800,
+                            }}
+                          >
                             {getConsumptionStaffName(consumption)}
                           </div>
                         </div>
@@ -3346,7 +3491,9 @@ const POSPage = () => {
                                 fontSize: '8px',
                               }}
                             >
-                              <span>{product.name || `Product #${item.product_id || item.productId}`}</span>
+                              <span>
+                                {product.name || `Product #${item.product_id || item.productId}`}
+                              </span>
                               <strong style={{ color: '#dce0e3' }}>× {item.quantity}</strong>
                             </div>
                           )
@@ -3365,7 +3512,14 @@ const POSPage = () => {
                 const staffName = getConsumptionStaffName(consumption).toLowerCase()
                 return reference.includes(q) || staffName.includes(q)
               }).length && (
-                <div style={{ padding: '30px', textAlign: 'center', color: '#777f88', fontSize: '9px' }}>
+                <div
+                  style={{
+                    padding: '30px',
+                    textAlign: 'center',
+                    color: '#777f88',
+                    fontSize: '9px',
+                  }}
+                >
                   No approved product consumption is waiting to be billed.
                 </div>
               )}
@@ -3394,6 +3548,545 @@ const POSPage = () => {
         staff={staff}
         currentUser={currentUser}
       />
+
+      <CModal
+        visible={showReceiptSearchModal}
+        onClose={() => {
+          setShowReceiptSearchModal(false)
+          setReceiptSearch('')
+          setReceiptResults([])
+        }}
+        size="lg"
+        alignment="center"
+      >
+        <CModalHeader>
+          <CModalTitle className="fw-bold">
+            <CIcon icon={cilPrint} className="me-2" />
+            Reprint Receipt
+          </CModalTitle>
+        </CModalHeader>
+
+        <CModalBody className="p-4">
+          <div
+            className="p-4 mb-4"
+            style={{
+              background: '#f8fafc',
+              borderRadius: '16px',
+              border: '1px solid #e9ecef',
+            }}
+          >
+            <h6 className="fw-bold mb-1">Find a previous sale</h6>
+
+            <small className="text-medium-emphasis d-block mb-3">
+              Search by receipt number, customer name or sale ID.
+            </small>
+
+            <div className="d-flex gap-2">
+              <CFormInput
+                size="lg"
+                value={receiptSearch}
+                placeholder="e.g. REC-000125 or John Doe"
+                onChange={(e) => setReceiptSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') searchReceipts()
+                }}
+              />
+
+              <CButton
+                color="primary"
+                size="lg"
+                onClick={searchReceipts}
+                disabled={receiptSearchLoading || !receiptSearch.trim()}
+              >
+                <CIcon icon={cilChart} className="me-2" />
+                Search
+              </CButton>
+            </div>
+          </div>
+
+          {receiptSearchLoading && (
+            <div className="text-center py-4">
+              <div className="spinner-border text-primary" role="status" />
+              <div className="mt-2 text-medium-emphasis">Searching sales...</div>
+            </div>
+          )}
+
+          {!receiptSearchLoading && receiptSearch && receiptResults.length === 0 && (
+            <div className="text-center py-5">
+              <div
+                style={{
+                  width: '70px',
+                  height: '70px',
+                  borderRadius: '50%',
+                  background: '#f1f5f9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 15px',
+                  fontSize: '28px',
+                }}
+              >
+                🔍
+              </div>
+
+              <h6 className="fw-bold">No sales found</h6>
+
+              <small className="text-medium-emphasis">
+                Try another receipt number or customer name.
+              </small>
+            </div>
+          )}
+
+          {receiptResults.length > 0 && (
+            <div>
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <h6 className="fw-bold mb-0">Search Results</h6>
+
+                <span className="badge bg-primary">
+                  {receiptResults.length} sale
+                  {receiptResults.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                {receiptResults.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-3 mb-2"
+                    style={{
+                      border: '1px solid #e9ecef',
+                      borderRadius: '14px',
+                    }}
+                  >
+                    <div className="d-flex justify-content-between align-items-center">
+                      <div>
+                        <div className="fw-bold">{item.receiptNumber || `SALE-${item.id}`}</div>
+
+                        <div className="small text-medium-emphasis">
+                          {item.customer?.fullname || item.Customer?.fullname || 'Walk-in Customer'}
+                        </div>
+
+                        <div className="small text-medium-emphasis">
+                          {item.createdAt ? new Date(item.createdAt).toLocaleString() : '-'}
+                        </div>
+                      </div>
+
+                      <div className="text-end">
+                        <div className="fw-bold text-success mb-2">
+                          ₦{Number(item.totalAmount || 0).toLocaleString()}
+                        </div>
+
+                        <CButton
+                          color="dark"
+                          size="sm"
+                          onClick={() => openReceiptForReprint(item.id)}
+                          disabled={receiptSearchLoading}
+                        >
+                          <CIcon icon={cilPrint} className="me-1" />
+                          Reprint
+                        </CButton>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CModalBody>
+      </CModal>
+
+      {/* ==========================================================
+    STAFF TIP MODAL
+========================================================== */}
+
+      <CModal
+        visible={showStaffTipModal}
+        onClose={() => {
+          if (!staffTipLoading) {
+            setShowStaffTipModal(false)
+          }
+        }}
+        alignment="center"
+        size="sm"
+        backdrop="static"
+      >
+        <CModalHeader
+          style={{
+            background: '#15191e',
+            borderBottom: '1px solid #2b3037',
+          }}
+        >
+          <CModalTitle
+            style={{
+              color: '#f4f5f6',
+              fontSize: '13px',
+              fontWeight: 900,
+              letterSpacing: '.5px',
+            }}
+          >
+            <CIcon
+              icon={cilCreditCard}
+              className="me-2"
+              style={{
+                color: '#e8bd35',
+              }}
+            />
+            RECORD STAFF TIP
+          </CModalTitle>
+        </CModalHeader>
+
+        <CModalBody
+          style={{
+            background: '#111418',
+            padding: '18px',
+          }}
+        >
+          {/* INFO HEADER */}
+          <div
+            style={{
+              padding: '12px',
+              marginBottom: '15px',
+              borderRadius: '6px',
+              border: '1px solid #3a3420',
+              background: '#1c1912',
+            }}
+          >
+            <div
+              style={{
+                color: '#e8bd35',
+                fontSize: '8px',
+                fontWeight: 900,
+                letterSpacing: '.8px',
+              }}
+            >
+              STAFF APPRECIATION
+            </div>
+
+            <div
+              style={{
+                marginTop: '4px',
+                color: '#7f8790',
+                fontSize: '8px',
+                lineHeight: 1.5,
+              }}
+            >
+              Record money given directly by a customer to a staff member as a tip.
+            </div>
+          </div>
+
+          {/* STAFF */}
+          <div style={{ marginBottom: '12px' }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: '5px',
+                color: '#8d959d',
+                fontSize: '8px',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+              }}
+            >
+              Staff Member
+            </label>
+
+            <CFormSelect
+              value={staffTipForm.staffId}
+              onChange={(e) =>
+                setStaffTipForm((prev) => ({
+                  ...prev,
+                  staffId: e.target.value,
+                }))
+              }
+              disabled={staffTipLoading}
+              style={{
+                height: '38px',
+                background: '#181d22',
+                color: '#dce0e3',
+                border: '1px solid #30363d',
+                fontSize: '9px',
+                boxShadow: 'none',
+              }}
+            >
+              <option value="">Select staff member...</option>
+
+              {Array.isArray(staff) &&
+                staff.map((member) => {
+                  const user = member.User || member.user
+
+                  return (
+                    <option key={member.id} value={member.id}>
+                      {user?.fullname || member.fullname || `Staff #${member.id}`}
+                    </option>
+                  )
+                })}
+            </CFormSelect>
+          </div>
+
+          {/* AMOUNT */}
+          <div style={{ marginBottom: '12px' }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: '5px',
+                color: '#8d959d',
+                fontSize: '8px',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+              }}
+            >
+              Tip Amount
+            </label>
+
+            <div
+              style={{
+                position: 'relative',
+              }}
+            >
+              <span
+                style={{
+                  position: 'absolute',
+                  left: '11px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: '#e8bd35',
+                  fontSize: '13px',
+                  fontWeight: 900,
+                  zIndex: 2,
+                }}
+              >
+                ₦
+              </span>
+
+              <CFormInput
+                type="number"
+                min="0"
+                step="100"
+                value={staffTipForm.amount}
+                onChange={(e) =>
+                  setStaffTipForm((prev) => ({
+                    ...prev,
+                    amount: e.target.value,
+                  }))
+                }
+                placeholder="0.00"
+                disabled={staffTipLoading}
+                style={{
+                  height: '42px',
+                  paddingLeft: '30px',
+                  background: '#181d22',
+                  color: '#f4f5f6',
+                  border: '1px solid #30363d',
+                  fontSize: '14px',
+                  fontWeight: 900,
+                  boxShadow: 'none',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* PAYMENT METHOD */}
+          <div style={{ marginBottom: '12px' }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: '5px',
+                color: '#8d959d',
+                fontSize: '8px',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+              }}
+            >
+              Payment Method
+            </label>
+
+            <CFormSelect
+              value={staffTipForm.paymentMethod}
+              onChange={(e) =>
+                setStaffTipForm((prev) => ({
+                  ...prev,
+                  paymentMethod: e.target.value,
+                }))
+              }
+              disabled={staffTipLoading}
+              style={{
+                height: '38px',
+                background: '#181d22',
+                color: '#dce0e3',
+                border: '1px solid #30363d',
+                fontSize: '9px',
+                boxShadow: 'none',
+              }}
+            >
+              <option value="cash">Cash</option>
+              <option value="pos">POS</option>
+              <option value="transfer">Transfer</option>
+            </CFormSelect>
+          </div>
+
+          {/* CUSTOMER */}
+          <div style={{ marginBottom: '12px' }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: '5px',
+                color: '#8d959d',
+                fontSize: '8px',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+              }}
+            >
+              Customer
+              <span
+                style={{
+                  marginLeft: '5px',
+                  color: '#555d65',
+                  fontSize: '7px',
+                  fontWeight: 500,
+                }}
+              >
+                OPTIONAL
+              </span>
+            </label>
+
+            <CFormSelect
+              value={staffTipForm.customerId}
+              onChange={(e) =>
+                setStaffTipForm((prev) => ({
+                  ...prev,
+                  customerId: e.target.value,
+                }))
+              }
+              disabled={staffTipLoading}
+              style={{
+                height: '38px',
+                background: '#181d22',
+                color: '#dce0e3',
+                border: '1px solid #30363d',
+                fontSize: '9px',
+                boxShadow: 'none',
+              }}
+            >
+              <option value="">Walk-in / Not specified</option>
+
+              {Array.isArray(customerss) &&
+                customerss.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.fullname}
+                    {customer.phone ? ` — ${customer.phone}` : ''}
+                  </option>
+                ))}
+            </CFormSelect>
+          </div>
+
+          {/* NOTE */}
+          <div style={{ marginBottom: '4px' }}>
+            <label
+              style={{
+                display: 'block',
+                marginBottom: '5px',
+                color: '#8d959d',
+                fontSize: '8px',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+              }}
+            >
+              Note
+              <span
+                style={{
+                  marginLeft: '5px',
+                  color: '#555d65',
+                  fontSize: '7px',
+                  fontWeight: 500,
+                }}
+              >
+                OPTIONAL
+              </span>
+            </label>
+
+            <textarea
+              value={staffTipForm.note}
+              onChange={(e) =>
+                setStaffTipForm((prev) => ({
+                  ...prev,
+                  note: e.target.value,
+                }))
+              }
+              disabled={staffTipLoading}
+              placeholder="Customer appreciation..."
+              rows={3}
+              style={{
+                width: '100%',
+                resize: 'none',
+                background: '#181d22',
+                color: '#dce0e3',
+                border: '1px solid #30363d',
+                borderRadius: '4px',
+                padding: '9px',
+                fontSize: '9px',
+                outline: 'none',
+              }}
+            />
+          </div>
+        </CModalBody>
+
+        <CModalFooter
+          style={{
+            background: '#15191e',
+            borderTop: '1px solid #2b3037',
+            padding: '10px 18px',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setStaffTipForm({
+                staffId: '',
+                amount: '',
+                paymentMethod: 'cash',
+                customerId: '',
+                note: '',
+              })
+
+              setShowStaffTipModal(false)
+            }}
+            disabled={staffTipLoading}
+            style={{
+              height: '36px',
+              padding: '0 15px',
+              border: '1px solid #30363d',
+              borderRadius: '4px',
+              background: '#1b2026',
+              color: '#8d959d',
+              fontSize: '8px',
+              fontWeight: 800,
+              cursor: staffTipLoading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            CANCEL
+          </button>
+
+          <button
+            type="button"
+            onClick={handleRecordStaffTip}
+            disabled={staffTipLoading}
+            style={{
+              height: '36px',
+              minWidth: '125px',
+              padding: '0 15px',
+              border: 0,
+              borderRadius: '4px',
+              background: staffTipLoading ? '#75631f' : '#e8bd35',
+              color: '#111',
+              fontSize: '8px',
+              fontWeight: 900,
+              cursor: staffTipLoading ? 'not-allowed' : 'pointer',
+              boxShadow: '0 4px 12px rgba(232,189,53,.12)',
+            }}
+          >
+            {staffTipLoading ? 'RECORDING...' : 'RECORD TIP'}
+          </button>
+        </CModalFooter>
+      </CModal>
 
       <CModal
         visible={showReceiptSearchModal}
