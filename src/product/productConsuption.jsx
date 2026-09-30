@@ -166,6 +166,18 @@ const ProductConsumption = () => {
     )
   }
 
+  // Sale linkage added for the POS product-consumption workflow.
+  // A consumption is billed exactly once in POS; sale_id is populated after billing.
+  const getSaleObject = (consumption) => {
+    return consumption?.Sale || consumption?.sale || null
+  }
+
+  const getSaleId = (consumption) => {
+    return consumption?.sale_id || consumption?.saleId || getSaleObject(consumption)?.id || null
+  }
+
+  const isBilled = (consumption) => Boolean(getSaleId(consumption))
+
   const getApprovedByName = (item) => {
     return item?.ApprovedBy?.fullname || item?.ApprovedBy?.name || '—'
   }
@@ -736,7 +748,8 @@ const ProductConsumption = () => {
         !searchValue ||
         staffName.includes(searchValue) ||
         reference.includes(searchValue) ||
-        reason.includes(searchValue)
+        reason.includes(searchValue) ||
+        String(getSaleObject(item)?.receiptNumber || '').toLowerCase().includes(searchValue)
 
       const itemStaffId = item.staff_id || item.staffId
 
@@ -1429,6 +1442,8 @@ const ProductConsumption = () => {
 
                     <CTableHeaderCell>Status</CTableHeaderCell>
 
+                    <CTableHeaderCell>Billing</CTableHeaderCell>
+
                     <CTableHeaderCell className="text-end px-4">Action</CTableHeaderCell>
                   </CTableRow>
                 </CTableHead>
@@ -1585,6 +1600,44 @@ const ProductConsumption = () => {
                           )}
                         </CTableDataCell>
 
+                        {/* BILLING / POS LINK */}
+
+                        <CTableDataCell>
+                          {isBilled(item) ? (
+                            <div>
+                              <CBadge
+                                style={{
+                                  background: '#eff6ff',
+                                  color: '#1d4ed8',
+                                  padding: '7px 10px',
+                                  borderRadius: 20,
+                                }}
+                              >
+                                Billed in POS
+                              </CBadge>
+                              <small
+                                className="d-block mt-1"
+                                style={{ color: '#6b7280' }}
+                              >
+                                {getSaleObject(item)?.receiptNumber || `Sale #${getSaleId(item)}`}
+                              </small>
+                            </div>
+                          ) : item.status === 'approved' ? (
+                            <CBadge
+                              style={{
+                                background: '#fff8df',
+                                color: '#8a6d00',
+                                padding: '7px 10px',
+                                borderRadius: 20,
+                              }}
+                            >
+                              Ready for POS
+                            </CBadge>
+                          ) : (
+                            <span className="text-medium-emphasis">—</span>
+                          )}
+                        </CTableDataCell>
+
                         {/* ACTIONS */}
 
                         <CTableDataCell className="text-end px-4">
@@ -1696,7 +1749,8 @@ const ProductConsumption = () => {
                     }}
                   >
                     This request will be saved as Pending. Stock will only be deducted after
-                    approval.
+                    approval. Once approved, the full issued quantity can be billed in POS using its reference number.
+                    Stock will not be deducted again when the POS sale is created.
                   </div>
                 </div>
               </div>
@@ -2072,6 +2126,35 @@ const ProductConsumption = () => {
                     ? formatDate(selectedConsumption.approved_at)
                     : '—'}
                 </div>
+              </div>
+
+              <div
+                className="mt-3 mb-4 p-3"
+                style={{
+                  background: isBilled(selectedConsumption) ? '#eff6ff' : '#fff8df',
+                  border: `1px solid ${isBilled(selectedConsumption) ? '#bfdbfe' : '#f0d978'}`,
+                  borderRadius: 12,
+                }}
+              >
+                {isBilled(selectedConsumption) ? (
+                  <div>
+                    <div className="fw-bold" style={{ color: '#1d4ed8' }}>
+                      Billed in POS
+                    </div>
+                    <div className="small mt-1" style={{ color: '#4b5563' }}>
+                      Receipt: {getSaleObject(selectedConsumption)?.receiptNumber || `Sale #${getSaleId(selectedConsumption)}`}
+                    </div>
+                  </div>
+                ) : selectedConsumption.status === 'approved' ? (
+                  <div>
+                    <div className="fw-bold" style={{ color: '#8a6d00' }}>
+                      Approved and ready for POS billing
+                    </div>
+                    <div className="small mt-1" style={{ color: '#4b5563' }}>
+                      Inventory was deducted when this request was approved. POS will not deduct the stock again.
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               <h6 className="fw-bold mb-3">Products</h6>
