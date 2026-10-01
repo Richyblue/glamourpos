@@ -776,6 +776,9 @@ const POSPage = () => {
       const payload = {
         customerId: selectedCustomer?.id || null,
 
+        // ==========================================
+        // KEEP ORIGINAL STAFF LOGIC
+        // ==========================================
         staffId: paymentData.serviceProviderId,
 
         items: cart,
@@ -804,44 +807,44 @@ const POSPage = () => {
         subtotal,
 
         totalAmount: total,
+
+        // ==========================================
+        // NEW - MULTIPLE SERVICE STAFF
+        //
+        // This is additive.
+        // Existing logic above remains untouched.
+        // ==========================================
+        serviceStaffAssignments: paymentData.serviceStaffAssignments || [],
       }
-      const response = await axios.post(
-        `${API_URL}api/v1/sales`,
 
-        payload,
-
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      const response = await axios.post(`${API_URL}api/v1/sales`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      )
+      })
 
       const completedSale = response.data.sale
 
       /*
-     Receipt
+      Receipt
     */
       setLastSale(response.data.sale)
 
       setSale(completedSale)
 
       /*
-     Close Payment Modal
+      Close Payment Modal
     */
-
       setShowPaymentModal(false)
 
       /*
-     Open Receipt
+      Open Receipt
     */
-
       setShowReceiptModal(true)
 
       /*
-     Reset POS
+      Reset POS
     */
-
       clearPOS()
     } catch (error) {
       console.error(error)
@@ -852,6 +855,7 @@ const POSPage = () => {
     }
   }
   // Payment Handling end
+
   // Product search
   const [search, setSearch] = useState('')
 
@@ -3547,6 +3551,7 @@ const POSPage = () => {
         processing={processingSale}
         staff={staff}
         currentUser={currentUser}
+        cart={cart}
       />
 
       <CModal

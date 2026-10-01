@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import {
   CModal,
@@ -24,9 +24,19 @@ export default function PaymentModal({
   processing,
   staff = [],
   currentUser,
+  cart = [],
 }) {
   const [paymentMethod, setPaymentMethod] = useState('cash')
+
+  // Legacy single service provider
   const [serviceProviderId, setServiceProviderId] = useState('')
+
+  // NEW:
+  // {
+  //   serviceId: staffId
+  // }
+  const [serviceStaffAssignments, setServiceStaffAssignments] = useState({})
+
   const [serviceType, setServiceType] = useState('in_salon')
   const [note, setNote] = useState('')
   const [standTag, setStandTag] = useState('')
@@ -37,6 +47,25 @@ export default function PaymentModal({
   // =========================================================
 
   const isHomeService = serviceType === 'home_service'
+
+  // =========================================================
+  // ACTIVE STAFF
+  // =========================================================
+
+  const activeStaff = useMemo(() => {
+    return staff.filter(
+      (item) =>
+        (item.User?.isActive === true || item.User?.isActive === 1) && item.User?.fullname?.trim(),
+    )
+  }, [staff])
+
+  // =========================================================
+  // SERVICES IN CURRENT CART
+  // =========================================================
+
+  const cartServices = useMemo(() => {
+    return cart.filter((item) => item.type === 'service' || item.serviceId || item.ServiceId)
+  }, [cart])
 
   // =========================================================
   // WHEN HOME SERVICE IS SELECTED
@@ -58,6 +87,7 @@ export default function PaymentModal({
     if (show) {
       setPaymentMethod('cash')
       setServiceProviderId('')
+      setServiceStaffAssignments({})
       setServiceType('in_salon')
       setNote('')
       setStandTag('')
@@ -66,15 +96,90 @@ export default function PaymentModal({
   }, [show])
 
   // =========================================================
+  // HANDLE STAFF ASSIGNMENT
+  // =========================================================
+
+  const handleServiceStaffChange = (serviceId, staffId) => {
+    setServiceStaffAssignments((prev) => {
+      const updated = { ...prev }
+
+      if (!staffId) {
+        delete updated[serviceId]
+      } else {
+        updated[serviceId] = staffId
+      }
+
+      return updated
+    })
+  }
+
+  // =========================================================
+  // GET STAFF NAME
+  // =========================================================
+
+  const getStaffName = (staffId) => {
+    const selectedStaff = activeStaff.find((item) => String(item.id) === String(staffId))
+
+    return selectedStaff?.User?.fullname?.trim() || ''
+  }
+
+  // =========================================================
   // HANDLE SUBMIT
   // =========================================================
 
   const handleSubmit = () => {
+    /*
+     * Convert:
+     *
+     * {
+     *   12: "4",
+     *   15: "8"
+     * }
+     *
+     * into:
+     *
+     * [
+     *   { serviceId: 12, staffId: 4 },
+     *   { serviceId: 15, staffId: 8 }
+     * ]
+     */
+
+    const assignments = Object.entries(serviceStaffAssignments)
+      .map(([serviceId, staffId]) => ({
+        serviceId: Number(serviceId),
+        staffId: Number(staffId),
+      }))
+      .filter(
+        (item) =>
+          Number.isInteger(item.serviceId) &&
+          item.serviceId > 0 &&
+          Number.isInteger(item.staffId) &&
+          item.staffId > 0,
+      )
+
+    /*
+     * Backward compatibility:
+     *
+     * If only one service exists and the cashier uses
+     * the old Service Provider dropdown, use it as
+     * the legacy provider.
+     */
+
+    let legacyProviderId = serviceProviderId
+
+    if (!legacyProviderId && assignments.length === 1) {
+      legacyProviderId = String(assignments[0].staffId)
+    }
+
     onSubmit({
       paymentMethod,
-      serviceProviderId,
+
+      serviceProviderId: legacyProviderId,
+
+      serviceStaffAssignments: assignments,
 
       standTag: isHomeService ? '' : standTag,
+
       cardNumber: isHomeService ? '' : cardNumber,
 
       note,
@@ -84,13 +189,18 @@ export default function PaymentModal({
   }
 
   // =========================================================
-  // ACTIVE STAFF
+  // CHECK WHETHER ALL SERVICES HAVE STAFF
   // =========================================================
 
-  const activeStaff = staff.filter(
-    (item) =>
-      (item.User?.isActive === true || item.User?.isActive === 1) && item.User?.fullname?.trim(),
-  )
+  const unassignedServices = cartServices.filter((item) => {
+    const serviceId = Number(item.serviceId || item.id)
+
+    return !serviceStaffAssignments[serviceId]
+  })
+
+  const hasMultipleServices = cartServices.length > 1
+
+  const hasUnassignedService = cartServices.length > 0 && unassignedServices.length > 0
 
   // =========================================================
   // STYLES
@@ -107,6 +217,7 @@ export default function PaymentModal({
     text: '#111827',
     white: '#ffffff',
     green: '#16a34a',
+    red: '#dc2626',
   }
 
   const selectStyle = {
@@ -378,12 +489,202 @@ export default function PaymentModal({
               <div>
                 <strong>Home Service Selected</strong>
 
-                <div className="small mt-1" style={{ color: colors.muted }}>
+                <div
+                  className="small mt-1"
+                  style={{
+                    color: colors.muted,
+                  }}
+                >
                   Stand number and card number are not required for home services.
                 </div>
               </div>
             </div>
           </CAlert>
+        )}
+
+        {/* =====================================================
+            SERVICE STAFF ASSIGNMENT
+        ====================================================== */}
+
+        {cartServices.length > 0 && (
+          <CCard className="border-0 mb-3" style={sectionCardStyle}>
+            <CCardBody style={{ padding: '18px' }}>
+              <div className="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                  <div
+                    style={{
+                      fontSize: '15px',
+                      fontWeight: '700',
+                      color: colors.text,
+                    }}
+                  >
+                    Service Providers
+                  </div>
+
+                  <small
+                    style={{
+                      color: colors.muted,
+                    }}
+                  >
+                    Assign the staff member who will receive commission for each service.
+                  </small>
+                </div>
+
+                {hasMultipleServices && (
+                  <div
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: '999px',
+                      background: hasUnassignedService
+                        ? 'rgba(220, 38, 38, .08)'
+                        : 'rgba(22, 163, 74, .08)',
+                      color: hasUnassignedService ? colors.red : colors.green,
+                      fontSize: '11px',
+                      fontWeight: '700',
+                    }}
+                  >
+                    {hasUnassignedService
+                      ? `${unassignedServices.length} Unassigned`
+                      : 'All Assigned'}
+                  </div>
+                )}
+              </div>
+
+              <div className="d-flex flex-column gap-3">
+                {cartServices.map((item, index) => {
+                  const serviceId = Number(item.serviceId || item.id)
+
+                  const selectedStaffId = serviceStaffAssignments[serviceId] || ''
+
+                  const serviceName = item.name || item.serviceName || `Service ${index + 1}`
+
+                  const quantity = Number(item.quantity || 1)
+
+                  const itemTotal = Number(item.subtotal ?? item.price ?? 0) * quantity
+
+                  return (
+                    <div
+                      key={`${serviceId}-${index}`}
+                      style={{
+                        padding: '14px',
+                        borderRadius: '14px',
+                        border: `1px solid ${
+                          selectedStaffId ? 'rgba(22, 163, 74, .25)' : colors.border
+                        }`,
+                        background: selectedStaffId ? 'rgba(22, 163, 74, .025)' : '#fff',
+                      }}
+                    >
+                      <CRow className="align-items-center">
+                        <CCol md={6} className="mb-3 mb-md-0">
+                          <div
+                            style={{
+                              fontSize: '14px',
+                              fontWeight: '700',
+                              color: colors.text,
+                            }}
+                          >
+                            {serviceName}
+                          </div>
+
+                          <div className="d-flex align-items-center gap-2 mt-1">
+                            <small
+                              style={{
+                                color: colors.muted,
+                              }}
+                            >
+                              Qty: {quantity}
+                            </small>
+
+                            <span
+                              style={{
+                                color: colors.border,
+                              }}
+                            >
+                              •
+                            </span>
+
+                            <small
+                              style={{
+                                color: colors.dark,
+                                fontWeight: '700',
+                              }}
+                            >
+                              ₦{itemTotal.toLocaleString()}
+                            </small>
+                          </div>
+
+                          {selectedStaffId && (
+                            <div
+                              className="mt-2"
+                              style={{
+                                fontSize: '11px',
+                                color: colors.green,
+                                fontWeight: '600',
+                              }}
+                            >
+                              ✓ {getStaffName(selectedStaffId)} assigned
+                            </div>
+                          )}
+                        </CCol>
+
+                        <CCol md={6}>
+                          <label
+                            className="form-label mb-1"
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              color: colors.muted,
+                              textTransform: 'uppercase',
+                              letterSpacing: '.5px',
+                            }}
+                          >
+                            Service Provider
+                          </label>
+
+                          <CFormSelect
+                            value={selectedStaffId}
+                            onChange={(e) => handleServiceStaffChange(serviceId, e.target.value)}
+                            style={selectStyle}
+                          >
+                            <option value="">Select Staff</option>
+
+                            {activeStaff.map((staffItem) => (
+                              <option key={staffItem.id} value={staffItem.id}>
+                                {staffItem.User.fullname.trim()}
+                              </option>
+                            ))}
+                          </CFormSelect>
+                        </CCol>
+                      </CRow>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* =================================================
+                  SINGLE SERVICE LEGACY PROVIDER
+              ================================================== */}
+
+              {cartServices.length === 1 && (
+                <div
+                  className="mt-3"
+                  style={{
+                    paddingTop: '14px',
+                    borderTop: `1px solid ${colors.border}`,
+                  }}
+                >
+                  <small
+                    style={{
+                      color: colors.muted,
+                    }}
+                  >
+                    You can also use the existing staff selection below. The selected provider above
+                    takes priority.
+                  </small>
+                </div>
+              )}
+            </CCardBody>
+          </CCard>
         )}
 
         {/* =====================================================
@@ -406,6 +707,8 @@ export default function PaymentModal({
               <small style={{ color: colors.muted }}>Select how this sale is being paid.</small>
             </div>
 
+            {/* PAYMENT METHOD */}
+
             <div className="mb-3">
               <label
                 className="form-label"
@@ -426,13 +729,18 @@ export default function PaymentModal({
                 style={selectStyle}
               >
                 <option value="cash">Cash</option>
+
                 <option value="transfer">Bank Transfer</option>
+
                 <option value="pos">POS</option>
+
                 <option value="mixed">Mixed Payment</option>
               </CFormSelect>
             </div>
 
-            {/* SERVICE PROVIDER */}
+            {/* =================================================
+                LEGACY SINGLE PROVIDER
+            ================================================== */}
 
             <div>
               <label
@@ -445,7 +753,7 @@ export default function PaymentModal({
                   letterSpacing: '.5px',
                 }}
               >
-                Service Provider
+                Primary Service Provider
               </label>
 
               <CFormSelect
@@ -462,8 +770,13 @@ export default function PaymentModal({
                 ))}
               </CFormSelect>
 
-              <small className="d-block mt-2" style={{ color: colors.muted }}>
-                Staff that attended to the customer.
+              <small
+                className="d-block mt-2"
+                style={{
+                  color: colors.muted,
+                }}
+              >
+                This remains available for the existing single-provider workflow.
               </small>
             </div>
           </CCardBody>
@@ -471,7 +784,6 @@ export default function PaymentModal({
 
         {/* =====================================================
             STAND + CARD
-            ONLY SHOW FOR IN-SALON
         ====================================================== */}
 
         {!isHomeService && (
@@ -488,12 +800,16 @@ export default function PaymentModal({
                   Salon Assignment
                 </div>
 
-                <small style={{ color: colors.muted }}>Assign the stand and customer card.</small>
+                <small
+                  style={{
+                    color: colors.muted,
+                  }}
+                >
+                  Assign the stand and customer card.
+                </small>
               </div>
 
               <CRow>
-                {/* STAND */}
-
                 <CCol md={6} className="mb-3 mb-md-0">
                   <label
                     className="form-label"
@@ -522,8 +838,6 @@ export default function PaymentModal({
                     ))}
                   </CFormSelect>
                 </CCol>
-
-                {/* CARD */}
 
                 <CCol md={6}>
                   <label
@@ -625,17 +939,19 @@ export default function PaymentModal({
         </CButton>
 
         <CButton
-          disabled={processing}
+          disabled={processing || hasUnassignedService}
           onClick={handleSubmit}
           style={{
             minWidth: '190px',
             height: '46px',
             borderRadius: '12px',
-            background: `linear-gradient(135deg, ${colors.gold}, ${colors.goldDark})`,
+            background: hasUnassignedService
+              ? '#d1d5db'
+              : `linear-gradient(135deg, ${colors.gold}, ${colors.goldDark})`,
             border: 'none',
-            color: colors.dark,
+            color: hasUnassignedService ? '#6b7280' : colors.dark,
             fontWeight: '800',
-            boxShadow: '0 6px 18px rgba(232, 189, 53, 0.25)',
+            boxShadow: hasUnassignedService ? 'none' : '0 6px 18px rgba(232, 189, 53, 0.25)',
           }}
         >
           {processing ? (
@@ -643,8 +959,13 @@ export default function PaymentModal({
               <span className="spinner-border spinner-border-sm" role="status" />
               Processing...
             </span>
+          ) : hasUnassignedService ? (
+            <>Assign Staff First</>
           ) : (
-            <>Complete Sale&nbsp; • &nbsp;₦{Number(total).toLocaleString()}</>
+            <>
+              Complete Sale&nbsp; • &nbsp;₦
+              {Number(total).toLocaleString()}
+            </>
           )}
         </CButton>
       </CModalFooter>
