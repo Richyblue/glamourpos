@@ -987,6 +987,144 @@ const Commission = () => {
           </CCard>
         </CCol>
       </CRow>
+      {/* =====================================================
+    STAFF EARNINGS / TIPS KPI CARDS
+====================================================== */}
+
+      <CRow className="mb-4">
+        {/* TOTAL STAFF EARNINGS */}
+
+        <CCol sm={6} xl={3} className="mb-3 mb-xl-0">
+          <CCard className="border-0 shadow-sm h-100">
+            <CCardBody>
+              <div className="d-flex justify-content-between">
+                <div>
+                  <div className="text-body-secondary small fw-semibold mb-2">
+                    TOTAL STAFF EARNINGS
+                  </div>
+
+                  <h4 className="fw-bold mb-1">{formatCurrency(totalStaffEarnings)}</h4>
+
+                  <small className="text-body-secondary">Commission + Tips</small>
+                </div>
+
+                <div
+                  className="rounded-circle d-flex align-items-center justify-content-center"
+                  style={{
+                    width: 45,
+                    height: 45,
+                    background: 'rgba(232, 189, 53, 0.12)',
+                  }}
+                >
+                  <CIcon
+                    icon={cilMoney}
+                    style={{
+                      color: '#e8bd35',
+                    }}
+                  />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
+        </CCol>
+
+        {/* TOTAL TIPS */}
+
+        <CCol sm={6} xl={3} className="mb-3 mb-xl-0">
+          <CCard className="border-0 shadow-sm h-100">
+            <CCardBody>
+              <div className="d-flex justify-content-between">
+                <div>
+                  <div className="text-body-secondary small fw-semibold mb-2">TOTAL TIPS</div>
+
+                  <h4
+                    className="fw-bold mb-1"
+                    style={{
+                      color: '#e8bd35',
+                    }}
+                  >
+                    {formatCurrency(totalTips)}
+                  </h4>
+
+                  <small className="text-body-secondary">Valid customer tips</small>
+                </div>
+
+                <div
+                  className="rounded-circle d-flex align-items-center justify-content-center"
+                  style={{
+                    width: 45,
+                    height: 45,
+                    background: 'rgba(232, 189, 53, 0.12)',
+                  }}
+                >
+                  <CIcon
+                    icon={cilMoney}
+                    style={{
+                      color: '#e8bd35',
+                    }}
+                  />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
+        </CCol>
+
+        {/* PENDING TIPS */}
+
+        <CCol sm={6} xl={3} className="mb-3 mb-xl-0">
+          <CCard className="border-0 shadow-sm h-100">
+            <CCardBody>
+              <div className="d-flex justify-content-between">
+                <div>
+                  <div className="text-body-secondary small fw-semibold mb-2">PENDING TIPS</div>
+
+                  <h4 className="fw-bold mb-1 text-warning">{formatCurrency(pendingTips)}</h4>
+
+                  <small className="text-body-secondary">Awaiting payment</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-warning bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: 45,
+                    height: 45,
+                  }}
+                >
+                  <CIcon icon={cilClock} className="text-warning" />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
+        </CCol>
+
+        {/* PAID TIPS */}
+
+        <CCol sm={6} xl={3}>
+          <CCard className="border-0 shadow-sm h-100">
+            <CCardBody>
+              <div className="d-flex justify-content-between">
+                <div>
+                  <div className="text-body-secondary small fw-semibold mb-2">PAID TIPS</div>
+
+                  <h4 className="fw-bold mb-1 text-success">{formatCurrency(paidTips)}</h4>
+
+                  <small className="text-body-secondary">Completed tip payments</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: 45,
+                    height: 45,
+                  }}
+                >
+                  <CIcon icon={cilCheckCircle} className="text-success" />
+                </div>
+              </div>
+            </CCardBody>
+          </CCard>
+        </CCol>
+      </CRow>
 
       {/* =====================================================
           FILTERS
