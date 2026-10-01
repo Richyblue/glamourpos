@@ -83,34 +83,115 @@ const Report = () => {
     return `₦${Number(value || 0).toLocaleString()}`
   }
 
-  const getProviderName = (sale) => {
+  // =========================================================
+  // STAFF NAME HELPER
+  // =========================================================
+
+  const getStaffName = (staff) => {
+    if (!staff) return '-'
+
     return (
-      sale.ServiceProvider?.fullname ||
-      sale.ServiceProvider?.User?.fullname ||
-      sale.ServiceProvider?.user?.fullname ||
+      staff.fullname ||
+      staff.Fullname ||
+      staff.name ||
+      staff.User?.fullname ||
+      staff.user?.fullname ||
+      staff.User?.name ||
+      staff.user?.name ||
       '-'
     )
   }
 
-  const getCashierName = (sale) => {
-    return sale.RecordedBy?.fullname || sale.RecordedBy?.User?.fullname || '-'
+  // =========================================================
+  // SALE LEVEL PROVIDER
+  // =========================================================
+
+  const getProviderName = (sale) => {
+    return getStaffName(sale?.ServiceProvider) || sale?.serviceProviderName || '-'
   }
 
+  // =========================================================
+  // SERVICE ITEM PROVIDER
+  // =========================================================
+
+  const getServiceItemProvider = (sale, item) => {
+    /*
+     * NEW PRIMARY SOURCE
+     *
+     * SaleItem.ServiceProvider
+     */
+    const directProvider =
+      item?.ServiceProvider || item?.serviceProvider || item?.Staff || item?.staff
+
+    if (directProvider) {
+      const name = getStaffName(directProvider)
+
+      if (name !== '-') {
+        return name
+      }
+    }
+
+    /*
+     * SECONDARY SOURCE
+     *
+     * Look for the commission attached to this
+     * exact SaleItem.
+     */
+    const commissions = getCommissions(sale)
+
+    const matchingCommission = commissions.find(
+      (commission) =>
+        Number(commission?.SaleItemId) === Number(item?.id) ||
+        Number(commission?.saleItemId) === Number(item?.id),
+    )
+
+    if (matchingCommission) {
+      const commissionStaff = matchingCommission.Staff || matchingCommission.staff
+
+      const commissionStaffName = getStaffName(commissionStaff)
+
+      if (commissionStaffName !== '-') {
+        return commissionStaffName
+      }
+
+      if (matchingCommission.staffName) {
+        return matchingCommission.staffName
+      }
+    }
+
+    /*
+     * THIRD SOURCE
+     *
+     * Legacy Sale-level provider.
+     */
+    return getProviderName(sale)
+  }
+
+  // =========================================================
+  // CASHIER
+  // =========================================================
+
+  const getCashierName = (sale) => {
+    return (
+      sale?.RecordedBy?.fullname ||
+      sale?.RecordedBy?.User?.fullname ||
+      sale?.RecordedBy?.user?.fullname ||
+      sale?.recordedByName ||
+      '-'
+    )
+  }
+
+  // =========================================================
+  // CUSTOMER
+  // =========================================================
+
   const getCustomerName = (sale) => {
-    return sale.Customer?.fullname || '-'
+    return sale?.Customer?.fullname || sale?.Customer?.name || sale?.customerName || '-'
   }
 
   // =========================================================
   // RETURNS
   // =========================================================
-
-  /*
-   * Your Sale -> SalesReturn association currently does not
-   * explicitly use an alias.
-   *
-   * We therefore support both possible Sequelize property
-   * names here.
-   */
 
   const getSaleReturns = (sale) => {
     return sale?.SalesReturns || sale?.salesReturns || sale?.SalesReturn || sale?.salesReturn || []
@@ -118,7 +199,7 @@ const Report = () => {
 
   const getReturnedItems = (sale) => {
     return getSaleReturns(sale).flatMap(
-      (returnRecord) => returnRecord.ReturnItems || returnRecord.returnItems || [],
+      (returnRecord) => returnRecord?.ReturnItems || returnRecord?.returnItems || [],
     )
   }
 
@@ -130,20 +211,12 @@ const Report = () => {
     return getReturnedItems(sale).filter((item) => item.itemType === 'product')
   }
 
-  /*
-   * Get total returned amount for this sale.
-   */
-
   const getSaleReturnTotal = (sale) => {
     return getSaleReturns(sale).reduce(
-      (sum, returnRecord) => sum + Number(returnRecord.totalRefund || 0),
+      (sum, returnRecord) => sum + Number(returnRecord?.totalRefund || 0),
       0,
     )
   }
-
-  /*
-   * Get returned quantity for a specific service.
-   */
 
   const getReturnedServiceQuantity = (sale, serviceId) => {
     return getReturnedServiceItems(sale)
@@ -151,19 +224,11 @@ const Report = () => {
       .reduce((sum, item) => sum + Number(item.quantity || 0), 0)
   }
 
-  /*
-   * Get returned quantity for a specific product.
-   */
-
   const getReturnedProductQuantity = (sale, productId) => {
     return getReturnedProductItems(sale)
       .filter((item) => Number(item.ProductId) === Number(productId))
       .reduce((sum, item) => sum + Number(item.quantity || 0), 0)
   }
-
-  /*
-   * Determine service return status.
-   */
 
   const getServiceReturnStatus = (sale, item) => {
     const returnedQuantity = getReturnedServiceQuantity(sale, item.ServiceId)
@@ -189,10 +254,6 @@ const Report = () => {
     }
   }
 
-  /*
-   * Determine product return status.
-   */
-
   const getProductReturnStatus = (sale, item) => {
     const returnedQuantity = getReturnedProductQuantity(sale, item.ProductId)
 
@@ -217,90 +278,42 @@ const Report = () => {
     }
   }
 
+  // =========================================================
+  // COLORS
+  // =========================================================
+
   const REVENUE_COLORS = ['#321fdb', '#e55353', '#2eb85c']
 
   // =========================================================
   // SALE ITEMS
   // =========================================================
 
+  const getSaleItems = (sale) => {
+    return sale?.SaleItems || sale?.saleItems || sale?.items || []
+  }
+
   const getServiceItems = (sale) => {
-    return (
-      sale.SaleItems?.filter(
-        (item) =>
-          item.itemType === 'service' ||
-          item.saleType === 'service' ||
-          item.Service ||
-          item.service,
-      ) || []
+    return getSaleItems(sale).filter(
+      (item) =>
+        item?.itemType === 'service' ||
+        item?.saleType === 'service' ||
+        item?.Service ||
+        item?.service,
     )
   }
 
   const getProductItems = (sale) => {
-    return (
-      sale.SaleItems?.filter(
-        (item) =>
-          item.itemType === 'product' ||
-          item.saleType === 'product' ||
-          item.Product ||
-          item.product,
-      ) || []
+    return getSaleItems(sale).filter(
+      (item) =>
+        item?.itemType === 'product' ||
+        item?.saleType === 'product' ||
+        item?.Product ||
+        item?.product,
     )
   }
 
   // =========================================================
-  // REMAINING SERVICE VALUE
-  // =========================================================
-
-  const getRemainingServiceTotal = (sale) => {
-    return getServiceItems(sale).reduce((sum, item) => {
-      const originalQuantity = Number(item.quantity || 0)
-
-      const originalSubtotal = Number(item.subtotal || 0)
-
-      const returnedQuantity = getReturnedServiceQuantity(sale, item.ServiceId)
-
-      const remainingQuantity = Math.max(originalQuantity - returnedQuantity, 0)
-
-      const unitPrice = originalQuantity > 0 ? originalSubtotal / originalQuantity : 0
-
-      return sum + remainingQuantity * unitPrice
-    }, 0)
-  }
-
-  // =========================================================
-  // REMAINING PRODUCT VALUE
-  // =========================================================
-
-  const getRemainingProductTotal = (sale) => {
-    return getProductItems(sale).reduce((sum, item) => {
-      const originalQuantity = Number(item.quantity || 0)
-
-      const originalSubtotal = Number(item.subtotal || 0)
-
-      const returnedQuantity = getReturnedProductQuantity(sale, item.ProductId)
-
-      const remainingQuantity = Math.max(originalQuantity - returnedQuantity, 0)
-
-      const unitPrice = originalQuantity > 0 ? originalSubtotal / originalQuantity : 0
-
-      return sum + remainingQuantity * unitPrice
-    }, 0)
-  }
-
-  // =========================================================
-  // ORIGINAL TOTALS
-  // =========================================================
-
-  const getServiceTotal = (sale) => {
-    return getServiceItems(sale).reduce((sum, item) => sum + Number(item.subtotal || 0), 0)
-  }
-
-  const getProductTotal = (sale) => {
-    return getProductItems(sale).reduce((sum, item) => sum + Number(item.subtotal || 0), 0)
-  }
-
-  // =========================================================
-  // COMMISSION
+  // COMMISSIONS
   // =========================================================
 
   const getCommissions = (sale) => {
@@ -315,9 +328,7 @@ const Report = () => {
   }
 
   const getCommission = (sale) => {
-    const commissions = getCommissions(sale)
-
-    return commissions[0] || null
+    return getCommissions(sale)[0] || null
   }
 
   const getPendingCommissions = (sale) => {
@@ -337,19 +348,19 @@ const Report = () => {
   // =========================================================
 
   const getStaffShare = (sale) => {
-    return getPendingCommissions(sale).reduce((total, commission) => {
-      return (
-        total + Number(commission?.currentCommissionAmount ?? commission?.commissionAmount ?? 0)
-      )
-    }, 0)
+    return getPendingCommissions(sale).reduce(
+      (total, commission) =>
+        total + Number(commission?.currentCommissionAmount ?? commission?.commissionAmount ?? 0),
+      0,
+    )
   }
 
   const getCurrentCommission = (sale) => {
-    return getCommissions(sale).reduce((total, commission) => {
-      return (
-        total + Number(commission?.currentCommissionAmount ?? commission?.commissionAmount ?? 0)
-      )
-    }, 0)
+    return getCommissions(sale).reduce(
+      (total, commission) =>
+        total + Number(commission?.currentCommissionAmount ?? commission?.commissionAmount ?? 0),
+      0,
+    )
   }
 
   const getPaidCommission = (sale) => {
@@ -412,38 +423,75 @@ const Report = () => {
 
     return statuses[0] || null
   }
+
   // =========================================================
   // SERVICE TYPE
   // =========================================================
 
   const getServiceType = (sale) => {
-    /*
-     * If Sale eventually stores serviceType directly,
-     * this will use it automatically.
-     */
-
-    if (sale.serviceType) {
+    if (sale?.serviceType) {
       return sale.serviceType
     }
 
-    /*
-     * Current system:
-     *
-     * 50% = Home Service
-     * 30% = In-Salon
-     */
+    const commissions = getCommissions(sale)
 
-    const rate = getCommissionRate(sale)
+    const rates = [
+      ...new Set(
+        commissions.map((commission) => Number(commission?.commissionRate || 0)).filter(Boolean),
+      ),
+    ]
 
-    if (rate === 50) {
-      return 'home_service'
-    }
+    if (rates.length === 1) {
+      if (rates[0] === 50) {
+        return 'home_service'
+      }
 
-    if (rate === 30) {
-      return 'in_salon'
+      if (rates[0] === 30) {
+        return 'in_salon'
+      }
     }
 
     return null
+  }
+
+  // =========================================================
+  // REMAINING SERVICE VALUE
+  // =========================================================
+
+  const getRemainingServiceTotal = (sale) => {
+    return getServiceItems(sale).reduce((sum, item) => {
+      const originalQuantity = Number(item.quantity || 0)
+
+      const originalSubtotal = Number(item.subtotal || 0)
+
+      const returnedQuantity = getReturnedServiceQuantity(sale, item.ServiceId)
+
+      const remainingQuantity = Math.max(originalQuantity - returnedQuantity, 0)
+
+      const unitPrice = originalQuantity > 0 ? originalSubtotal / originalQuantity : 0
+
+      return sum + remainingQuantity * unitPrice
+    }, 0)
+  }
+
+  // =========================================================
+  // REMAINING PRODUCT VALUE
+  // =========================================================
+
+  const getRemainingProductTotal = (sale) => {
+    return getProductItems(sale).reduce((sum, item) => {
+      const originalQuantity = Number(item.quantity || 0)
+
+      const originalSubtotal = Number(item.subtotal || 0)
+
+      const returnedQuantity = getReturnedProductQuantity(sale, item.ProductId)
+
+      const remainingQuantity = Math.max(originalQuantity - returnedQuantity, 0)
+
+      const unitPrice = originalQuantity > 0 ? originalSubtotal / originalQuantity : 0
+
+      return sum + remainingQuantity * unitPrice
+    }, 0)
   }
 
   // =========================================================
@@ -460,17 +508,87 @@ const Report = () => {
 
   // =========================================================
   // SERVICE PROVIDERS
+  //
+  // IMPORTANT:
+  // Build this from SaleItems, not Sale.ServiceProvider.
   // =========================================================
 
   const serviceProviders = useMemo(() => {
-    return [
-      ...new Set(
-        sales
-          .map((sale) => getProviderName(sale))
-          .filter((provider) => provider && provider !== '-'),
-      ),
-    ]
+    const providerMap = new Map()
+
+    sales.forEach((sale) => {
+      const serviceItems = getServiceItems(sale)
+
+      serviceItems.forEach((item) => {
+        const providerName = getServiceItemProvider(sale, item)
+
+        if (providerName && providerName !== '-') {
+          providerMap.set(providerName, providerName)
+        }
+      })
+
+      /*
+       * Legacy fallback for old sales
+       * that do not have item-level provider.
+       */
+      if (!serviceItems.length) {
+        const legacyProvider = getProviderName(sale)
+
+        if (legacyProvider && legacyProvider !== '-') {
+          providerMap.set(legacyProvider, legacyProvider)
+        }
+      }
+    })
+
+    return Array.from(providerMap.values()).sort((a, b) => a.localeCompare(b))
   }, [sales])
+
+  // =========================================================
+  // CHECK WHETHER STAFF WORKED ON SALE
+  // =========================================================
+
+  const saleHasProvider = (sale, selectedProvider) => {
+    if (!selectedProvider) {
+      return true
+    }
+
+    const normalized = selectedProvider.trim().toLowerCase()
+
+    /*
+     * First check individual service providers.
+     */
+    const serviceItems = getServiceItems(sale)
+
+    const itemProviderMatch = serviceItems.some((item) => {
+      const provider = getServiceItemProvider(sale, item)
+
+      return provider && provider.trim().toLowerCase() === normalized
+    })
+
+    if (itemProviderMatch) {
+      return true
+    }
+
+    /*
+     * Then check commission staff.
+     */
+    const commissionMatch = getCommissions(sale).some((commission) => {
+      const staffName = getStaffName(commission?.Staff || commission?.staff)
+
+      return staffName && staffName.trim().toLowerCase() === normalized
+    })
+
+    if (commissionMatch) {
+      return true
+    }
+
+    /*
+     * Finally support old Sale-level provider.
+     */
+    const legacyProvider = getProviderName(sale)
+
+    return legacyProvider && legacyProvider.trim().toLowerCase() === normalized
+  }
 
   // =========================================================
   // FILTER SALES
@@ -486,12 +604,17 @@ const Report = () => {
 
       const cashier = getCashierName(sale).toLowerCase()
 
-      const invoice = (sale.invoiceNumber || sale.receiptNumber || '').toLowerCase()
+      const invoice = (sale?.invoiceNumber || sale?.receiptNumber || '').toLowerCase()
 
       const services = getServiceItems(sale)
-        .map(
-          (item) => item.Service?.name || item.service?.name || item.serviceName || item.name || '',
-        )
+        .map((item) => {
+          const serviceName =
+            item?.Service?.name || item?.service?.name || item?.serviceName || item?.name || ''
+
+          const staffName = getServiceItemProvider(sale, item)
+
+          return `${serviceName} ${staffName}`
+        })
         .join(' ')
         .toLowerCase()
 
@@ -503,7 +626,7 @@ const Report = () => {
         provider.includes(keyword) ||
         services.includes(keyword)
 
-      const matchesProvider = providerFilter === '' || getProviderName(sale) === providerFilter
+      const matchesProvider = providerFilter === '' || saleHasProvider(sale, providerFilter)
 
       return matchesSearch && matchesProvider
     })
@@ -515,19 +638,12 @@ const Report = () => {
 
   const kpis = useMemo(() => {
     let grossSales = 0
-
     let totalServiceSales = 0
-
     let totalProductSales = 0
-
     let productProfit = 0
-
     let staffShare = 0
-
     let ownerServiceProfit = 0
-
     let homeServiceSales = 0
-
     let inSalonServiceSales = 0
 
     filteredSales.forEach((sale) => {
@@ -535,37 +651,30 @@ const Report = () => {
 
       grossSales += saleAmount
 
-      // =====================================================
-      // SERVICE
-      // =====================================================
-
       const serviceTotal = getRemainingServiceTotal(sale)
 
       totalServiceSales += serviceTotal
-
-      // =====================================================
-      // PRODUCTS
-      // =====================================================
 
       const productTotal = getRemainingProductTotal(sale)
 
       totalProductSales += productTotal
 
-      // =====================================================
-      // STAFF COMMISSION
-      // =====================================================
-
+      /*
+       * IMPORTANT:
+       * This already sums every commission
+       * belonging to this sale.
+       *
+       * Therefore:
+       *
+       * Staff A = ₦3,000
+       * Staff B = ₦2,000
+       * Staff C = ₦4,000
+       *
+       * Staff Share = ₦9,000
+       */
       staffShare += getStaffShare(sale)
 
-      // =====================================================
-      // OWNER SERVICE PROFIT
-      // =====================================================
-
       ownerServiceProfit += getOwnerServiceProfit(sale)
-
-      // =====================================================
-      // SERVICE TYPE
-      // =====================================================
 
       const serviceType = getServiceType(sale)
 
@@ -576,16 +685,6 @@ const Report = () => {
       if (serviceType === 'in_salon') {
         inSalonServiceSales += serviceTotal
       }
-
-      // =====================================================
-      // PRODUCT PROFIT
-      // =====================================================
-
-      /*
-       * Recalculate product profit based on the
-       * remaining quantity so returned products
-       * do not continue contributing profit.
-       */
 
       getProductItems(sale).forEach((item) => {
         const originalQuantity = Number(item.quantity || 0)
@@ -604,49 +703,21 @@ const Report = () => {
       })
     })
 
-    // =======================================================
-    // RETURNS
-    // =======================================================
-
-    /*
-     * Keep your original report-level return logic.
-     */
-
     const totalReturns = Number(report.totalReturns || 0)
 
     const netSales = grossSales - totalReturns
-
-    // =======================================================
-    // FALLBACK TO BACKEND PRODUCT PROFIT
-    // =======================================================
 
     if (productProfit === 0 && Number(report.productProfit || 0) > 0) {
       productProfit = Number(report.productProfit || 0)
     }
 
-    // =======================================================
-    // OWNER PROFIT
-    // =======================================================
-
     const ownerProfit = productProfit + ownerServiceProfit
 
-    // =======================================================
-    // EXPENSES
-    // =======================================================
-
     const totalExpenses = Number(report.totalExpenses || 0)
-
-    // =======================================================
-    // NET PROFIT AFTER EXPENSES
-    // =======================================================
 
     const netProfit = ownerProfit - totalExpenses
 
     const totalProfit = ownerProfit
-
-    // =======================================================
-    // TRANSACTIONS
-    // =======================================================
 
     const totalTransactions = filteredSales.length
 
@@ -663,11 +734,8 @@ const Report = () => {
       staffShare,
       ownerServiceProfit,
       ownerProfit,
-
-      // NEW
       totalExpenses,
       netProfit,
-
       totalProfit,
       averageSale,
       homeServiceSales,
@@ -676,7 +744,7 @@ const Report = () => {
   }, [filteredSales, report])
 
   // =========================================================
-  // SALES TREND CHART
+  // SALES TREND
   // =========================================================
 
   const salesTrendData = useMemo(() => {
@@ -697,10 +765,6 @@ const Report = () => {
         }
       }
 
-      /*
-       * Keep original chart logic.
-       */
-
       grouped[date].sales += Number(sale.totalAmount || 0)
     })
 
@@ -717,12 +781,10 @@ const Report = () => {
         name: 'Service Revenue',
         amount: Number(kpis.totalServiceSales || 0),
       },
-
       {
         name: 'Staff Share',
         amount: Number(kpis.staffShare || 0),
       },
-
       {
         name: 'Owner Service Profit',
         amount: Number(kpis.ownerServiceProfit || 0),
@@ -731,7 +793,7 @@ const Report = () => {
   }, [kpis])
 
   // =========================================================
-  // REVENUE BREAKDOWN CHART
+  // REVENUE BREAKDOWN
   // =========================================================
 
   const revenueBreakdownData = useMemo(() => {
@@ -740,12 +802,10 @@ const Report = () => {
         name: 'In-Salon',
         value: Number(kpis.inSalonServiceSales || 0),
       },
-
       {
         name: 'Home Service',
         value: Number(kpis.homeServiceSales || 0),
       },
-
       {
         name: 'Products',
         value: Number(kpis.totalProductSales || 0),
@@ -775,14 +835,22 @@ const Report = () => {
         },
       })
 
-      setReport(response.data)
+      setReport(response.data || {})
 
       setSales(
-        (response.data.sales || []).map((sale) => ({
+        (response.data?.sales || []).map((sale) => ({
           ...sale,
 
+          /*
+           * Normalize commissions.
+           */
           Commissions:
-            sale.Commissions || sale.commissions || (sale.Commission ? [sale.Commission] : []),
+            sale?.Commissions || sale?.commissions || (sale?.Commission ? [sale.Commission] : []),
+
+          /*
+           * Normalize SaleItems.
+           */
+          SaleItems: sale?.SaleItems || sale?.saleItems || sale?.items || [],
         })),
       )
     } catch (error) {
@@ -811,69 +879,70 @@ const Report = () => {
   }
 
   // =========================================================
-  // EXPORT EXCEL
+  // EXCEL EXPORT
   // =========================================================
 
   const exportExcel = () => {
-    const exportData = filteredSales.map((sale) => {
-      const provider = getProviderName(sale)
+    const exportData = []
 
+    filteredSales.forEach((sale) => {
       const services = getServiceItems(sale)
-        .map((item) => {
-          const status = getServiceReturnStatus(sale, item)
 
-          const serviceName =
-            item.Service?.name ||
-            item.service?.name ||
-            item.serviceName ||
-            item.name ||
-            item.productName ||
-            '-'
-
-          if (status.returned && !status.partial) {
-            return `${serviceName} - RETURNED`
-          }
-
-          if (status.returned && status.partial) {
-            return `${serviceName} - ${status.returnedQuantity} returned / ${status.remainingQuantity} remaining`
-          }
-
-          return serviceName
-        })
-        .join(', ')
-
-      const commissionRate = getCommissionRate(sale)
-
-      const staffShare = getStaffShare(sale)
+      const returnAmount = getSaleReturnTotal(sale)
 
       const serviceRevenue = getRemainingServiceTotal(sale)
 
       const ownerServiceProfit = getOwnerServiceProfit(sale)
 
-      const returnAmount = getSaleReturnTotal(sale)
+      const commissions = getCommissions(sale)
 
-      return {
+      /*
+       * If the sale contains multiple services,
+       * export the service/staff information together.
+       */
+      const serviceDetails = services
+        .map((item) => {
+          const serviceName =
+            item?.Service?.name ||
+            item?.service?.name ||
+            item?.serviceName ||
+            item?.name ||
+            'Service'
+
+          const staffName = getServiceItemProvider(sale, item)
+
+          return `${serviceName} - ${staffName}`
+        })
+        .join(', ')
+
+      exportData.push({
         Invoice: sale.invoiceNumber || sale.receiptNumber || '-',
 
         Customer: getCustomerName(sale),
 
         'Sales By': getCashierName(sale),
 
-        'Service Provider': provider,
+        'Service Provider': serviceDetails || getProviderName(sale),
 
         'Service Type': getServiceType(sale) === 'home_service' ? 'Home Service' : 'In-Salon',
 
-        'Service Rendered': services || '-',
+        'Service Rendered': serviceDetails || '-',
+
+        'Staff Count': new Set(
+          commissions
+            .map((commission) => getStaffName(commission?.Staff || commission?.staff))
+            .filter((name) => name && name !== '-'),
+        ).size,
 
         'Returned Amount': returnAmount,
 
         'Service Revenue': serviceRevenue,
 
-        'Commission Rate': `${commissionRate}%`,
-
-        'Staff Share': staffShare,
+        'Staff Share': getStaffShare(sale),
 
         'Owner Service Profit': ownerServiceProfit,
+
+        'Commission Rate': `${getCommissionRate(sale)}%`,
 
         'Card Number': sale.CardNumber || '-',
 
@@ -884,7 +953,7 @@ const Report = () => {
         Status: sale.approvalStatus || '-',
 
         Date: sale.createdAt ? new Date(sale.createdAt).toLocaleDateString() : '-',
-      }
+      })
     })
 
     const worksheet = XLSX.utils.json_to_sheet(exportData)
@@ -902,10 +971,6 @@ const Report = () => {
 
   return (
     <>
-      {/* =====================================================
-          HEADER
-      ===================================================== */}
-
       <CCard className="border-0 shadow-sm mb-4">
         <CCardBody>
           <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
@@ -926,239 +991,108 @@ const Report = () => {
       </CCard>
 
       {/* =====================================================
-          KPI SECTION 1
-      ===================================================== */}
+          KPI SECTION
+      ====================================================== */}
 
       <CRow className="g-3 mb-3">
-        {/* GROSS SALES */}
-
         <CCol xs={12} sm={6} xl={3}>
           <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <div className="d-flex justify-content-between align-items-start">
-                <div>
-                  <div className="text-medium-emphasis small mb-2">Gross Sales</div>
+              <div className="text-medium-emphasis small mb-2">Gross Sales</div>
 
-                  <h3 className="fw-bold text-success mb-1">{money(kpis.grossSales)}</h3>
+              <h3 className="fw-bold text-success mb-1">{money(kpis.grossSales)}</h3>
 
-                  <small className="text-medium-emphasis">
-                    {kpis.totalTransactions} transactions
-                  </small>
-                </div>
-
-                <div className="rounded-circle bg-success bg-opacity-10 p-3">
-                  <CIcon icon={cilMoney} className="text-success" size="xl" />
-                </div>
-              </div>
+              <small className="text-medium-emphasis">{kpis.totalTransactions} transactions</small>
             </CCardBody>
           </CCard>
         </CCol>
 
-        {/* NET SALES */}
-
         <CCol xs={12} sm={6} xl={3}>
           <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <div className="d-flex justify-content-between align-items-start">
-                <div>
-                  <div className="text-medium-emphasis small mb-2">Net Sales</div>
+              <div className="text-medium-emphasis small mb-2">Net Sales</div>
 
-                  <h3 className="fw-bold text-primary mb-1">{money(kpis.netSales)}</h3>
+              <h3 className="fw-bold text-primary mb-1">{money(kpis.netSales)}</h3>
 
-                  <small className="text-medium-emphasis">
-                    Average sale: {money(kpis.averageSale)}
-                  </small>
-                </div>
-
-                <div className="rounded-circle bg-primary bg-opacity-10 p-3">
-                  <CIcon icon={cilChart} className="text-primary" size="xl" />
-                </div>
-              </div>
+              <small className="text-medium-emphasis">
+                Average sale: {money(kpis.averageSale)}
+              </small>
             </CCardBody>
           </CCard>
         </CCol>
 
-        {/* SERVICE REVENUE */}
-
         <CCol xs={12} sm={6} xl={3}>
           <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <div className="d-flex justify-content-between align-items-start">
-                <div>
-                  <div className="text-medium-emphasis small mb-2">Service Revenue</div>
+              <div className="text-medium-emphasis small mb-2">Service Revenue</div>
 
-                  <h3 className="fw-bold text-info mb-1">{money(kpis.totalServiceSales)}</h3>
+              <h3 className="fw-bold text-info mb-1">{money(kpis.totalServiceSales)}</h3>
 
-                  <small className="text-medium-emphasis">
-                    In-Salon: {money(kpis.inSalonServiceSales)}
-                  </small>
-                </div>
-
-                <div className="rounded-circle bg-info bg-opacity-10 p-3">
-                  <CIcon icon={cilPeople} className="text-info" size="xl" />
-                </div>
-              </div>
+              <small className="text-medium-emphasis">
+                In-Salon: {money(kpis.inSalonServiceSales)}
+              </small>
             </CCardBody>
           </CCard>
         </CCol>
 
-        {/* PRODUCT SALES */}
-
         <CCol xs={12} sm={6} xl={3}>
           <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <div className="d-flex justify-content-between align-items-start">
-                <div>
-                  <div className="text-medium-emphasis small mb-2">Product Sales</div>
+              <div className="text-medium-emphasis small mb-2">Product Sales</div>
 
-                  <h3 className="fw-bold text-secondary mb-1">{money(kpis.totalProductSales)}</h3>
+              <h3 className="fw-bold text-secondary mb-1">{money(kpis.totalProductSales)}</h3>
 
-                  <small className="text-medium-emphasis">Product revenue</small>
-                </div>
-
-                <div className="rounded-circle bg-secondary bg-opacity-10 p-3">
-                  <CIcon icon={cilMoney} className="text-secondary" size="xl" />
-                </div>
-              </div>
+              <small className="text-medium-emphasis">Product revenue</small>
             </CCardBody>
           </CCard>
         </CCol>
       </CRow>
 
-      {/* =====================================================
-          KPI SECTION 2
-      ===================================================== */}
-
       <CRow className="g-3 mb-4">
-        {/* STAFF SHARE */}
-
         <CCol xs={12} sm={6} xl={3}>
           <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <div className="d-flex justify-content-between align-items-start">
-                <div>
-                  <div className="text-medium-emphasis small mb-2">Staff Share</div>
+              <div className="text-medium-emphasis small mb-2">Staff Share</div>
 
-                  <h3 className="fw-bold text-warning mb-1">{money(kpis.staffShare)}</h3>
+              <h3 className="fw-bold text-warning mb-1">{money(kpis.staffShare)}</h3>
 
-                  <small className="text-medium-emphasis">Pending service commission</small>
-                </div>
-
-                <div className="rounded-circle bg-warning bg-opacity-10 p-3">
-                  <CIcon icon={cilPeople} className="text-warning" size="xl" />
-                </div>
-              </div>
+              <small className="text-medium-emphasis">Pending service commission</small>
             </CCardBody>
           </CCard>
         </CCol>
 
-        {/* OWNER SERVICE PROFIT */}
-
         <CCol xs={12} sm={6} xl={3}>
           <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <div className="d-flex justify-content-between align-items-start">
-                <div>
-                  <div className="text-medium-emphasis small mb-2">Owner Service Profit</div>
+              <div className="text-medium-emphasis small mb-2">Owner Service Profit</div>
 
-                  <h3 className="fw-bold text-success mb-1">{money(kpis.ownerServiceProfit)}</h3>
+              <h3 className="fw-bold text-success mb-1">{money(kpis.ownerServiceProfit)}</h3>
 
-                  <small className="text-medium-emphasis">
-                    Service revenue − pending staff share
-                  </small>
-                </div>
-
-                <div className="rounded-circle bg-success bg-opacity-10 p-3">
-                  <CIcon icon={cilCheckCircle} className="text-success" size="xl" />
-                </div>
-              </div>
+              <small className="text-medium-emphasis">Service revenue − pending staff share</small>
             </CCardBody>
           </CCard>
         </CCol>
 
-        {/* OWNER PROFIT */}
-
         <CCol xs={12} sm={6} xl={3}>
           <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <div className="d-flex justify-content-between align-items-start">
-                <div>
-                  <div className="text-medium-emphasis small mb-2">Owner Profit</div>
+              <div className="text-medium-emphasis small mb-2">Owner Profit</div>
 
-                  <h3 className="fw-bold text-success mb-1">{money(kpis.ownerProfit)}</h3>
+              <h3 className="fw-bold text-success mb-1">{money(kpis.ownerProfit)}</h3>
 
-                  <small className="text-medium-emphasis">Product + service profit</small>
-                </div>
-
-                <div className="rounded-circle bg-success bg-opacity-10 p-3">
-                  <CIcon icon={cilChart} className="text-success" size="xl" />
-                </div>
-              </div>
+              <small className="text-medium-emphasis">Product + service profit</small>
             </CCardBody>
           </CCard>
         </CCol>
 
-        {/* NET PROFIT */}
-
         <CCol xs={12} sm={6} xl={3}>
           <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <div className="d-flex justify-content-between align-items-start">
-                <div>
-                  <div className="text-medium-emphasis small mb-2">Net Profit</div>
+              <div className="text-medium-emphasis small mb-2">Net Profit</div>
 
-                  <h3 className="fw-bold text-success mb-1">{money(kpis.netProfit)}</h3>
+              <h3 className="fw-bold text-success mb-1">{money(kpis.netProfit)}</h3>
 
-                  <small className="text-medium-emphasis">Owner profit − expenses</small>
-                </div>
-
-                <div className="rounded-circle bg-success bg-opacity-10 p-3">
-                  <CIcon icon={cilChart} className="text-success" size="xl" />
-                </div>
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-        {/* EXPENSES */}
-
-        <CCol xs={12} sm={6} xl={3}>
-          <CCard className="border-0 shadow-sm h-100">
-            <CCardBody>
-              <div className="d-flex justify-content-between align-items-start">
-                <div>
-                  <div className="text-medium-emphasis small mb-2">Expenses</div>
-
-                  <h3 className="fw-bold text-danger mb-1">{money(kpis.totalExpenses)}</h3>
-
-                  <small className="text-medium-emphasis">Business expenses</small>
-                </div>
-
-                <div className="rounded-circle bg-danger bg-opacity-10 p-3">
-                  <CIcon icon={cilMoney} className="text-danger" size="xl" />
-                </div>
-              </div>
-            </CCardBody>
-          </CCard>
-        </CCol>
-
-        {/* HOME SERVICE */}
-
-        <CCol xs={12} sm={6} xl={3}>
-          <CCard className="border-0 shadow-sm h-100">
-            <CCardBody>
-              <div className="d-flex justify-content-between align-items-start">
-                <div>
-                  <div className="text-medium-emphasis small mb-2">Home Service</div>
-
-                  <h3 className="fw-bold text-dark mb-1">{money(kpis.homeServiceSales)}</h3>
-
-                  <small className="text-medium-emphasis">50% staff share where applicable</small>
-                </div>
-
-                <div className="rounded-circle bg-dark bg-opacity-10 p-3">
-                  <CIcon icon={cilHome} className="text-dark" size="xl" />
-                </div>
-              </div>
+              <small className="text-medium-emphasis">Owner profit − expenses</small>
             </CCardBody>
           </CCard>
         </CCol>
@@ -1166,11 +1100,9 @@ const Report = () => {
 
       {/* =====================================================
           ANALYTICS
-      ===================================================== */}
+      ====================================================== */}
 
       <CRow className="g-3 mb-4">
-        {/* SALES TREND */}
-
         <CCol xs={12} lg={8}>
           <CCard className="border-0 shadow-sm h-100">
             <CCardHeader className="bg-transparent border-0 pt-4 px-4">
@@ -1184,15 +1116,7 @@ const Report = () => {
             <CCardBody>
               {salesTrendData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={320}>
-                  <LineChart
-                    data={salesTrendData}
-                    margin={{
-                      top: 10,
-                      right: 20,
-                      left: 10,
-                      bottom: 10,
-                    }}
-                  >
+                  <LineChart data={salesTrendData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
 
                     <XAxis dataKey="date" tickLine={false} axisLine={false} />
@@ -1213,14 +1137,7 @@ const Report = () => {
                       name="Sales"
                       stroke="#321fdb"
                       strokeWidth={3}
-                      dot={{
-                        r: 4,
-                        fill: '#321fdb',
-                      }}
-                      activeDot={{
-                        r: 6,
-                        fill: '#321fdb',
-                      }}
+                      dot={{ r: 4 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -1232,8 +1149,6 @@ const Report = () => {
             </CCardBody>
           </CCard>
         </CCol>
-
-        {/* REVENUE BREAKDOWN */}
 
         <CCol xs={12} lg={4}>
           <CCard className="border-0 shadow-sm h-100">
@@ -1256,7 +1171,6 @@ const Report = () => {
                       outerRadius={105}
                       innerRadius={55}
                       paddingAngle={3}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     >
                       {revenueBreakdownData.map((entry, index) => (
                         <Cell
@@ -1282,8 +1196,8 @@ const Report = () => {
       </CRow>
 
       {/* =====================================================
-          SERVICE / PROFIT ANALYSIS
-      ===================================================== */}
+          PROFIT ANALYSIS
+      ====================================================== */}
 
       <CRow className="mb-4">
         <CCol xs={12}>
@@ -1297,52 +1211,38 @@ const Report = () => {
             </CCardHeader>
 
             <CCardBody>
-              {profitChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={330}>
-                  <BarChart
-                    data={profitChartData}
-                    margin={{
-                      top: 10,
-                      right: 20,
-                      left: 10,
-                      bottom: 10,
-                    }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <ResponsiveContainer width="100%" height={330}>
+                <BarChart data={profitChartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
 
-                    <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} />
 
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) => `₦${Number(value).toLocaleString()}`}
-                    />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => `₦${Number(value).toLocaleString()}`}
+                  />
 
-                    <Tooltip formatter={(value) => `₦${Number(value).toLocaleString()}`} />
+                  <Tooltip formatter={(value) => `₦${Number(value).toLocaleString()}`} />
 
-                    <Bar dataKey="amount" name="Amount" radius={[6, 6, 0, 0]}>
-                      {profitChartData.map((entry, index) => (
-                        <Cell
-                          key={`profit-cell-${index}`}
-                          fill={index === 0 ? '#321fdb' : index === 1 ? '#f9b115' : '#2eb85c'}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="text-center text-medium-emphasis py-5">
-                  No profit data available.
-                </div>
-              )}
+                  <Bar dataKey="amount" name="Amount" radius={[6, 6, 0, 0]}>
+                    {profitChartData.map((entry, index) => (
+                      <Cell
+                        key={`profit-cell-${index}`}
+                        fill={index === 0 ? '#321fdb' : index === 1 ? '#f9b115' : '#2eb85c'}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </CCardBody>
           </CCard>
         </CCol>
       </CRow>
 
       {/* =====================================================
-          FILTER PANEL
-      ===================================================== */}
+          FILTERS
+      ====================================================== */}
 
       <CCard className="border-0 shadow-sm mb-4">
         <CCardHeader className="bg-transparent border-0">
@@ -1355,8 +1255,6 @@ const Report = () => {
 
         <CCardBody>
           <CRow className="g-3">
-            {/* START DATE */}
-
             <CCol xs={12} md={2}>
               <label className="small fw-semibold mb-1">Start Date</label>
 
@@ -1367,8 +1265,6 @@ const Report = () => {
               />
             </CCol>
 
-            {/* END DATE */}
-
             <CCol xs={12} md={2}>
               <label className="small fw-semibold mb-1">End Date</label>
 
@@ -1378,8 +1274,6 @@ const Report = () => {
                 onChange={(e) => setEndDate(e.target.value)}
               />
             </CCol>
-
-            {/* STATUS */}
 
             <CCol xs={12} md={2}>
               <label className="small fw-semibold mb-1">Status</label>
@@ -1394,8 +1288,6 @@ const Report = () => {
                 <option value="cancelled">Cancelled</option>
               </CFormSelect>
             </CCol>
-
-            {/* SERVICE PROVIDER */}
 
             <CCol xs={12} md={3}>
               <label className="small fw-semibold mb-1">Service Provider</label>
@@ -1413,8 +1305,6 @@ const Report = () => {
                 ))}
               </CFormSelect>
             </CCol>
-
-            {/* SEARCH */}
 
             <CCol xs={12} md={3}>
               <label className="small fw-semibold mb-1">Search</label>
@@ -1465,8 +1355,8 @@ const Report = () => {
       </CCard>
 
       {/* =====================================================
-          ACTIVE FILTER SUMMARY
-      ===================================================== */}
+          FILTER SUMMARY
+      ====================================================== */}
 
       {(providerFilter || search) && (
         <CCard className="border-0 shadow-sm mb-4">
@@ -1499,7 +1389,7 @@ const Report = () => {
 
       {/* =====================================================
           SALES TABLE
-      ===================================================== */}
+      ====================================================== */}
 
       <CCard className="border-0 shadow-sm">
         <CCardHeader className="bg-transparent">
@@ -1554,26 +1444,15 @@ const Report = () => {
             <CTableBody>
               {filteredSales.length > 0 ? (
                 filteredSales.map((sale) => {
-                  const provider = getProviderName(sale)
-
                   const services = getServiceItems(sale)
 
-                  /*
-                   * IMPORTANT:
-                   * These are now RETURN-AWARE.
-                   */
+                  const returnAmount = getSaleReturnTotal(sale)
 
                   const serviceTotal = getRemainingServiceTotal(sale)
 
                   const productTotal = getRemainingProductTotal(sale)
 
-                  const returnAmount = getSaleReturnTotal(sale)
-
                   const staffShare = getStaffShare(sale)
-
-                  const commission = getCommission(sale)
-
-                  const commissionRate = getCommissionRate(sale)
 
                   const currentCommission = getCurrentCommission(sale)
 
@@ -1585,11 +1464,17 @@ const Report = () => {
 
                   const commissionStatus = getCommissionStatus(sale)
 
-                  const ownerServiceProfit = getOwnerServiceProfit(sale)
+                  const commissionRate = getCommissionRate(sale)
 
                   const serviceType = getServiceType(sale)
 
                   const isHomeService = serviceType === 'home_service'
+
+                  const ownerServiceProfit = getOwnerServiceProfit(sale)
+
+                  const saleNetAmount = Math.max(Number(sale.totalAmount || 0) - returnAmount, 0)
+
+                  const hasReturnedProduct = getReturnedProductItems(sale).length > 0
 
                   const commissionIsPending = commissionStatus === 'pending'
 
@@ -1598,18 +1483,15 @@ const Report = () => {
                   const commissionIsPartial = commissionStatus === 'partial'
 
                   /*
-                   * Returned items
+                   * All staff on this sale.
                    */
-
-                  const hasReturnedService = getReturnedServiceItems(sale).length > 0
-
-                  const hasReturnedProduct = getReturnedProductItems(sale).length > 0
-
-                  /*
-                   * Sale net amount
-                   */
-
-                  const saleNetAmount = Math.max(Number(sale.totalAmount || 0) - returnAmount, 0)
+                  const saleProviders = [
+                    ...new Set(
+                      services
+                        .map((item) => getServiceItemProvider(sale, item))
+                        .filter((name) => name && name !== '-'),
+                    ),
+                  ]
 
                   return (
                     <CTableRow key={sale.id}>
@@ -1620,14 +1502,7 @@ const Report = () => {
 
                         {returnAmount > 0 && (
                           <div className="mt-1">
-                            <CBadge
-                              color="danger"
-                              style={{
-                                fontSize: '10px',
-                              }}
-                            >
-                              RETURNED: {money(returnAmount)}
-                            </CBadge>
+                            <CBadge color="danger">RETURNED: {money(returnAmount)}</CBadge>
                           </div>
                         )}
                       </CTableDataCell>
@@ -1640,90 +1515,67 @@ const Report = () => {
 
                       <CTableDataCell>{getCashierName(sale)}</CTableDataCell>
 
-                      {/* PROVIDER */}
+                      {/* PROVIDERS */}
 
                       <CTableDataCell>
-                        {provider !== '-' ? <CBadge color="info">{provider}</CBadge> : '-'}
+                        {saleProviders.length > 0 ? (
+                          <div className="d-flex flex-column gap-1">
+                            {saleProviders.map((provider) => (
+                              <CBadge key={provider} color="info">
+                                {provider}
+                              </CBadge>
+                            ))}
+                          </div>
+                        ) : (
+                          '-'
+                        )}
                       </CTableDataCell>
 
-                      {/* SERVICE */}
+                      {/* SERVICES */}
 
                       <CTableDataCell>
                         {services.length > 0 ? (
                           services.map((item, index) => {
                             const serviceName =
-                              item.Service?.name ||
-                              item.service?.name ||
-                              item.serviceName ||
-                              item.name ||
-                              item.productName ||
+                              item?.Service?.name ||
+                              item?.service?.name ||
+                              item?.serviceName ||
+                              item?.name ||
                               'Service'
+
+                            const provider = getServiceItemProvider(sale, item)
 
                             const returnStatus = getServiceReturnStatus(sale, item)
 
                             return (
-                              <div key={item.id || index} className="mb-2">
-                                <div className="d-flex align-items-center gap-2 flex-wrap">
-                                  <span
-                                    className={
-                                      returnStatus.returned && !returnStatus.partial
-                                        ? 'text-decoration-line-through text-muted'
-                                        : 'fw-semibold'
-                                    }
-                                  >
-                                    {serviceName}
-                                  </span>
+                              <div key={item.id || index} className="mb-3">
+                                <div className="fw-semibold">{serviceName}</div>
 
-                                  {returnStatus.returned && !returnStatus.partial && (
-                                    <CBadge
-                                      color="danger"
-                                      style={{
-                                        fontSize: '10px',
-                                      }}
-                                    >
-                                      RETURNED
-                                    </CBadge>
-                                  )}
-
-                                  {returnStatus.returned && returnStatus.partial && (
-                                    <CBadge
-                                      color="warning"
-                                      textColor="dark"
-                                      style={{
-                                        fontSize: '10px',
-                                      }}
-                                    >
-                                      PARTIALLY RETURNED
-                                    </CBadge>
-                                  )}
+                                <div className="small text-primary fw-semibold">
+                                  Staff: {provider}
                                 </div>
 
                                 <small className="text-medium-emphasis">
-                                  {returnStatus.returned ? (
-                                    <>
-                                      {returnStatus.partial
-                                        ? `${returnStatus.returnedQuantity} returned / ${returnStatus.remainingQuantity} remaining`
-                                        : `${returnStatus.returnedQuantity} returned`}
-                                    </>
-                                  ) : (
-                                    <>
-                                      {item.quantity && Number(item.quantity) > 1
-                                        ? `Qty: ${item.quantity} • `
-                                        : ''}
-
-                                      {money(item.subtotal)}
-                                    </>
-                                  )}
+                                  {returnStatus.returned
+                                    ? returnStatus.partial
+                                      ? `${returnStatus.returnedQuantity} returned / ${returnStatus.remainingQuantity} remaining`
+                                      : `${returnStatus.returnedQuantity} returned`
+                                    : `Qty: ${item.quantity || 1} • ${money(item.subtotal)}`}
                                 </small>
 
+                                {returnStatus.returned && !returnStatus.partial && (
+                                  <div>
+                                    <CBadge color="danger" className="mt-1">
+                                      RETURNED
+                                    </CBadge>
+                                  </div>
+                                )}
+
                                 {returnStatus.partial && (
-                                  <div className="small text-success mt-1">
-                                    Remaining value:{' '}
-                                    {money(
-                                      Number(item.subtotal || 0) *
-                                        (returnStatus.remainingQuantity /
-                                          Number(item.quantity || 1)),
-                                    )}
+                                  <div>
+                                    <CBadge color="warning" textColor="dark" className="mt-1">
+                                      PARTIALLY RETURNED
+                                    </CBadge>
                                   </div>
                                 )}
                               </div>
@@ -1734,16 +1586,9 @@ const Report = () => {
                         )}
 
                         {hasReturnedProduct && (
-                          <div className="mt-2">
-                            <CBadge
-                              color="secondary"
-                              style={{
-                                fontSize: '10px',
-                              }}
-                            >
-                              Product return
-                            </CBadge>
-                          </div>
+                          <CBadge color="secondary" className="mt-1">
+                            Product return
+                          </CBadge>
                         )}
                       </CTableDataCell>
 
@@ -1759,9 +1604,7 @@ const Report = () => {
                         )}
 
                         {commissionRate > 0 && (
-                          <div className="small text-medium-emphasis mt-1">
-                            {commissionRate}% staff
-                          </div>
+                          <div className="small text-medium-emphasis mt-1">{commissionRate}%</div>
                         )}
                       </CTableDataCell>
 
@@ -1796,12 +1639,10 @@ const Report = () => {
                           <>
                             <div className="fw-bold text-warning">{money(staffShare)}</div>
 
-                            <small className="text-medium-emphasis">
-                              {commissionRate > 0 ? `${commissionRate}% Pending` : 'Pending'}
-                            </small>
+                            <small className="text-medium-emphasis">Pending</small>
 
                             {outstandingCommission > 0 && (
-                              <small className="text-muted d-block mt-1">
+                              <small className="text-muted d-block">
                                 Outstanding: {money(outstandingCommission)}
                               </small>
                             )}
@@ -1852,6 +1693,7 @@ const Report = () => {
                           </small>
                         )}
                       </CTableDataCell>
+
                       {/* OWNER PROFIT */}
 
                       <CTableDataCell>
@@ -1897,14 +1739,7 @@ const Report = () => {
 
                         {returnAmount > 0 && (
                           <div className="mt-1">
-                            <CBadge
-                              color="danger"
-                              style={{
-                                fontSize: '10px',
-                              }}
-                            >
-                              RETURN
-                            </CBadge>
+                            <CBadge color="danger">RETURN</CBadge>
                           </div>
                         )}
                       </CTableDataCell>
@@ -1950,7 +1785,7 @@ const Report = () => {
 
       {/* =====================================================
           RETURN MODAL
-      ===================================================== */}
+      ====================================================== */}
 
       <ReturnModal
         show={showReturnModal}
