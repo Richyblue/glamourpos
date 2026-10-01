@@ -28,19 +28,48 @@ export default function PaymentModal({
 }) {
   const [paymentMethod, setPaymentMethod] = useState('cash')
 
-  // Legacy single service provider
+  // =========================================================
+  // LEGACY SINGLE SERVICE PROVIDER
+  // =========================================================
+
   const [serviceProviderId, setServiceProviderId] = useState('')
 
-  // NEW:
+  // =========================================================
+  // MULTI-SERVICE STAFF ASSIGNMENTS
+  //
   // {
-  //   serviceId: staffId
+  //   12: "4",
+  //   15: "8",
+  //   20: "11"
   // }
+  //
+  // serviceId -> staffId
+  // =========================================================
+
   const [serviceStaffAssignments, setServiceStaffAssignments] = useState({})
 
   const [serviceType, setServiceType] = useState('in_salon')
   const [note, setNote] = useState('')
   const [standTag, setStandTag] = useState('')
   const [cardNumber, setCardNumber] = useState('')
+
+  // =========================================================
+  // COLORS
+  // =========================================================
+
+  const colors = {
+    dark: '#111827',
+    darkSoft: '#1f2937',
+    gold: '#e8bd35',
+    goldDark: '#c9a227',
+    background: '#f5f7fb',
+    border: '#e5e7eb',
+    muted: '#6b7280',
+    text: '#111827',
+    white: '#ffffff',
+    green: '#16a34a',
+    red: '#dc2626',
+  }
 
   // =========================================================
   // DETERMINE IF HOME SERVICE
@@ -53,18 +82,53 @@ export default function PaymentModal({
   // =========================================================
 
   const activeStaff = useMemo(() => {
-    return staff.filter(
-      (item) =>
-        (item.User?.isActive === true || item.User?.isActive === 1) && item.User?.fullname?.trim(),
-    )
+    if (!Array.isArray(staff)) return []
+
+    return staff.filter((item) => {
+      const isActive = item.User?.isActive === true || item.User?.isActive === 1
+
+      const fullname = item.User?.fullname?.trim()
+
+      return isActive && fullname
+    })
   }, [staff])
 
   // =========================================================
+  // GET SERVICE ID FROM CART ITEM
+  //
+  // Supports different structures that may exist in the
+  // existing POS cart.
+  // =========================================================
+
+  const getCartServiceId = (item) => {
+    const possibleId =
+      item?.serviceId || item?.ServiceId || item?.service?.id || item?.Service?.id || item?.id
+
+    const serviceId = Number(possibleId)
+
+    return Number.isInteger(serviceId) && serviceId > 0 ? serviceId : null
+  }
+
+  // =========================================================
   // SERVICES IN CURRENT CART
+  //
+  // IMPORTANT:
+  // Do not identify every item with serviceId as a service
+  // unless it actually represents a service.
   // =========================================================
 
   const cartServices = useMemo(() => {
-    return cart.filter((item) => item.type === 'service' || item.serviceId || item.ServiceId)
+    if (!Array.isArray(cart)) return []
+
+    return cart.filter((item) => {
+      const isService =
+        item?.type === 'service' ||
+        item?.itemType === 'service' ||
+        item?.ServiceId ||
+        item?.serviceId
+
+      return isService && getCartServiceId(item)
+    })
   }, [cart])
 
   // =========================================================
@@ -100,13 +164,15 @@ export default function PaymentModal({
   // =========================================================
 
   const handleServiceStaffChange = (serviceId, staffId) => {
+    const normalizedServiceId = Number(serviceId)
+
     setServiceStaffAssignments((prev) => {
       const updated = { ...prev }
 
       if (!staffId) {
-        delete updated[serviceId]
+        delete updated[normalizedServiceId]
       } else {
-        updated[serviceId] = staffId
+        updated[normalizedServiceId] = String(staffId)
       }
 
       return updated
@@ -124,59 +190,152 @@ export default function PaymentModal({
   }
 
   // =========================================================
+  // GET SELECTED STAFF FOR A SERVICE
+  //
+  // Explicit service assignment has priority.
+  //
+  // For ONE service only, the legacy provider is also
+  // considered an assignment.
+  // =========================================================
+
+  const getSelectedStaffForService = (serviceId) => {
+    const explicitStaff = serviceStaffAssignments[serviceId]
+
+    if (explicitStaff) {
+      return String(explicitStaff)
+    }
+
+    if (cartServices.length === 1 && serviceProviderId) {
+      return String(serviceProviderId)
+    }
+
+    return ''
+  }
+
+  // =========================================================
+  // CHECK WHETHER EVERY SERVICE HAS A PROVIDER
+  // =========================================================
+
+  const unassignedServices = useMemo(() => {
+    return cartServices.filter((item) => {
+      const serviceId = getCartServiceId(item)
+
+      if (!serviceId) {
+        return true
+      }
+
+      const selectedStaff = serviceStaffAssignments[serviceId]
+
+      // For a single-service sale, the legacy provider
+      // counts as the provider.
+      if (!selectedStaff && cartServices.length === 1) {
+        return !serviceProviderId
+      }
+
+      return !selectedStaff
+    })
+  }, [cartServices, serviceStaffAssignments, serviceProviderId])
+
+  const hasMultipleServices = cartServices.length > 1
+
+  const hasUnassignedService = cartServices.length > 0 && unassignedServices.length > 0
+
+  // =========================================================
   // HANDLE SUBMIT
   // =========================================================
 
   const handleSubmit = () => {
     /*
-     * Convert:
+     * Build an assignment for EVERY service.
      *
-     * {
-     *   12: "4",
-     *   15: "8"
-     * }
+     * Priority:
      *
-     * into:
-     *
-     * [
-     *   { serviceId: 12, staffId: 4 },
-     *   { serviceId: 15, staffId: 8 }
-     * ]
+     * 1. Per-service provider
+     * 2. Legacy provider for single-service sale
      */
 
-    const assignments = Object.entries(serviceStaffAssignments)
-      .map(([serviceId, staffId]) => ({
-        serviceId: Number(serviceId),
-        staffId: Number(staffId),
-      }))
-      .filter(
-        (item) =>
-          Number.isInteger(item.serviceId) &&
-          item.serviceId > 0 &&
-          Number.isInteger(item.staffId) &&
-          item.staffId > 0,
+    const assignments = []
+
+    cartServices.forEach((item) => {
+      const serviceId = getCartServiceId(item)
+
+      if (!serviceId) return
+
+      let selectedStaffId = serviceStaffAssignments[serviceId] || ''
+
+      /*
+       * Backward compatibility:
+       *
+       * If there is only one service and the old
+       * Primary Service Provider is selected,
+       * use it for that service.
+       */
+
+      if (!selectedStaffId && cartServices.length === 1) {
+        selectedStaffId = serviceProviderId || ''
+      }
+
+      const numericStaffId = Number(selectedStaffId)
+
+      if (Number.isInteger(numericStaffId) && numericStaffId > 0) {
+        assignments.push({
+          serviceId: Number(serviceId),
+          staffId: numericStaffId,
+        })
+      }
+    })
+
+    // =======================================================
+    // REMOVE DUPLICATE SERVICE ASSIGNMENTS
+    // =======================================================
+
+    const uniqueAssignments = Array.from(
+      new Map(assignments.map((assignment) => [String(assignment.serviceId), assignment])).values(),
+    )
+
+    // =======================================================
+    // FINAL VALIDATION
+    // =======================================================
+
+    const missingServices = cartServices.filter((item) => {
+      const serviceId = getCartServiceId(item)
+
+      return !uniqueAssignments.some(
+        (assignment) => Number(assignment.serviceId) === Number(serviceId),
       )
+    })
 
-    /*
-     * Backward compatibility:
-     *
-     * If only one service exists and the cashier uses
-     * the old Service Provider dropdown, use it as
-     * the legacy provider.
-     */
+    if (missingServices.length > 0) {
+      return
+    }
+
+    // =======================================================
+    // LEGACY PROVIDER
+    //
+    // Keep this because existing backend/POS logic uses it.
+    //
+    // For a single service, automatically synchronize it
+    // with the actual service assignment.
+    // =======================================================
 
     let legacyProviderId = serviceProviderId
 
-    if (!legacyProviderId && assignments.length === 1) {
-      legacyProviderId = String(assignments[0].staffId)
+    if (cartServices.length === 1 && uniqueAssignments.length === 1) {
+      legacyProviderId = String(uniqueAssignments[0].staffId)
     }
+
+    // =======================================================
+    // SUBMIT
+    // =======================================================
 
     onSubmit({
       paymentMethod,
 
-      serviceProviderId: legacyProviderId,
+      // Existing field preserved
+      serviceProviderId: legacyProviderId || '',
 
-      serviceStaffAssignments: assignments,
+      // New multi-service assignment
+      serviceStaffAssignments: uniqueAssignments,
 
       standTag: isHomeService ? '' : standTag,
 
@@ -189,36 +348,8 @@ export default function PaymentModal({
   }
 
   // =========================================================
-  // CHECK WHETHER ALL SERVICES HAVE STAFF
-  // =========================================================
-
-  const unassignedServices = cartServices.filter((item) => {
-    const serviceId = Number(item.serviceId || item.id)
-
-    return !serviceStaffAssignments[serviceId]
-  })
-
-  const hasMultipleServices = cartServices.length > 1
-
-  const hasUnassignedService = cartServices.length > 0 && unassignedServices.length > 0
-
-  // =========================================================
   // STYLES
   // =========================================================
-
-  const colors = {
-    dark: '#111827',
-    darkSoft: '#1f2937',
-    gold: '#e8bd35',
-    goldDark: '#c9a227',
-    background: '#f5f7fb',
-    border: '#e5e7eb',
-    muted: '#6b7280',
-    text: '#111827',
-    white: '#ffffff',
-    green: '#16a34a',
-    red: '#dc2626',
-  }
 
   const selectStyle = {
     minHeight: '48px',
@@ -246,6 +377,10 @@ export default function PaymentModal({
     transition: 'all .2s ease',
     boxShadow: active ? '0 5px 16px rgba(232, 189, 53, 0.15)' : 'none',
   })
+
+  // =========================================================
+  // RENDER
+  // =========================================================
 
   return (
     <CModal visible={show} onClose={onHide} alignment="center" size="lg" backdrop="static">
@@ -552,15 +687,31 @@ export default function PaymentModal({
 
               <div className="d-flex flex-column gap-3">
                 {cartServices.map((item, index) => {
-                  const serviceId = Number(item.serviceId || item.id)
+                  const serviceId = getCartServiceId(item)
 
-                  const selectedStaffId = serviceStaffAssignments[serviceId] || ''
+                  const selectedStaffId = getSelectedStaffForService(serviceId)
 
-                  const serviceName = item.name || item.serviceName || `Service ${index + 1}`
+                  const serviceName =
+                    item.name ||
+                    item.serviceName ||
+                    item.Service?.name ||
+                    item.service?.name ||
+                    `Service ${index + 1}`
 
                   const quantity = Number(item.quantity || 1)
 
-                  const itemTotal = Number(item.subtotal ?? item.price ?? 0) * quantity
+                  /*
+                   * Use subtotal directly when available.
+                   *
+                   * This avoids multiplying an already
+                   * calculated subtotal by quantity.
+                   */
+                  const rawSubtotal = item.subtotal ?? item.Subtotal
+
+                  const rawPrice = item.price ?? item.Price ?? 0
+
+                  const itemTotal =
+                    rawSubtotal !== undefined ? Number(rawSubtotal) : Number(rawPrice) * quantity
 
                   return (
                     <div
@@ -678,8 +829,29 @@ export default function PaymentModal({
                       color: colors.muted,
                     }}
                   >
-                    You can also use the existing staff selection below. The selected provider above
-                    takes priority.
+                    For a single service, you can use either the provider above or the existing
+                    Primary Service Provider selection below.
+                  </small>
+                </div>
+              )}
+
+              {hasMultipleServices && (
+                <div
+                  className="mt-3"
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    background: 'rgba(232, 189, 53, 0.08)',
+                    border: '1px solid rgba(232, 189, 53, 0.25)',
+                  }}
+                >
+                  <small
+                    style={{
+                      color: colors.dark,
+                    }}
+                  >
+                    <strong>Multiple services:</strong> assign each service to the staff member who
+                    actually performed it.
                   </small>
                 </div>
               )}
@@ -776,7 +948,8 @@ export default function PaymentModal({
                   color: colors.muted,
                 }}
               >
-                This remains available for the existing single-provider workflow.
+                For existing single-provider sales, this field continues to work as before. For
+                multiple services, use the provider selector above.
               </small>
             </div>
           </CCardBody>
