@@ -262,7 +262,7 @@ const ReceiptModal = ({ show, onHide, sale }) => {
             <style>
 
               @page {
-                size: 80mm auto;
+                size: 60mm auto;
                 margin: 0;
               }
 
@@ -274,19 +274,21 @@ const ReceiptModal = ({ show, onHide, sale }) => {
               body {
                 margin: 0;
                 padding: 0;
-                width: 80mm;
+                width: 60mm;
                 background: #ffffff;
               }
 
               body {
-                width: 80mm;
+                width: 60mm;
+                 margin: 0;
+                  padding: 5px;
                 font-family: monospace;
-                font-size: 9px;
+                font-size: 8px;
                 color: #000;
               }
 
               .receipt {
-                width: 80mm;
+                width: 60mm;
                 padding: 5px;
               }
 
