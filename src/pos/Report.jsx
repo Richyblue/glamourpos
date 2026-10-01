@@ -1,22 +1,3 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import axios from 'axios'
-import * as XLSX from 'xlsx'
-
-import ReturnModal from './ReturnModal'
-
-import {
-  cilSearch,
-  cilCloudDownload,
-  cilFilter,
-  cilMoney,
-  cilPeople,
-  cilChart,
-  cilCheckCircle,
-  cilHome,
-} from '@coreui/icons'
-
-import CIcon from '@coreui/icons-react'
-
 import {
   CCard,
   CCardBody,
@@ -24,839 +5,118 @@ import {
   CRow,
   CCol,
   CButton,
-  CFormInput,
-  CFormSelect,
+  CBadge,
   CTable,
   CTableHead,
   CTableBody,
   CTableRow,
   CTableHeaderCell,
   CTableDataCell,
-  CBadge,
+  CFormInput,
+  CFormSelect,
+  CSpinner,
   CInputGroup,
   CInputGroupText,
-  CSpinner,
 } from '@coreui/react'
 
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  PieChart,
-  Pie,
-  Cell,
-} from 'recharts'
+import { useState, useEffect, useMemo } from 'react'
+import axios from 'axios'
+import Swal from 'sweetalert2'
+import * as XLSX from 'xlsx'
 
-const Report = () => {
+import CIcon from '@coreui/icons-react'
+import {
+  cilSearch,
+  cilReload,
+  cilFilter,
+  cilCloudDownload,
+  cilCheckCircle,
+  cilClock,
+  cilMoney,
+  cilLoopCircular,
+  cilUser,
+  cilCalendar,
+  cilX,
+} from '@coreui/icons'
+
+const Commission = () => {
   const API_URL = import.meta.env.VITE_BACKEND_URL
 
-  // =========================================================
-  // STATE
-  // =========================================================
-
+  const [commissions, setCommissions] = useState([])
   const [loading, setLoading] = useState(false)
-
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [providerFilter, setProviderFilter] = useState('')
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [monthFilter, setMonthFilter] = useState('')
+  const [yearFilter, setYearFilter] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [selectedStaff, setSelectedStaff] = useState('')
+  const [staffs, setStaffs] = useState([])
+  // =========================================================
+  // STAFF TIPS
+  // =========================================================
 
-  const [showReturnModal, setShowReturnModal] = useState(false)
-  const [selectedSaleId, setSelectedSaleId] = useState(null)
-
-  const [sales, setSales] = useState([])
-  const [report, setReport] = useState({})
+  const [staffTips, setStaffTips] = useState([])
+  const [tipsLoading, setTipsLoading] = useState(false)
 
   // =========================================================
-  // HELPERS
+  // FORMAT CURRENCY
   // =========================================================
 
-  const money = (value) => {
-    return `₦${Number(value || 0).toLocaleString()}`
+  const formatCurrency = (amount) => {
+    return `₦${Number(amount || 0).toLocaleString('en-NG', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`
   }
 
   // =========================================================
-  // STAFF NAME HELPER
+  // GET COMMISSIONS
   // =========================================================
 
-  const getStaffName = (staff) => {
-    if (!staff) return '-'
-
-    return (
-      staff.fullname ||
-      staff.Fullname ||
-      staff.name ||
-      staff.User?.fullname ||
-      staff.user?.fullname ||
-      staff.User?.name ||
-      staff.user?.name ||
-      '-'
-    )
-  }
-
-  // =========================================================
-  // SALE LEVEL PROVIDER
-  // =========================================================
-
-  const getProviderName = (sale) => {
-    return getStaffName(sale?.ServiceProvider) || sale?.serviceProviderName || '-'
-  }
-
-  // =========================================================
-  // SERVICE ITEM PROVIDER
-  // =========================================================
-
-  const getServiceItemProvider = (sale, item) => {
-    /*
-     * NEW PRIMARY SOURCE
-     *
-     * SaleItem.ServiceProvider
-     */
-    const directProvider =
-      item?.ServiceProvider || item?.serviceProvider || item?.Staff || item?.staff
-
-    if (directProvider) {
-      const name = getStaffName(directProvider)
-
-      if (name !== '-') {
-        return name
-      }
-    }
-
-    /*
-     * SECONDARY SOURCE
-     *
-     * Look for the commission attached to this
-     * exact SaleItem.
-     */
-    const commissions = getCommissions(sale)
-
-    const matchingCommission = commissions.find(
-      (commission) =>
-        Number(commission?.SaleItemId) === Number(item?.id) ||
-        Number(commission?.saleItemId) === Number(item?.id),
-    )
-
-    if (matchingCommission) {
-      const commissionStaff = matchingCommission.Staff || matchingCommission.staff
-
-      const commissionStaffName = getStaffName(commissionStaff)
-
-      if (commissionStaffName !== '-') {
-        return commissionStaffName
-      }
-
-      if (matchingCommission.staffName) {
-        return matchingCommission.staffName
-      }
-    }
-
-    /*
-     * THIRD SOURCE
-     *
-     * Legacy Sale-level provider.
-     */
-    return getProviderName(sale)
-  }
-
-  // =========================================================
-  // CASHIER
-  // =========================================================
-
-  const getCashierName = (sale) => {
-    return (
-      sale?.RecordedBy?.fullname ||
-      sale?.RecordedBy?.User?.fullname ||
-      sale?.RecordedBy?.user?.fullname ||
-      sale?.recordedByName ||
-      '-'
-    )
-  }
-
-  // =========================================================
-  // CUSTOMER
-  // =========================================================
-
-  const getCustomerName = (sale) => {
-    return sale?.Customer?.fullname || sale?.Customer?.name || sale?.customerName || '-'
-  }
-
-  // =========================================================
-  // RETURNS
-  // =========================================================
-
-  const getSaleReturns = (sale) => {
-    return sale?.SalesReturns || sale?.salesReturns || sale?.SalesReturn || sale?.salesReturn || []
-  }
-
-  const getReturnedItems = (sale) => {
-    return getSaleReturns(sale).flatMap(
-      (returnRecord) => returnRecord?.ReturnItems || returnRecord?.returnItems || [],
-    )
-  }
-
-  const getReturnedServiceItems = (sale) => {
-    return getReturnedItems(sale).filter((item) => item.itemType === 'service')
-  }
-
-  const getReturnedProductItems = (sale) => {
-    return getReturnedItems(sale).filter((item) => item.itemType === 'product')
-  }
-
-  const getSaleReturnTotal = (sale) => {
-    return getSaleReturns(sale).reduce(
-      (sum, returnRecord) => sum + Number(returnRecord?.totalRefund || 0),
-      0,
-    )
-  }
-
-  const getReturnedServiceQuantity = (sale, serviceId) => {
-    return getReturnedServiceItems(sale)
-      .filter((item) => Number(item.ServiceId) === Number(serviceId))
-      .reduce((sum, item) => sum + Number(item.quantity || 0), 0)
-  }
-
-  const getReturnedProductQuantity = (sale, productId) => {
-    return getReturnedProductItems(sale)
-      .filter((item) => Number(item.ProductId) === Number(productId))
-      .reduce((sum, item) => sum + Number(item.quantity || 0), 0)
-  }
-
-  const getServiceReturnStatus = (sale, item) => {
-    const returnedQuantity = getReturnedServiceQuantity(sale, item.ServiceId)
-
-    const originalQuantity = Number(item.quantity || 0)
-
-    if (returnedQuantity <= 0) {
-      return {
-        returned: false,
-        partial: false,
-        returnedQuantity: 0,
-        remainingQuantity: originalQuantity,
-      }
-    }
-
-    const remainingQuantity = Math.max(originalQuantity - returnedQuantity, 0)
-
-    return {
-      returned: true,
-      partial: remainingQuantity > 0,
-      returnedQuantity,
-      remainingQuantity,
-    }
-  }
-
-  const getProductReturnStatus = (sale, item) => {
-    const returnedQuantity = getReturnedProductQuantity(sale, item.ProductId)
-
-    const originalQuantity = Number(item.quantity || 0)
-
-    if (returnedQuantity <= 0) {
-      return {
-        returned: false,
-        partial: false,
-        returnedQuantity: 0,
-        remainingQuantity: originalQuantity,
-      }
-    }
-
-    const remainingQuantity = Math.max(originalQuantity - returnedQuantity, 0)
-
-    return {
-      returned: true,
-      partial: remainingQuantity > 0,
-      returnedQuantity,
-      remainingQuantity,
-    }
-  }
-
-  // =========================================================
-  // COLORS
-  // =========================================================
-
-  const REVENUE_COLORS = ['#321fdb', '#e55353', '#2eb85c']
-
-  // =========================================================
-  // SALE ITEMS
-  // =========================================================
-
-  const getSaleItems = (sale) => {
-    return sale?.SaleItems || sale?.saleItems || sale?.items || []
-  }
-
-  const getServiceItems = (sale) => {
-    return getSaleItems(sale).filter(
-      (item) =>
-        item?.itemType === 'service' ||
-        item?.saleType === 'service' ||
-        item?.Service ||
-        item?.service,
-    )
-  }
-
-  const getProductItems = (sale) => {
-    return getSaleItems(sale).filter(
-      (item) =>
-        item?.itemType === 'product' ||
-        item?.saleType === 'product' ||
-        item?.Product ||
-        item?.product,
-    )
-  }
-
-  // =========================================================
-  // COMMISSIONS
-  // =========================================================
-
-  const getCommissions = (sale) => {
-    const commissions =
-      sale?.Commissions || sale?.commissions || sale?.Commission || sale?.commission || []
-
-    if (Array.isArray(commissions)) {
-      return commissions
-    }
-
-    return commissions ? [commissions] : []
-  }
-
-  const getCommission = (sale) => {
-    return getCommissions(sale)[0] || null
-  }
-
-  const getPendingCommissions = (sale) => {
-    return getCommissions(sale).filter(
-      (commission) => String(commission?.status || '').toLowerCase() === 'pending',
-    )
-  }
-
-  const getPaidCommissions = (sale) => {
-    return getCommissions(sale).filter(
-      (commission) => String(commission?.status || '').toLowerCase() === 'paid',
-    )
-  }
-
-  // =========================================================
-  // STAFF SHARE
-  // =========================================================
-
-  const getStaffShare = (sale) => {
-    return getPendingCommissions(sale).reduce(
-      (total, commission) =>
-        total + Number(commission?.currentCommissionAmount ?? commission?.commissionAmount ?? 0),
-      0,
-    )
-  }
-
-  const getCurrentCommission = (sale) => {
-    return getCommissions(sale).reduce(
-      (total, commission) =>
-        total + Number(commission?.currentCommissionAmount ?? commission?.commissionAmount ?? 0),
-      0,
-    )
-  }
-
-  const getPaidCommission = (sale) => {
-    return getCommissions(sale).reduce(
-      (total, commission) => total + Number(commission?.paidAmount || 0),
-      0,
-    )
-  }
-
-  const getReturnedCommission = (sale) => {
-    return getCommissions(sale).reduce(
-      (total, commission) => total + Number(commission?.returnedCommissionAmount || 0),
-      0,
-    )
-  }
-
-  const getOutstandingCommission = (sale) => {
-    return getCommissions(sale).reduce(
-      (total, commission) => total + Number(commission?.outstandingCommission || 0),
-      0,
-    )
-  }
-
-  const getCommissionRate = (sale) => {
-    const commissions = getCommissions(sale)
-
-    if (!commissions.length) {
-      return 0
-    }
-
-    const rates = [
-      ...new Set(
-        commissions
-          .map((commission) => Number(commission?.commissionRate || 0))
-          .filter((rate) => rate > 0),
-      ),
-    ]
-
-    return rates.length === 1 ? rates[0] : 0
-  }
-
-  const getCommissionStatus = (sale) => {
-    const commissions = getCommissions(sale)
-
-    if (!commissions.length) {
-      return null
-    }
-
-    const statuses = [
-      ...new Set(commissions.map((commission) => String(commission?.status || '').toLowerCase())),
-    ]
-
-    if (statuses.length === 1) {
-      return statuses[0]
-    }
-
-    if (statuses.includes('pending') && statuses.includes('paid')) {
-      return 'partial'
-    }
-
-    return statuses[0] || null
-  }
-
-  // =========================================================
-  // SERVICE TYPE
-  // =========================================================
-
-  const getServiceType = (sale) => {
-    if (sale?.serviceType) {
-      return sale.serviceType
-    }
-
-    const commissions = getCommissions(sale)
-
-    const rates = [
-      ...new Set(
-        commissions.map((commission) => Number(commission?.commissionRate || 0)).filter(Boolean),
-      ),
-    ]
-
-    if (rates.length === 1) {
-      if (rates[0] === 50) {
-        return 'home_service'
-      }
-
-      if (rates[0] === 30) {
-        return 'in_salon'
-      }
-    }
-
-    return null
-  }
-
-  // =========================================================
-  // REMAINING SERVICE VALUE
-  // =========================================================
-
-  const getRemainingServiceTotal = (sale) => {
-    return getServiceItems(sale).reduce((sum, item) => {
-      const originalQuantity = Number(item.quantity || 0)
-
-      const originalSubtotal = Number(item.subtotal || 0)
-
-      const returnedQuantity = getReturnedServiceQuantity(sale, item.ServiceId)
-
-      const remainingQuantity = Math.max(originalQuantity - returnedQuantity, 0)
-
-      const unitPrice = originalQuantity > 0 ? originalSubtotal / originalQuantity : 0
-
-      return sum + remainingQuantity * unitPrice
-    }, 0)
-  }
-
-  // =========================================================
-  // REMAINING PRODUCT VALUE
-  // =========================================================
-
-  const getRemainingProductTotal = (sale) => {
-    return getProductItems(sale).reduce((sum, item) => {
-      const originalQuantity = Number(item.quantity || 0)
-
-      const originalSubtotal = Number(item.subtotal || 0)
-
-      const returnedQuantity = getReturnedProductQuantity(sale, item.ProductId)
-
-      const remainingQuantity = Math.max(originalQuantity - returnedQuantity, 0)
-
-      const unitPrice = originalQuantity > 0 ? originalSubtotal / originalQuantity : 0
-
-      return sum + remainingQuantity * unitPrice
-    }, 0)
-  }
-
-  // =========================================================
-  // OWNER SERVICE PROFIT
-  // =========================================================
-
-  const getOwnerServiceProfit = (sale) => {
-    const serviceRevenue = getRemainingServiceTotal(sale)
-
-    const pendingCommission = getStaffShare(sale)
-
-    return Math.max(serviceRevenue - pendingCommission, 0)
-  }
-
-  // =========================================================
-  // SERVICE PROVIDERS
-  //
-  // IMPORTANT:
-  // Build this from SaleItems, not Sale.ServiceProvider.
-  // =========================================================
-
-  const serviceProviders = useMemo(() => {
-    const providerMap = new Map()
-
-    sales.forEach((sale) => {
-      const serviceItems = getServiceItems(sale)
-
-      serviceItems.forEach((item) => {
-        const providerName = getServiceItemProvider(sale, item)
-
-        if (providerName && providerName !== '-') {
-          providerMap.set(providerName, providerName)
-        }
-      })
-
-      /*
-       * Legacy fallback for old sales
-       * that do not have item-level provider.
-       */
-      if (!serviceItems.length) {
-        const legacyProvider = getProviderName(sale)
-
-        if (legacyProvider && legacyProvider !== '-') {
-          providerMap.set(legacyProvider, legacyProvider)
-        }
-      }
-    })
-
-    return Array.from(providerMap.values()).sort((a, b) => a.localeCompare(b))
-  }, [sales])
-
-  // =========================================================
-  // CHECK WHETHER STAFF WORKED ON SALE
-  // =========================================================
-
-  const saleHasProvider = (sale, selectedProvider) => {
-    if (!selectedProvider) {
-      return true
-    }
-
-    const normalized = selectedProvider.trim().toLowerCase()
-
-    /*
-     * First check individual service providers.
-     */
-    const serviceItems = getServiceItems(sale)
-
-    const itemProviderMatch = serviceItems.some((item) => {
-      const provider = getServiceItemProvider(sale, item)
-
-      return provider && provider.trim().toLowerCase() === normalized
-    })
-
-    if (itemProviderMatch) {
-      return true
-    }
-
-    /*
-     * Then check commission staff.
-     */
-    const commissionMatch = getCommissions(sale).some((commission) => {
-      const staffName = getStaffName(commission?.Staff || commission?.staff)
-
-      return staffName && staffName.trim().toLowerCase() === normalized
-    })
-
-    if (commissionMatch) {
-      return true
-    }
-
-    /*
-     * Finally support old Sale-level provider.
-     */
-    const legacyProvider = getProviderName(sale)
-
-    return legacyProvider && legacyProvider.trim().toLowerCase() === normalized
-  }
-
-  // =========================================================
-  // FILTER SALES
-  // =========================================================
-
-  const filteredSales = useMemo(() => {
-    const keyword = search.trim().toLowerCase()
-
-    return sales.filter((sale) => {
-      const provider = getProviderName(sale).toLowerCase()
-
-      const customer = getCustomerName(sale).toLowerCase()
-
-      const cashier = getCashierName(sale).toLowerCase()
-
-      const invoice = (sale?.invoiceNumber || sale?.receiptNumber || '').toLowerCase()
-
-      const services = getServiceItems(sale)
-        .map((item) => {
-          const serviceName =
-            item?.Service?.name || item?.service?.name || item?.serviceName || item?.name || ''
-
-          const staffName = getServiceItemProvider(sale, item)
-
-          return `${serviceName} ${staffName}`
-        })
-        .join(' ')
-        .toLowerCase()
-
-      const matchesSearch =
-        !keyword ||
-        invoice.includes(keyword) ||
-        customer.includes(keyword) ||
-        cashier.includes(keyword) ||
-        provider.includes(keyword) ||
-        services.includes(keyword)
-
-      const matchesProvider = providerFilter === '' || saleHasProvider(sale, providerFilter)
-
-      return matchesSearch && matchesProvider
-    })
-  }, [sales, search, providerFilter])
-
-  // =========================================================
-  // KPI CALCULATIONS
-  // =========================================================
-
-  const kpis = useMemo(() => {
-    let grossSales = 0
-    let totalServiceSales = 0
-    let totalProductSales = 0
-    let productProfit = 0
-    let staffShare = 0
-    let ownerServiceProfit = 0
-    let homeServiceSales = 0
-    let inSalonServiceSales = 0
-
-    filteredSales.forEach((sale) => {
-      const saleAmount = Number(sale.totalAmount || 0)
-
-      grossSales += saleAmount
-
-      const serviceTotal = getRemainingServiceTotal(sale)
-
-      totalServiceSales += serviceTotal
-
-      const productTotal = getRemainingProductTotal(sale)
-
-      totalProductSales += productTotal
-
-      /*
-       * IMPORTANT:
-       * This already sums every commission
-       * belonging to this sale.
-       *
-       * Therefore:
-       *
-       * Staff A = ₦3,000
-       * Staff B = ₦2,000
-       * Staff C = ₦4,000
-       *
-       * Staff Share = ₦9,000
-       */
-      staffShare += getStaffShare(sale)
-
-      ownerServiceProfit += getOwnerServiceProfit(sale)
-
-      const serviceType = getServiceType(sale)
-
-      if (serviceType === 'home_service') {
-        homeServiceSales += serviceTotal
-      }
-
-      if (serviceType === 'in_salon') {
-        inSalonServiceSales += serviceTotal
-      }
-
-      getProductItems(sale).forEach((item) => {
-        const originalQuantity = Number(item.quantity || 0)
-
-        const originalSubtotal = Number(item.subtotal || 0)
-
-        const returnedQuantity = getReturnedProductQuantity(sale, item.ProductId)
-
-        const remainingQuantity = Math.max(originalQuantity - returnedQuantity, 0)
-
-        const unitPrice = originalQuantity > 0 ? originalSubtotal / originalQuantity : 0
-
-        const costPrice = Number(item.Product?.costPrice || 0)
-
-        productProfit += (unitPrice - costPrice) * remainingQuantity
-      })
-    })
-
-    const totalReturns = Number(report.totalReturns || 0)
-
-    const netSales = grossSales - totalReturns
-
-    if (productProfit === 0 && Number(report.productProfit || 0) > 0) {
-      productProfit = Number(report.productProfit || 0)
-    }
-
-    const ownerProfit = productProfit + ownerServiceProfit
-
-    const totalExpenses = Number(report.totalExpenses || 0)
-
-    const netProfit = ownerProfit - totalExpenses
-
-    const totalProfit = ownerProfit
-
-    const totalTransactions = filteredSales.length
-
-    const averageSale = totalTransactions > 0 ? netSales / totalTransactions : 0
-
-    return {
-      grossSales,
-      totalReturns,
-      netSales,
-      totalTransactions,
-      totalServiceSales,
-      totalProductSales,
-      productProfit,
-      staffShare,
-      ownerServiceProfit,
-      ownerProfit,
-      totalExpenses,
-      netProfit,
-      totalProfit,
-      averageSale,
-      homeServiceSales,
-      inSalonServiceSales,
-    }
-  }, [filteredSales, report])
-
-  // =========================================================
-  // SALES TREND
-  // =========================================================
-
-  const salesTrendData = useMemo(() => {
-    const grouped = {}
-
-    filteredSales.forEach((sale) => {
-      const date = sale.createdAt
-        ? new Date(sale.createdAt).toLocaleDateString('en-NG', {
-            day: '2-digit',
-            month: 'short',
-          })
-        : 'Unknown'
-
-      if (!grouped[date]) {
-        grouped[date] = {
-          date,
-          sales: 0,
-        }
-      }
-
-      grouped[date].sales += Number(sale.totalAmount || 0)
-    })
-
-    return Object.values(grouped)
-  }, [filteredSales])
-
-  // =========================================================
-  // PROFIT CHART
-  // =========================================================
-
-  const profitChartData = useMemo(() => {
-    return [
-      {
-        name: 'Service Revenue',
-        amount: Number(kpis.totalServiceSales || 0),
-      },
-      {
-        name: 'Staff Share',
-        amount: Number(kpis.staffShare || 0),
-      },
-      {
-        name: 'Owner Service Profit',
-        amount: Number(kpis.ownerServiceProfit || 0),
-      },
-    ]
-  }, [kpis])
-
-  // =========================================================
-  // REVENUE BREAKDOWN
-  // =========================================================
-
-  const revenueBreakdownData = useMemo(() => {
-    return [
-      {
-        name: 'In-Salon',
-        value: Number(kpis.inSalonServiceSales || 0),
-      },
-      {
-        name: 'Home Service',
-        value: Number(kpis.homeServiceSales || 0),
-      },
-      {
-        name: 'Products',
-        value: Number(kpis.totalProductSales || 0),
-      },
-    ].filter((item) => item.value > 0)
-  }, [kpis])
-
-  // =========================================================
-  // GET SALES REPORT
-  // =========================================================
-
-  const getSalesReport = async () => {
+  const getCommissions = async () => {
     try {
       setLoading(true)
 
       const token = localStorage.getItem('token')
 
-      const response = await axios.get(`${API_URL}api/v1/report`, {
-        params: {
-          startDate,
-          endDate,
-          status: statusFilter,
-        },
-
+      const response = await axios.get(`${API_URL}api/v1/commissions`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       })
 
-      setReport(response.data || {})
-
-      setSales(
-        (response.data?.sales || []).map((sale) => ({
-          ...sale,
-
-          /*
-           * Normalize commissions.
-           */
-          Commissions:
-            sale?.Commissions || sale?.commissions || (sale?.Commission ? [sale.Commission] : []),
-
-          /*
-           * Normalize SaleItems.
-           */
-          SaleItems: sale?.SaleItems || sale?.saleItems || sale?.items || [],
-        })),
-      )
+      setCommissions(response.data.commissions || [])
     } catch (error) {
-      console.error('Report Error:', error)
+      console.error('Commission Error:', error)
+
+      Swal.fire({
+        icon: 'error',
+        title: 'Unable to Load Commissions',
+        text: error?.response?.data?.message || 'There was a problem loading commission records.',
+      })
     } finally {
       setLoading(false)
+    }
+  }
+
+  // =========================================================
+  // GET STAFF
+  // =========================================================
+
+  const getStaffs = async () => {
+    try {
+      const token = localStorage.getItem('token')
+
+      const response = await axios.get(`${API_URL}api/v1/staffs`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      setStaffs(response.data.staffs || [])
+    } catch (error) {
+      console.error('Staff Error:', error)
     }
   }
 
@@ -865,376 +125,860 @@ const Report = () => {
   // =========================================================
 
   useEffect(() => {
-    getSalesReport()
+    const fetchData = async () => {
+      await Promise.all([getCommissions(), getStaffs(), getStaffTips()])
+    }
+
+    fetchData()
   }, [])
-
   // =========================================================
-  // RETURN
+  // REFRESH TIPS WHEN STAFF / DATE FILTER CHANGES
   // =========================================================
 
-  const handleReturn = (sale) => {
-    setSelectedSaleId(sale.id)
+  useEffect(() => {
+    getStaffTips()
+  }, [selectedStaff, dateFrom, dateTo])
+  // =========================================================
+  // GET STAFF TIPS
+  // =========================================================
 
-    setShowReturnModal(true)
+  const getStaffTips = async () => {
+    try {
+      setTipsLoading(true)
+
+      const token = localStorage.getItem('token')
+
+      const params = new URLSearchParams()
+
+      // -----------------------------------------------------
+      // STAFF FILTER
+      // -----------------------------------------------------
+
+      if (selectedStaff) {
+        params.append('staffId', selectedStaff)
+      }
+
+      // -----------------------------------------------------
+      // STATUS
+      // -----------------------------------------------------
+
+      // Don't send commission status directly because:
+      //
+      // commission:
+      // pending / paid
+      //
+      // tips:
+      // recorded / paid / voided
+      //
+      // We therefore handle tip status separately below.
+      // -----------------------------------------------------
+
+      // -----------------------------------------------------
+      // DATE FILTER
+      // -----------------------------------------------------
+
+      if (dateFrom) {
+        params.append('startDate', dateFrom)
+      }
+
+      if (dateTo) {
+        params.append('endDate', dateTo)
+      }
+
+      const query = params.toString()
+
+      const response = await axios.get(`${API_URL}api/v1/staff-tips${query ? `?${query}` : ''}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      setStaffTips(response.data.tips || [])
+    } catch (error) {
+      console.error('Staff Tips Error:', error)
+
+      Swal.fire({
+        icon: 'error',
+        title: 'Unable to Load Staff Tips',
+        text: error?.response?.data?.message || 'There was a problem loading staff tip records.',
+      })
+    } finally {
+      setTipsLoading(false)
+    }
+  }
+  // =========================================================
+  // COMMISSION HELPERS
+  // =========================================================
+
+  const getOriginalCommission = (item) => {
+    if (item.originalCommissionAmount !== undefined && item.originalCommissionAmount !== null) {
+      return Number(item.originalCommissionAmount)
+    }
+
+    return Number(item.commissionAmount || 0)
+  }
+
+  const getCurrentCommission = (item) => {
+    return Number(item.commissionAmount || 0)
+  }
+
+  const getReturnedCommission = (item) => {
+    if (item.returnedCommissionAmount !== undefined && item.returnedCommissionAmount !== null) {
+      return Number(item.returnedCommissionAmount)
+    }
+
+    const original = getOriginalCommission(item)
+    const current = getCurrentCommission(item)
+
+    return Math.max(original - current, 0)
+  }
+
+  const isReturned = (item) => {
+    if (item.returned === true) return true
+    if (item.isReturned === true) return true
+
+    if (Number(item.returnedServiceTotal || 0) > 0) {
+      return true
+    }
+
+    if (item.Sale?.status === 'refunded' || item.Sale?.status === 'voided') {
+      return true
+    }
+
+    return false
   }
 
   // =========================================================
-  // EXCEL EXPORT
+  // STAFF HELPERS
+  // =========================================================
+
+  const getStaffRecord = (item) => {
+    if (!item) return null
+
+    const nestedStaff =
+      item.Staff ||
+      item.staff ||
+      item.ServiceProvider ||
+      item.serviceProvider ||
+      item.SaleItem?.ServiceProvider ||
+      item.SaleItem?.serviceProvider ||
+      item.SaleItem?.Staff ||
+      item.SaleItem?.staff
+
+    if (nestedStaff) return nestedStaff
+
+    const staffId =
+      item.StaffId ||
+      item.staffId ||
+      item.SaleItem?.ServiceProviderId ||
+      item.SaleItem?.serviceProviderId
+
+    if (!staffId) return null
+
+    return staffs.find((staff) => String(staff.id) === String(staffId)) || null
+  }
+
+  const getStaffName = (item) => {
+    const staff = getStaffRecord(item)
+
+    return (
+      staff?.User?.fullname ||
+      staff?.User?.fullName ||
+      staff?.User?.name ||
+      staff?.user?.fullname ||
+      staff?.user?.fullName ||
+      staff?.user?.name ||
+      staff?.fullname ||
+      staff?.fullName ||
+      staff?.name ||
+      (item?.StaffId ? `Staff #${item.StaffId}` : 'Unknown Staff')
+    )
+  }
+
+  const getServiceName = (item) => {
+    return (
+      item?.Service?.name ||
+      item?.Service?.serviceName ||
+      item?.service?.name ||
+      item?.service?.serviceName ||
+      item?.SaleItem?.Service?.name ||
+      item?.SaleItem?.Service?.serviceName ||
+      item?.SaleItem?.service?.name ||
+      item?.SaleItem?.service?.serviceName ||
+      item?.serviceName ||
+      item?.ServiceName ||
+      '-'
+    )
+  }
+
+  // =========================================================
+  // FILTERED COMMISSIONS
+  // =========================================================
+
+  const filteredCommissions = useMemo(() => {
+    return commissions.filter((commission) => {
+      const staffName = getStaffName(commission)
+      const serviceName = getServiceName(commission)
+
+      const receiptNumber = commission.Sale?.receiptNumber || commission.Sale?.ReceiptNumber || ''
+
+      const searchText = `${staffName} ${serviceName} ${receiptNumber}`.toLowerCase()
+
+      const searchMatch = searchText.includes(search.toLowerCase())
+
+      const resolvedStaff = getStaffRecord(commission)
+
+      const staffMatch =
+        selectedStaff === '' ||
+        String(commission.StaffId || resolvedStaff?.id || '') === String(selectedStaff)
+
+      const statusMatch = statusFilter === '' || commission.status === statusFilter
+
+      const date = commission.commissionDate ? new Date(commission.commissionDate) : null
+
+      const monthMatch = monthFilter === '' || (date && date.getMonth() + 1 === Number(monthFilter))
+
+      const yearMatch = yearFilter === '' || (date && date.getFullYear() === Number(yearFilter))
+
+      let dateFromMatch = true
+      let dateToMatch = true
+
+      if (dateFrom) {
+        const fromDate = new Date(`${dateFrom}T00:00:00`)
+        dateFromMatch = date && date >= fromDate
+      }
+
+      if (dateTo) {
+        const toDate = new Date(`${dateTo}T23:59:59.999`)
+        dateToMatch = date && date <= toDate
+      }
+
+      return (
+        searchMatch &&
+        staffMatch &&
+        statusMatch &&
+        monthMatch &&
+        yearMatch &&
+        dateFromMatch &&
+        dateToMatch
+      )
+    })
+  }, [
+    commissions,
+    staffs,
+    search,
+    selectedStaff,
+    statusFilter,
+    monthFilter,
+    yearFilter,
+    dateFrom,
+    dateTo,
+  ])
+  // =========================================================
+  // COMMISSION KPIs
+  // =========================================================
+
+  // =========================================================
+  // 1. CURRENT COMMISSION
+  // =========================================================
+  // Total commission currently applicable to all records
+  // after service returns have been accounted for.
+  //
+  // Example:
+  // Original = ₦10,000
+  // Return adjustment = ₦3,000
+  // Current = ₦7,000
+  //
+  // Current Commission = ₦7,000
+  // =========================================================
+
+  const totalCommission = filteredCommissions.reduce((sum, item) => {
+    return sum + Number(item.currentCommissionAmount ?? item.commissionAmount ?? 0)
+  }, 0)
+
+  // =========================================================
+  // 2. CURRENT PENDING COMMISSION
+  // =========================================================
+  // Only commissions that are still pending.
+  //
+  // IMPORTANT:
+  // This uses the CURRENT amount after returns.
+  //
+  // Example:
+  // Original commission = ₦10,000
+  // Return adjustment  = ₦3,000
+  // Current pending    = ₦7,000
+  //
+  // Pending KPI = ₦7,000
+  // =========================================================
+
+  const pendingCommission = filteredCommissions.reduce((sum, item) => {
+    if (item.status !== 'pending') {
+      return sum
+    }
+
+    return sum + Number(item.currentCommissionAmount ?? item.commissionAmount ?? 0)
+  }, 0)
+
+  // =========================================================
+  // 3. PAID COMMISSION
+  // =========================================================
+  // Only commissions whose status is paid.
+  //
+  // These are commissions that have already been paid
+  // to the service provider.
+  // =========================================================
+
+  const paidCommission = filteredCommissions.reduce((sum, item) => {
+    if (item.status !== 'paid') {
+      return sum
+    }
+
+    return sum + Number(item.currentCommissionAmount ?? item.commissionAmount ?? 0)
+  }, 0)
+
+  // =========================================================
+  // 4. RETURN ADJUSTMENTS
+  // =========================================================
+  // Total commission removed because services were returned.
+  //
+  // Example:
+  // Original commission = ₦10,000
+  // Current commission  = ₦7,000
+  // Return adjustment   = ₦3,000
+  //
+  // Return Adjustment KPI = ₦3,000
+  //
+  // This value comes from the backend calculation.
+  // =========================================================
+
+  const returnedCommission = filteredCommissions.reduce((sum, item) => {
+    return sum + Number(item.returnedCommissionAmount || 0)
+  }, 0)
+
+  // =========================================================
+  // STAFF TIP TOTALS
+  // =========================================================
+
+  // Exclude voided tips from earnings.
+  const validTips = staffTips.filter((tip) => tip.status !== 'voided')
+
+  // ---------------------------------------------------------
+  // TOTAL TIPS
+  // ---------------------------------------------------------
+
+  const totalTips = validTips.reduce((sum, tip) => {
+    return sum + Number(tip.amount || 0)
+  }, 0)
+
+  // ---------------------------------------------------------
+  // PENDING TIPS
+  // ---------------------------------------------------------
+
+  const pendingTips = validTips.reduce((sum, tip) => {
+    if (tip.status !== 'recorded') {
+      return sum
+    }
+
+    return sum + Number(tip.amount || 0)
+  }, 0)
+
+  // ---------------------------------------------------------
+  // PAID TIPS
+  // ---------------------------------------------------------
+
+  const paidTips = validTips.reduce((sum, tip) => {
+    if (tip.status !== 'paid') {
+      return sum
+    }
+
+    return sum + Number(tip.amount || 0)
+  }, 0)
+
+  // ---------------------------------------------------------
+  // TOTAL STAFF EARNINGS
+  // ---------------------------------------------------------
+
+  const totalStaffEarnings = totalCommission + totalTips
+
+  // ---------------------------------------------------------
+  // TOTAL CURRENT AMOUNT PAYABLE
+  // ---------------------------------------------------------
+
+  const totalPayable = pendingCommission + pendingTips
+  // =========================================================
+  // RESET FILTERS
+  // =========================================================
+
+  const resetFilters = () => {
+    setSearch('')
+    setStatusFilter('')
+    setMonthFilter('')
+    setYearFilter('')
+    setSelectedStaff('')
+    setDateFrom('')
+    setDateTo('')
+  }
+
+  const hasFilters = search || statusFilter || monthFilter || yearFilter || selectedStaff
+
+  // =========================================================
+  // MARK COMMISSION AS PAID
+  // =========================================================
+
+  const markPaid = async (id, amount) => {
+    if (Number(amount || 0) <= 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'No Commission Due',
+        text: 'This commission has no outstanding amount to pay.',
+      })
+
+      return
+    }
+
+    const result = await Swal.fire({
+      title: 'Mark Commission as Paid?',
+      text: `You are about to mark ${formatCurrency(amount)} as paid.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Mark as Paid',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#198754',
+    })
+
+    if (!result.isConfirmed) return
+
+    try {
+      const token = localStorage.getItem('token')
+
+      await axios.put(
+        `${API_URL}api/v1/commissions/${id}/pay`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Payment Recorded',
+        text: 'Commission has been marked as paid.',
+        timer: 1800,
+        showConfirmButton: false,
+      })
+
+      getCommissions()
+    } catch (error) {
+      console.error(error)
+
+      Swal.fire({
+        icon: 'error',
+        title: 'Payment Failed',
+        text: error?.response?.data?.message || 'Unable to mark commission as paid.',
+      })
+    }
+  }
+
+  // =========================================================
+  // PAY STAFF TIP
+  // =========================================================
+
+  const payStaffTip = async (id, amount) => {
+    if (Number(amount || 0) <= 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Invalid Tip',
+        text: 'This tip has no valid amount.',
+      })
+
+      return
+    }
+
+    const result = await Swal.fire({
+      title: 'Pay Staff Tip?',
+      text: `You are about to pay ${formatCurrency(amount)}.`,
+      icon: 'question',
+
+      showCancelButton: true,
+
+      confirmButtonText: 'Yes, Pay Tip',
+
+      cancelButtonText: 'Cancel',
+
+      confirmButtonColor: '#198754',
+    })
+
+    if (!result.isConfirmed) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem('token')
+
+      await axios.put(
+        `${API_URL}api/v1/staff-tips/${id}/pay`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Tip Paid',
+        text: 'Staff tip has been marked as paid.',
+        timer: 1800,
+        showConfirmButton: false,
+      })
+
+      await getStaffTips()
+    } catch (error) {
+      console.error('Pay Staff Tip Error:', error)
+
+      Swal.fire({
+        icon: 'error',
+        title: 'Payment Failed',
+        text: error?.response?.data?.message || 'Unable to pay staff tip.',
+      })
+    }
+  }
+
+  // =========================================================
+  // EXPORT EXCEL
   // =========================================================
 
   const exportExcel = () => {
-    const exportData = []
-
-    filteredSales.forEach((sale) => {
-      const services = getServiceItems(sale)
-
-      const returnAmount = getSaleReturnTotal(sale)
-
-      const serviceRevenue = getRemainingServiceTotal(sale)
-
-      const ownerServiceProfit = getOwnerServiceProfit(sale)
-
-      const commissions = getCommissions(sale)
-
-      /*
-       * If the sale contains multiple services,
-       * export the service/staff information together.
-       */
-      const serviceDetails = services
-        .map((item) => {
-          const serviceName =
-            item?.Service?.name ||
-            item?.service?.name ||
-            item?.serviceName ||
-            item?.name ||
-            'Service'
-
-          const staffName = getServiceItemProvider(sale, item)
-
-          return `${serviceName} - ${staffName}`
-        })
-        .join(', ')
-
-      exportData.push({
-        Invoice: sale.invoiceNumber || sale.receiptNumber || '-',
-
-        Customer: getCustomerName(sale),
-
-        'Sales By': getCashierName(sale),
-
-        'Service Provider': serviceDetails || getProviderName(sale),
-
-        'Service Type': getServiceType(sale) === 'home_service' ? 'Home Service' : 'In-Salon',
-
-        'Service Rendered': serviceDetails || '-',
-
-        'Staff Count': new Set(
-          commissions
-            .map((commission) => getStaffName(commission?.Staff || commission?.staff))
-            .filter((name) => name && name !== '-'),
-        ).size,
-
-        'Returned Amount': returnAmount,
-
-        'Service Revenue': serviceRevenue,
-
-        'Staff Share': getStaffShare(sale),
-
-        'Owner Service Profit': ownerServiceProfit,
-
-        'Commission Rate': `${getCommissionRate(sale)}%`,
-
-        'Card Number': sale.CardNumber || '-',
-
-        'Stand Tag': sale.StandTag || '-',
-
-        Amount: Number(sale.totalAmount || 0),
-
-        Status: sale.approvalStatus || '-',
-
-        Date: sale.createdAt ? new Date(sale.createdAt).toLocaleDateString() : '-',
+    if (!filteredCommissions.length) {
+      Swal.fire({
+        icon: 'info',
+        title: 'Nothing to Export',
+        text: 'There are no commission records matching your filters.',
       })
-    })
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData)
+      return
+    }
+
+    const worksheetData = filteredCommissions.map((item) => ({
+      Staff: getStaffName(item),
+      Service: getServiceName(item),
+
+      Receipt: item.Sale?.receiptNumber || item.Sale?.ReceiptNumber || '-',
+
+      OriginalCommission: getOriginalCommission(item),
+
+      ReturnedCommission: getReturnedCommission(item),
+
+      CurrentCommission: getCurrentCommission(item),
+
+      Rate: `${Number(item.commissionRate || 0)}%`,
+
+      Date: item.commissionDate,
+
+      Status: item.status?.toUpperCase() || '',
+
+      Returned: isReturned(item) ? 'YES' : 'NO',
+    }))
+
+    const worksheet = XLSX.utils.json_to_sheet(worksheetData)
 
     const workbook = XLSX.utils.book_new()
 
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sales Report')
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Commissions')
 
-    XLSX.writeFile(workbook, 'SalesReport.xlsx')
+    XLSX.writeFile(workbook, 'CommissionReport.xlsx')
   }
 
   // =========================================================
-  // UI
+  // STATUS BADGE
+  // =========================================================
+
+  const renderStatus = (status) => {
+    if (status === 'paid') {
+      return (
+        <CBadge color="success" className="px-3 py-2">
+          <CIcon icon={cilCheckCircle} size="sm" className="me-1" />
+          PAID
+        </CBadge>
+      )
+    }
+
+    return (
+      <CBadge color="warning" className="px-3 py-2">
+        <CIcon icon={cilClock} size="sm" className="me-1" />
+        PENDING
+      </CBadge>
+    )
+  }
+
+  // =========================================================
+  // RENDER
   // =========================================================
 
   return (
-    <>
+    <div className="commission-page">
+      {/* =====================================================
+          PAGE HEADER
+      ====================================================== */}
+
       <CCard className="border-0 shadow-sm mb-4">
-        <CCardBody>
-          <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
-            <div>
-              <h4 className="fw-bold mb-1">Sales & Profit Report</h4>
+        <CCardBody className="p-4">
+          <CRow className="align-items-center">
+            <CCol md={7}>
+              <div className="d-flex align-items-center">
+                <div
+                  className="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center me-3"
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                  }}
+                >
+                  <CIcon icon={cilMoney} size="xl" className="text-primary" />
+                </div>
 
-              <div className="text-medium-emphasis">
-                Track sales, services, staff commissions and owner profitability.
+                <div>
+                  <h3 className="fw-bold mb-1">Staff Commission</h3>
+
+                  <div className="text-body-secondary">
+                    Track staff earnings, payments, adjustments and returned services.
+                  </div>
+                </div>
               </div>
-            </div>
+            </CCol>
 
-            <CButton color="success" onClick={exportExcel} disabled={!filteredSales.length}>
-              <CIcon icon={cilCloudDownload} className="me-2" />
-              Export Excel
-            </CButton>
-          </div>
+            <CCol md={5} className="text-md-end mt-3 mt-md-0">
+              <CButton
+                color="light"
+                className="me-2 border"
+                onClick={getCommissions}
+                disabled={loading}
+              >
+                <CIcon icon={cilReload} className="me-2" />
+                Refresh
+              </CButton>
+
+              <CButton color="primary" onClick={exportExcel} disabled={!filteredCommissions.length}>
+                <CIcon icon={cilCloudDownload} className="me-2" />
+                Export Excel
+              </CButton>
+            </CCol>
+          </CRow>
         </CCardBody>
       </CCard>
 
       {/* =====================================================
-          KPI SECTION
+          KPI CARDS
       ====================================================== */}
 
-      <CRow className="g-3 mb-3">
-        <CCol xs={12} sm={6} xl={3}>
+      <CRow className="mb-4">
+        {/* TOTAL */}
+
+        <CCol sm={6} xl={3} className="mb-3 mb-xl-0">
           <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <div className="text-medium-emphasis small mb-2">Gross Sales</div>
+              <div className="d-flex justify-content-between">
+                <div>
+                  <div className="text-body-secondary small fw-semibold mb-2">
+                    CURRENT COMMISSION
+                  </div>
 
-              <h3 className="fw-bold text-success mb-1">{money(kpis.grossSales)}</h3>
+                  <h4 className="fw-bold mb-1">{formatCurrency(totalCommission)}</h4>
 
-              <small className="text-medium-emphasis">{kpis.totalTransactions} transactions</small>
+                  <small className="text-body-secondary">
+                    {filteredCommissions.length} record
+                    {filteredCommissions.length !== 1 ? 's' : ''}
+                  </small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: 45,
+                    height: 45,
+                  }}
+                >
+                  <CIcon icon={cilMoney} className="text-primary" />
+                </div>
+              </div>
             </CCardBody>
           </CCard>
         </CCol>
 
-        <CCol xs={12} sm={6} xl={3}>
+        {/* PENDING */}
+
+        <CCol sm={6} xl={3} className="mb-3 mb-xl-0">
           <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <div className="text-medium-emphasis small mb-2">Net Sales</div>
+              <div className="d-flex justify-content-between">
+                <div>
+                  <div className="text-body-secondary small fw-semibold mb-2">PENDING</div>
 
-              <h3 className="fw-bold text-primary mb-1">{money(kpis.netSales)}</h3>
+                  <h4 className="fw-bold mb-1 text-warning">{formatCurrency(pendingCommission)}</h4>
 
-              <small className="text-medium-emphasis">
-                Average sale: {money(kpis.averageSale)}
-              </small>
+                  <small className="text-body-secondary">Awaiting payment</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-warning bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: 45,
+                    height: 45,
+                  }}
+                >
+                  <CIcon icon={cilClock} className="text-warning" />
+                </div>
+              </div>
             </CCardBody>
           </CCard>
         </CCol>
 
-        <CCol xs={12} sm={6} xl={3}>
+        {/* PAID */}
+
+        <CCol sm={6} xl={3} className="mb-3 mb-xl-0">
           <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <div className="text-medium-emphasis small mb-2">Service Revenue</div>
+              <div className="d-flex justify-content-between">
+                <div>
+                  <div className="text-body-secondary small fw-semibold mb-2">PAID</div>
 
-              <h3 className="fw-bold text-info mb-1">{money(kpis.totalServiceSales)}</h3>
+                  <h4 className="fw-bold mb-1 text-success">{formatCurrency(paidCommission)}</h4>
 
-              <small className="text-medium-emphasis">
-                In-Salon: {money(kpis.inSalonServiceSales)}
-              </small>
+                  <small className="text-body-secondary">Completed payments</small>
+                </div>
+
+                <div
+                  className="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: 45,
+                    height: 45,
+                  }}
+                >
+                  <CIcon icon={cilCheckCircle} className="text-success" />
+                </div>
+              </div>
             </CCardBody>
           </CCard>
         </CCol>
 
-        <CCol xs={12} sm={6} xl={3}>
+        {/* RETURNED */}
+
+        <CCol sm={6} xl={3}>
           <CCard className="border-0 shadow-sm h-100">
             <CCardBody>
-              <div className="text-medium-emphasis small mb-2">Product Sales</div>
+              <div className="d-flex justify-content-between">
+                <div>
+                  <div className="text-body-secondary small fw-semibold mb-2">
+                    RETURN ADJUSTMENTS
+                  </div>
 
-              <h3 className="fw-bold text-secondary mb-1">{money(kpis.totalProductSales)}</h3>
+                  <h4 className="fw-bold mb-1 text-danger">{formatCurrency(returnedCommission)}</h4>
 
-              <small className="text-medium-emphasis">Product revenue</small>
-            </CCardBody>
-          </CCard>
-        </CCol>
-      </CRow>
+                  <small className="text-body-secondary">Commission removed</small>
+                </div>
 
-      <CRow className="g-3 mb-4">
-        <CCol xs={12} sm={6} xl={3}>
-          <CCard className="border-0 shadow-sm h-100">
-            <CCardBody>
-              <div className="text-medium-emphasis small mb-2">Staff Share</div>
-
-              <h3 className="fw-bold text-warning mb-1">{money(kpis.staffShare)}</h3>
-
-              <small className="text-medium-emphasis">Pending service commission</small>
-            </CCardBody>
-          </CCard>
-        </CCol>
-
-        <CCol xs={12} sm={6} xl={3}>
-          <CCard className="border-0 shadow-sm h-100">
-            <CCardBody>
-              <div className="text-medium-emphasis small mb-2">Owner Service Profit</div>
-
-              <h3 className="fw-bold text-success mb-1">{money(kpis.ownerServiceProfit)}</h3>
-
-              <small className="text-medium-emphasis">Service revenue − pending staff share</small>
-            </CCardBody>
-          </CCard>
-        </CCol>
-
-        <CCol xs={12} sm={6} xl={3}>
-          <CCard className="border-0 shadow-sm h-100">
-            <CCardBody>
-              <div className="text-medium-emphasis small mb-2">Owner Profit</div>
-
-              <h3 className="fw-bold text-success mb-1">{money(kpis.ownerProfit)}</h3>
-
-              <small className="text-medium-emphasis">Product + service profit</small>
-            </CCardBody>
-          </CCard>
-        </CCol>
-
-        <CCol xs={12} sm={6} xl={3}>
-          <CCard className="border-0 shadow-sm h-100">
-            <CCardBody>
-              <div className="text-medium-emphasis small mb-2">Net Profit</div>
-
-              <h3 className="fw-bold text-success mb-1">{money(kpis.netProfit)}</h3>
-
-              <small className="text-medium-emphasis">Owner profit − expenses</small>
+                <div
+                  className="rounded-circle bg-danger bg-opacity-10 d-flex align-items-center justify-content-center"
+                  style={{
+                    width: 45,
+                    height: 45,
+                  }}
+                >
+                  <CIcon icon={cilLoopCircular} className="text-danger" />
+                </div>
+              </div>
             </CCardBody>
           </CCard>
         </CCol>
       </CRow>
 
       {/* =====================================================
-          ANALYTICS
-      ====================================================== */}
-
-      <CRow className="g-3 mb-4">
-        <CCol xs={12} lg={8}>
-          <CCard className="border-0 shadow-sm h-100">
-            <CCardHeader className="bg-transparent border-0 pt-4 px-4">
-              <h5 className="fw-bold mb-1">Sales Performance</h5>
-
-              <small className="text-medium-emphasis">
-                Sales revenue for the current filtered report.
-              </small>
-            </CCardHeader>
-
-            <CCardBody>
-              {salesTrendData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={320}>
-                  <LineChart data={salesTrendData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-
-                    <XAxis dataKey="date" tickLine={false} axisLine={false} />
-
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value) => `₦${Number(value).toLocaleString()}`}
-                    />
-
-                    <Tooltip formatter={(value) => `₦${Number(value).toLocaleString()}`} />
-
-                    <Legend />
-
-                    <Line
-                      type="monotone"
-                      dataKey="sales"
-                      name="Sales"
-                      stroke="#321fdb"
-                      strokeWidth={3}
-                      dot={{ r: 4 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="text-center text-medium-emphasis py-5">
-                  No sales data available for the selected filters.
-                </div>
-              )}
-            </CCardBody>
-          </CCard>
-        </CCol>
-
-        <CCol xs={12} lg={4}>
-          <CCard className="border-0 shadow-sm h-100">
-            <CCardHeader className="bg-transparent border-0 pt-4 px-4">
-              <h5 className="fw-bold mb-1">Revenue Breakdown</h5>
-
-              <small className="text-medium-emphasis">Services and product revenue</small>
-            </CCardHeader>
-
-            <CCardBody>
-              {revenueBreakdownData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={320}>
-                  <PieChart>
-                    <Pie
-                      data={revenueBreakdownData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={105}
-                      innerRadius={55}
-                      paddingAngle={3}
-                    >
-                      {revenueBreakdownData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={REVENUE_COLORS[index % REVENUE_COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-
-                    <Tooltip formatter={(value) => `₦${Number(value).toLocaleString()}`} />
-
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="text-center text-medium-emphasis py-5">
-                  No revenue data available.
-                </div>
-              )}
-            </CCardBody>
-          </CCard>
-        </CCol>
-      </CRow>
-
-      {/* =====================================================
-          PROFIT ANALYSIS
-      ====================================================== */}
+    STAFF EARNINGS SUMMARY
+====================================================== */}
 
       <CRow className="mb-4">
         <CCol xs={12}>
           <CCard className="border-0 shadow-sm">
-            <CCardHeader className="bg-transparent border-0 pt-4 px-4">
-              <h5 className="fw-bold mb-1">Service Revenue & Profit Analysis</h5>
+            <CCardBody className="p-4">
+              <CRow className="align-items-center">
+                {/* TITLE */}
 
-              <small className="text-medium-emphasis">
-                Compare service revenue, current pending staff share and owner service profit.
-              </small>
-            </CCardHeader>
-
-            <CCardBody>
-              <ResponsiveContainer width="100%" height={330}>
-                <BarChart data={profitChartData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-
-                  <XAxis dataKey="name" tickLine={false} axisLine={false} />
-
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => `₦${Number(value).toLocaleString()}`}
-                  />
-
-                  <Tooltip formatter={(value) => `₦${Number(value).toLocaleString()}`} />
-
-                  <Bar dataKey="amount" name="Amount" radius={[6, 6, 0, 0]}>
-                    {profitChartData.map((entry, index) => (
-                      <Cell
-                        key={`profit-cell-${index}`}
-                        fill={index === 0 ? '#321fdb' : index === 1 ? '#f9b115' : '#2eb85c'}
+                <CCol md={4} className="mb-3 mb-md-0">
+                  <div className="d-flex align-items-center">
+                    <div
+                      className="rounded-circle d-flex align-items-center justify-content-center me-3"
+                      style={{
+                        width: 48,
+                        height: 48,
+                        background: 'rgba(232,189,53,.12)',
+                      }}
+                    >
+                      <CIcon
+                        icon={cilMoney}
+                        style={{
+                          color: '#e8bd35',
+                        }}
                       />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+                    </div>
+
+                    <div>
+                      <h5 className="fw-bold mb-1">Staff Earnings</h5>
+
+                      <small className="text-body-secondary">Commission and customer tips</small>
+                    </div>
+                  </div>
+                </CCol>
+
+                {/* COMMISSION */}
+
+                <CCol sm={4} md={2}>
+                  <div className="text-body-secondary small fw-semibold">COMMISSION</div>
+
+                  <div className="fw-bold mt-1">{formatCurrency(totalCommission)}</div>
+                </CCol>
+
+                {/* TIPS */}
+
+                <CCol sm={4} md={2}>
+                  <div className="text-body-secondary small fw-semibold">TIPS</div>
+
+                  <div
+                    className="fw-bold mt-1"
+                    style={{
+                      color: '#e8bd35',
+                    }}
+                  >
+                    {formatCurrency(totalTips)}
+                  </div>
+                </CCol>
+
+                {/* PAYABLE */}
+
+                <CCol sm={4} md={2}>
+                  <div className="text-body-secondary small fw-semibold">PAYABLE</div>
+
+                  <div className="fw-bold text-warning mt-1">{formatCurrency(totalPayable)}</div>
+                </CCol>
+
+                {/* TOTAL */}
+
+                <CCol sm={12} md={2}>
+                  <div className="text-body-secondary small fw-semibold">TOTAL EARNINGS</div>
+
+                  <div
+                    className="fw-bold mt-1"
+                    style={{
+                      fontSize: '18px',
+                      color: '#198754',
+                    }}
+                  >
+                    {formatCurrency(totalStaffEarnings)}
+                  </div>
+                </CCol>
+              </CRow>
             </CCardBody>
           </CCard>
         </CCol>
@@ -1245,69 +989,29 @@ const Report = () => {
       ====================================================== */}
 
       <CCard className="border-0 shadow-sm mb-4">
-        <CCardHeader className="bg-transparent border-0">
-          <div className="d-flex align-items-center">
-            <CIcon icon={cilFilter} className="me-2" />
+        <CCardHeader className="bg-white border-0 pt-4 px-4">
+          <div className="d-flex justify-content-between align-items-center">
+            <div className="d-flex align-items-center">
+              <CIcon icon={cilFilter} className="me-2 text-primary" />
 
-            <strong>Report Filters</strong>
+              <strong>Commission Filters</strong>
+            </div>
+
+            {hasFilters && (
+              <CButton color="light" size="sm" className="border" onClick={resetFilters}>
+                <CIcon icon={cilX} className="me-1" />
+                Clear Filters
+              </CButton>
+            )}
           </div>
         </CCardHeader>
 
-        <CCardBody>
+        <CCardBody className="px-4 pb-4">
           <CRow className="g-3">
-            <CCol xs={12} md={2}>
-              <label className="small fw-semibold mb-1">Start Date</label>
+            {/* SEARCH */}
 
-              <CFormInput
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-            </CCol>
-
-            <CCol xs={12} md={2}>
-              <label className="small fw-semibold mb-1">End Date</label>
-
-              <CFormInput
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-            </CCol>
-
-            <CCol xs={12} md={2}>
-              <label className="small fw-semibold mb-1">Status</label>
-
-              <CFormSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                <option value="">All Status</option>
-
-                <option value="approved">Approved</option>
-
-                <option value="pending">Pending</option>
-
-                <option value="cancelled">Cancelled</option>
-              </CFormSelect>
-            </CCol>
-
-            <CCol xs={12} md={3}>
-              <label className="small fw-semibold mb-1">Service Provider</label>
-
-              <CFormSelect
-                value={providerFilter}
-                onChange={(e) => setProviderFilter(e.target.value)}
-              >
-                <option value="">All Service Providers</option>
-
-                {serviceProviders.map((provider) => (
-                  <option key={provider} value={provider}>
-                    {provider}
-                  </option>
-                ))}
-              </CFormSelect>
-            </CCol>
-
-            <CCol xs={12} md={3}>
-              <label className="small fw-semibold mb-1">Search</label>
+            <CCol xs={12} lg={4}>
+              <label className="form-label small fw-semibold">Search</label>
 
               <CInputGroup>
                 <CInputGroupText>
@@ -1315,486 +1019,625 @@ const Report = () => {
                 </CInputGroupText>
 
                 <CFormInput
-                  placeholder="Invoice, customer, staff or service..."
+                  placeholder="Staff name or receipt number..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </CInputGroup>
             </CCol>
+
+            {/* STAFF */}
+
+            <CCol xs={12} sm={6} lg={2}>
+              <label className="form-label small fw-semibold">Staff</label>
+
+              <CFormSelect value={selectedStaff} onChange={(e) => setSelectedStaff(e.target.value)}>
+                <option value="">All Staff</option>
+
+                {staffs.map((staff) => (
+                  <option key={staff.id} value={staff.id}>
+                    {staff.User?.fullname || staff.User?.name || staff.name || `Staff #${staff.id}`}
+                  </option>
+                ))}
+              </CFormSelect>
+            </CCol>
+
+            {/* STATUS */}
+
+            <CCol xs={12} sm={6} lg={2}>
+              <label className="form-label small fw-semibold">Status</label>
+
+              <CFormSelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="">All Status</option>
+
+                <option value="pending">Pending</option>
+
+                <option value="paid">Paid</option>
+              </CFormSelect>
+            </CCol>
+            {/* FROM DATE */}
+
+            <CCol xs={12} sm={6} lg={2}>
+              <label className="form-label small fw-semibold">From Date</label>
+
+              <CFormInput
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </CCol>
+
+            {/* TO DATE */}
+
+            <CCol xs={12} sm={6} lg={2}>
+              <label className="form-label small fw-semibold">To Date</label>
+
+              <CFormInput
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </CCol>
+
+            {/* MONTH */}
+
+            <CCol xs={12} sm={6} lg={2}>
+              <label className="form-label small fw-semibold">Month</label>
+
+              <CFormSelect value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}>
+                <option value="">All Months</option>
+
+                {[
+                  'January',
+                  'February',
+                  'March',
+                  'April',
+                  'May',
+                  'June',
+                  'July',
+                  'August',
+                  'September',
+                  'October',
+                  'November',
+                  'December',
+                ].map((month, index) => (
+                  <option key={month} value={index + 1}>
+                    {month}
+                  </option>
+                ))}
+              </CFormSelect>
+            </CCol>
+
+            {/* YEAR */}
+
+            <CCol xs={12} sm={6} lg={2}>
+              <label className="form-label small fw-semibold">Year</label>
+
+              <CFormSelect value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+                <option value="">All Years</option>
+
+                {Array.from(
+                  {
+                    length: 7,
+                  },
+                  (_, index) => new Date().getFullYear() - index,
+                ).map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </CFormSelect>
+            </CCol>
           </CRow>
-
-          <div className="mt-3 d-flex gap-2">
-            <CButton color="primary" onClick={getSalesReport} disabled={loading}>
-              {loading ? (
-                <>
-                  <CSpinner size="sm" className="me-2" />
-                  Loading...
-                </>
-              ) : (
-                <>
-                  <CIcon icon={cilFilter} className="me-2" />
-                  Apply Date/Status Filter
-                </>
-              )}
-            </CButton>
-
-            {(providerFilter || search) && (
-              <CButton
-                color="secondary"
-                variant="outline"
-                onClick={() => {
-                  setProviderFilter('')
-                  setSearch('')
-                }}
-              >
-                Clear Search
-              </CButton>
-            )}
-          </div>
         </CCardBody>
       </CCard>
-
       {/* =====================================================
-          FILTER SUMMARY
-      ====================================================== */}
+    STAFF TIPS
+====================================================== */}
 
-      {(providerFilter || search) && (
-        <CCard className="border-0 shadow-sm mb-4">
-          <CCardBody>
-            <div className="d-flex align-items-center flex-wrap gap-3">
-              <strong>Current View:</strong>
+      <CCard className="border-0 shadow-sm mt-4">
+        <CCardHeader className="bg-white border-0 p-4">
+          <CRow className="align-items-center">
+            <CCol md={7}>
+              <div className="d-flex align-items-center">
+                <div
+                  className="rounded-circle d-flex align-items-center justify-content-center me-3"
+                  style={{
+                    width: 42,
+                    height: 42,
+                    background: 'rgba(232,189,53,.12)',
+                  }}
+                >
+                  <CIcon
+                    icon={cilMoney}
+                    style={{
+                      color: '#e8bd35',
+                    }}
+                  />
+                </div>
 
-              {providerFilter && (
-                <CBadge color="primary" className="px-3 py-2">
-                  Provider: {providerFilter}
-                </CBadge>
-              )}
+                <div>
+                  <h5 className="fw-bold mb-1">Staff Tips</h5>
 
-              {search && (
-                <CBadge color="info" className="px-3 py-2">
-                  Search: {search}
-                </CBadge>
-              )}
+                  <div className="text-body-secondary small">
+                    Customer tips recorded for staff members
+                  </div>
+                </div>
+              </div>
+            </CCol>
 
-              <span className="text-medium-emphasis">
-                {filteredSales.length} matching transaction
-                {filteredSales.length !== 1 ? 's' : ''}
+            <CCol md={5} className="text-md-end mt-3 mt-md-0">
+              <span className="me-3">
+                <small className="text-body-secondary">Total Tips</small>
+
+                <strong
+                  className="ms-2"
+                  style={{
+                    color: '#e8bd35',
+                  }}
+                >
+                  {formatCurrency(totalTips)}
+                </strong>
               </span>
 
-              <strong>{money(kpis.netSales)}</strong>
-            </div>
-          </CCardBody>
-        </CCard>
-      )}
-
-      {/* =====================================================
-          SALES TABLE
-      ====================================================== */}
-
-      <CCard className="border-0 shadow-sm">
-        <CCardHeader className="bg-transparent">
-          <div className="d-flex justify-content-between align-items-center">
-            <div>
-              <h5 className="mb-1 fw-bold">Sales Transactions</h5>
-
-              <small className="text-medium-emphasis">
-                Showing {filteredSales.length} transaction
-                {filteredSales.length !== 1 ? 's' : ''}
-              </small>
-            </div>
-
-            <CBadge color="primary" className="px-3 py-2">
-              Staff Share: {money(kpis.staffShare)}
-            </CBadge>
-          </div>
+              <CBadge color="warning" className="px-3 py-2">
+                Pending: {formatCurrency(pendingTips)}
+              </CBadge>
+            </CCol>
+          </CRow>
         </CCardHeader>
 
         <CCardBody className="p-0">
-          <CTable hover responsive className="mb-0 align-middle">
-            <CTableHead>
-              <CTableRow>
-                <CTableHeaderCell>Invoice</CTableHeaderCell>
-
-                <CTableHeaderCell>Customer</CTableHeaderCell>
-
-                <CTableHeaderCell>Sales By</CTableHeaderCell>
-
-                <CTableHeaderCell>Service Provider</CTableHeaderCell>
-
-                <CTableHeaderCell>Service Rendered</CTableHeaderCell>
-
-                <CTableHeaderCell>Service Type</CTableHeaderCell>
-
-                <CTableHeaderCell>Revenue</CTableHeaderCell>
-
-                <CTableHeaderCell>Staff Share</CTableHeaderCell>
-
-                <CTableHeaderCell>Owner Profit</CTableHeaderCell>
-
-                <CTableHeaderCell>Card / Stand</CTableHeaderCell>
-
-                <CTableHeaderCell>Status</CTableHeaderCell>
-
-                <CTableHeaderCell>Date</CTableHeaderCell>
-
-                <CTableHeaderCell>Action</CTableHeaderCell>
-              </CTableRow>
-            </CTableHead>
-
-            <CTableBody>
-              {filteredSales.length > 0 ? (
-                filteredSales.map((sale) => {
-                  const services = getServiceItems(sale)
-
-                  const returnAmount = getSaleReturnTotal(sale)
-
-                  const serviceTotal = getRemainingServiceTotal(sale)
-
-                  const productTotal = getRemainingProductTotal(sale)
-
-                  const staffShare = getStaffShare(sale)
-
-                  const currentCommission = getCurrentCommission(sale)
-
-                  const paidCommission = getPaidCommission(sale)
-
-                  const returnedCommission = getReturnedCommission(sale)
-
-                  const outstandingCommission = getOutstandingCommission(sale)
-
-                  const commissionStatus = getCommissionStatus(sale)
-
-                  const commissionRate = getCommissionRate(sale)
-
-                  const serviceType = getServiceType(sale)
-
-                  const isHomeService = serviceType === 'home_service'
-
-                  const ownerServiceProfit = getOwnerServiceProfit(sale)
-
-                  const saleNetAmount = Math.max(Number(sale.totalAmount || 0) - returnAmount, 0)
-
-                  const hasReturnedProduct = getReturnedProductItems(sale).length > 0
-
-                  const commissionIsPending = commissionStatus === 'pending'
-
-                  const commissionIsPaid = commissionStatus === 'paid'
-
-                  const commissionIsPartial = commissionStatus === 'partial'
-
-                  /*
-                   * All staff on this sale.
-                   */
-                  const saleProviders = [
-                    ...new Set(
-                      services
-                        .map((item) => getServiceItemProvider(sale, item))
-                        .filter((name) => name && name !== '-'),
-                    ),
-                  ]
-
-                  return (
-                    <CTableRow key={sale.id}>
-                      {/* INVOICE */}
-
-                      <CTableDataCell>
-                        <strong>{sale.invoiceNumber || sale.receiptNumber || '-'}</strong>
-
-                        {returnAmount > 0 && (
-                          <div className="mt-1">
-                            <CBadge color="danger">RETURNED: {money(returnAmount)}</CBadge>
-                          </div>
-                        )}
-                      </CTableDataCell>
-
-                      {/* CUSTOMER */}
-
-                      <CTableDataCell>{getCustomerName(sale)}</CTableDataCell>
-
-                      {/* CASHIER */}
-
-                      <CTableDataCell>{getCashierName(sale)}</CTableDataCell>
-
-                      {/* PROVIDERS */}
-
-                      <CTableDataCell>
-                        {saleProviders.length > 0 ? (
-                          <div className="d-flex flex-column gap-1">
-                            {saleProviders.map((provider) => (
-                              <CBadge key={provider} color="info">
-                                {provider}
-                              </CBadge>
-                            ))}
-                          </div>
-                        ) : (
-                          '-'
-                        )}
-                      </CTableDataCell>
-
-                      {/* SERVICES */}
-
-                      <CTableDataCell>
-                        {services.length > 0 ? (
-                          services.map((item, index) => {
-                            const serviceName =
-                              item?.Service?.name ||
-                              item?.service?.name ||
-                              item?.serviceName ||
-                              item?.name ||
-                              'Service'
-
-                            const provider = getServiceItemProvider(sale, item)
-
-                            const returnStatus = getServiceReturnStatus(sale, item)
-
-                            return (
-                              <div key={item.id || index} className="mb-3">
-                                <div className="fw-semibold">{serviceName}</div>
-
-                                <div className="small text-primary fw-semibold">
-                                  Staff: {provider}
-                                </div>
-
-                                <small className="text-medium-emphasis">
-                                  {returnStatus.returned
-                                    ? returnStatus.partial
-                                      ? `${returnStatus.returnedQuantity} returned / ${returnStatus.remainingQuantity} remaining`
-                                      : `${returnStatus.returnedQuantity} returned`
-                                    : `Qty: ${item.quantity || 1} • ${money(item.subtotal)}`}
-                                </small>
-
-                                {returnStatus.returned && !returnStatus.partial && (
-                                  <div>
-                                    <CBadge color="danger" className="mt-1">
-                                      RETURNED
-                                    </CBadge>
-                                  </div>
-                                )}
-
-                                {returnStatus.partial && (
-                                  <div>
-                                    <CBadge color="warning" textColor="dark" className="mt-1">
-                                      PARTIALLY RETURNED
-                                    </CBadge>
-                                  </div>
-                                )}
-                              </div>
-                            )
-                          })
-                        ) : (
-                          <span className="text-medium-emphasis">No service</span>
-                        )}
-
-                        {hasReturnedProduct && (
-                          <CBadge color="secondary" className="mt-1">
-                            Product return
-                          </CBadge>
-                        )}
-                      </CTableDataCell>
-
-                      {/* SERVICE TYPE */}
-
-                      <CTableDataCell>
-                        {services.length > 0 ? (
-                          <CBadge color={isHomeService ? 'dark' : 'primary'}>
-                            {isHomeService ? 'Home Service' : 'In-Salon'}
-                          </CBadge>
-                        ) : (
-                          '-'
-                        )}
-
-                        {commissionRate > 0 && (
-                          <div className="small text-medium-emphasis mt-1">{commissionRate}%</div>
-                        )}
-                      </CTableDataCell>
-
-                      {/* REVENUE */}
-
-                      <CTableDataCell>
-                        <div className="fw-bold">{money(saleNetAmount)}</div>
-
-                        {serviceTotal > 0 && (
-                          <small className="text-info d-block">
-                            Service: {money(serviceTotal)}
-                          </small>
-                        )}
-
-                        {productTotal > 0 && (
-                          <small className="text-secondary d-block">
-                            Product: {money(productTotal)}
-                          </small>
-                        )}
-
-                        {returnAmount > 0 && (
-                          <small className="text-danger d-block">
-                            Return: -{money(returnAmount)}
-                          </small>
-                        )}
-                      </CTableDataCell>
-
-                      {/* STAFF SHARE */}
-
-                      <CTableDataCell>
-                        {commissionIsPending && staffShare > 0 ? (
-                          <>
-                            <div className="fw-bold text-warning">{money(staffShare)}</div>
-
-                            <small className="text-medium-emphasis">Pending</small>
-
-                            {outstandingCommission > 0 && (
-                              <small className="text-muted d-block">
-                                Outstanding: {money(outstandingCommission)}
-                              </small>
-                            )}
-                          </>
-                        ) : commissionIsPartial ? (
-                          <>
-                            {staffShare > 0 && (
-                              <div className="fw-bold text-warning">{money(staffShare)}</div>
-                            )}
-
-                            {paidCommission > 0 && (
-                              <small className="text-success d-block">
-                                Paid: {money(paidCommission)}
-                              </small>
-                            )}
-
-                            {outstandingCommission > 0 && (
-                              <small className="text-warning d-block">
-                                Outstanding: {money(outstandingCommission)}
-                              </small>
-                            )}
-
-                            <CBadge color="warning" textColor="dark" className="mt-1">
-                              Partially Paid
-                            </CBadge>
-                          </>
-                        ) : commissionIsPaid && paidCommission > 0 ? (
-                          <>
-                            <div className="text-medium-emphasis">{money(paidCommission)}</div>
-
-                            <CBadge color="secondary" className="mt-1">
-                              Paid
-                            </CBadge>
-                          </>
-                        ) : currentCommission > 0 ? (
-                          <>
-                            <div className="text-medium-emphasis">{money(currentCommission)}</div>
-
-                            <small className="text-muted d-block">Current commission</small>
-                          </>
-                        ) : (
-                          '-'
-                        )}
-
-                        {returnedCommission > 0 && (
-                          <small className="text-danger d-block mt-1">
-                            Returned: -{money(returnedCommission)}
-                          </small>
-                        )}
-                      </CTableDataCell>
-
-                      {/* OWNER PROFIT */}
-
-                      <CTableDataCell>
-                        {serviceTotal > 0 ? (
-                          <div className="fw-bold text-success">{money(ownerServiceProfit)}</div>
-                        ) : (
-                          '-'
-                        )}
-                      </CTableDataCell>
-
-                      {/* CARD / STAND */}
-
-                      <CTableDataCell>
-                        {isHomeService ? (
-                          <CBadge color="dark">Home Service</CBadge>
-                        ) : (
-                          <>
-                            <div>
-                              <strong>Card:</strong> {sale.CardNumber || '-'}
+          {tipsLoading ? (
+            <div className="text-center py-5">
+              <CSpinner color="primary" />
+
+              <div className="text-body-secondary mt-3">Loading staff tips...</div>
+            </div>
+          ) : staffTips.length === 0 ? (
+            <div className="text-center py-5 px-3">
+              <div
+                className="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-3"
+                style={{
+                  width: 65,
+                  height: 65,
+                }}
+              >
+                <CIcon icon={cilMoney} size="xl" className="text-body-secondary" />
+              </div>
+
+              <h5 className="fw-bold">No Staff Tips</h5>
+
+              <p className="text-body-secondary mb-0">
+                No tips have been recorded for the selected filters.
+              </p>
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <CTable hover align="middle" className="mb-0">
+                <CTableHead>
+                  <CTableRow>
+                    <CTableHeaderCell className="px-4">#</CTableHeaderCell>
+
+                    <CTableHeaderCell>Staff</CTableHeaderCell>
+
+                    <CTableHeaderCell>Customer</CTableHeaderCell>
+
+                    <CTableHeaderCell>Payment</CTableHeaderCell>
+
+                    <CTableHeaderCell className="text-end">Amount</CTableHeaderCell>
+
+                    <CTableHeaderCell>Date</CTableHeaderCell>
+
+                    <CTableHeaderCell>Status</CTableHeaderCell>
+
+                    <CTableHeaderCell className="text-end px-4">Action</CTableHeaderCell>
+                  </CTableRow>
+                </CTableHead>
+
+                <CTableBody>
+                  {staffTips.map((tip, index) => {
+                    const staffName =
+                      tip.Staff?.User?.fullname ||
+                      tip.Staff?.User?.name ||
+                      tip.Staff?.name ||
+                      'Unknown Staff'
+
+                    const customerName = tip.Customer?.fullname || 'Walk-in Customer'
+
+                    return (
+                      <CTableRow key={tip.id}>
+                        {/* NUMBER */}
+
+                        <CTableDataCell className="px-4 text-body-secondary">
+                          {index + 1}
+                        </CTableDataCell>
+
+                        {/* STAFF */}
+
+                        <CTableDataCell>
+                          <div className="d-flex align-items-center">
+                            <div
+                              className="rounded-circle d-flex align-items-center justify-content-center me-2 fw-bold"
+                              style={{
+                                width: 36,
+                                height: 36,
+                                background: 'rgba(13,110,253,.1)',
+                                color: '#0d6efd',
+                              }}
+                            >
+                              {staffName.charAt(0).toUpperCase()}
                             </div>
 
-                            <small className="text-medium-emphasis">
-                              Stand: {sale.StandTag || '-'}
-                            </small>
-                          </>
-                        )}
-                      </CTableDataCell>
+                            <div>
+                              <div className="fw-semibold">{staffName}</div>
 
-                      {/* STATUS */}
-
-                      <CTableDataCell>
-                        <CBadge
-                          color={
-                            sale.approvalStatus === 'approved'
-                              ? 'success'
-                              : sale.approvalStatus === 'cancelled'
-                                ? 'danger'
-                                : 'warning'
-                          }
-                        >
-                          {sale.approvalStatus || 'pending'}
-                        </CBadge>
-
-                        {returnAmount > 0 && (
-                          <div className="mt-1">
-                            <CBadge color="danger">RETURN</CBadge>
+                              {tip.note && (
+                                <small className="text-body-secondary">{tip.note}</small>
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </CTableDataCell>
+                        </CTableDataCell>
 
-                      {/* DATE */}
+                        {/* CUSTOMER */}
 
-                      <CTableDataCell>
-                        {sale.createdAt ? new Date(sale.createdAt).toLocaleDateString() : '-'}
-                      </CTableDataCell>
+                        <CTableDataCell>
+                          <div className="fw-semibold">{customerName}</div>
 
-                      {/* ACTION */}
+                          {tip.Customer?.phone && (
+                            <small className="text-body-secondary">{tip.Customer.phone}</small>
+                          )}
+                        </CTableDataCell>
 
-                      <CTableDataCell>
-                        <CButton
-                          color="warning"
-                          size="sm"
-                          disabled={sale.status === 'refunded'}
-                          onClick={() => handleReturn(sale)}
-                        >
-                          {sale.status === 'refunded' ? 'Returned' : 'Return'}
-                        </CButton>
-                      </CTableDataCell>
-                    </CTableRow>
-                  )
-                })
-              ) : (
-                <CTableRow>
-                  <CTableDataCell colSpan="13" className="text-center py-5">
-                    <CIcon icon={cilSearch} size="xl" className="text-medium-emphasis mb-3" />
+                        {/* PAYMENT METHOD */}
 
-                    <h5>No sales found</h5>
+                        <CTableDataCell>
+                          <CBadge color="secondary" className="px-2 py-1">
+                            {String(tip.paymentMethod || '').toUpperCase()}
+                          </CBadge>
+                        </CTableDataCell>
 
-                    <p className="text-medium-emphasis mb-0">
-                      Try changing your search, service provider or date filters.
-                    </p>
-                  </CTableDataCell>
-                </CTableRow>
-              )}
-            </CTableBody>
-          </CTable>
+                        {/* AMOUNT */}
+
+                        <CTableDataCell className="text-end">
+                          <span
+                            className="fw-bold"
+                            style={{
+                              color: tip.status === 'voided' ? '#dc3545' : '#e8bd35',
+                            }}
+                          >
+                            {formatCurrency(tip.amount)}
+                          </span>
+                        </CTableDataCell>
+
+                        {/* DATE */}
+
+                        <CTableDataCell>
+                          {tip.createdAt
+                            ? new Date(tip.createdAt).toLocaleDateString('en-NG', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })
+                            : '-'}
+                        </CTableDataCell>
+
+                        {/* STATUS */}
+
+                        <CTableDataCell>
+                          {tip.status === 'paid' && (
+                            <CBadge color="success" className="px-3 py-2">
+                              <CIcon icon={cilCheckCircle} size="sm" className="me-1" />
+                              PAID
+                            </CBadge>
+                          )}
+
+                          {tip.status === 'recorded' && (
+                            <CBadge color="warning" className="px-3 py-2">
+                              <CIcon icon={cilClock} size="sm" className="me-1" />
+                              PENDING
+                            </CBadge>
+                          )}
+
+                          {tip.status === 'voided' && (
+                            <CBadge color="danger" className="px-3 py-2">
+                              VOIDED
+                            </CBadge>
+                          )}
+                        </CTableDataCell>
+
+                        {/* ACTION */}
+
+                        <CTableDataCell className="text-end px-4">
+                          {tip.status === 'recorded' ? (
+                            <CButton
+                              size="sm"
+                              color="success"
+                              variant="outline"
+                              onClick={() => payStaffTip(tip.id, tip.amount)}
+                            >
+                              <CIcon icon={cilCheckCircle} className="me-1" />
+                              Pay
+                            </CButton>
+                          ) : tip.status === 'paid' ? (
+                            <span className="text-success small fw-semibold">
+                              <CIcon icon={cilCheckCircle} size="sm" className="me-1" />
+                              Paid
+                            </span>
+                          ) : (
+                            <span className="text-danger small fw-semibold">Voided</span>
+                          )}
+                        </CTableDataCell>
+                      </CTableRow>
+                    )
+                  })}
+                </CTableBody>
+              </CTable>
+            </div>
+          )}
         </CCardBody>
       </CCard>
 
       {/* =====================================================
-          RETURN MODAL
+          TABLE
       ====================================================== */}
 
-      <ReturnModal
-        show={showReturnModal}
-        onHide={() => setShowReturnModal(false)}
-        saleId={selectedSaleId}
-        reload={getSalesReport}
-      />
-    </>
+      <CCard className="border-0 shadow-sm">
+        <CCardHeader className="bg-white border-0 p-4">
+          <CRow className="align-items-center">
+            <CCol md={6}>
+              <h5 className="fw-bold mb-1">Commission Records</h5>
+
+              <div className="text-body-secondary small">
+                Showing <strong>{filteredCommissions.length}</strong> of{' '}
+                <strong>{commissions.length}</strong> commission records
+              </div>
+            </CCol>
+
+            <CCol md={6} className="text-md-end mt-3 mt-md-0">
+              {selectedStaff && (
+                <CBadge color="primary" className="px-3 py-2">
+                  <CIcon icon={cilUser} className="me-1" />
+                  Staff Filter Applied
+                </CBadge>
+              )}
+            </CCol>
+          </CRow>
+        </CCardHeader>
+
+        <CCardBody className="p-0">
+          {loading ? (
+            <div className="text-center py-5">
+              <CSpinner color="primary" />
+
+              <div className="text-body-secondary mt-3">Loading commission records...</div>
+            </div>
+          ) : filteredCommissions.length === 0 ? (
+            <div className="text-center py-5 px-3">
+              <div
+                className="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-3"
+                style={{
+                  width: 70,
+                  height: 70,
+                }}
+              >
+                <CIcon icon={cilMoney} size="xl" className="text-body-secondary" />
+              </div>
+
+              <h5 className="fw-bold">No Commission Records</h5>
+
+              <p className="text-body-secondary mb-3">
+                No commission records match the selected filters.
+              </p>
+
+              {hasFilters && (
+                <CButton color="primary" variant="outline" onClick={resetFilters}>
+                  Clear Filters
+                </CButton>
+              )}
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <CTable hover align="middle" className="mb-0">
+                <CTableHead>
+                  <CTableRow>
+                    <CTableHeaderCell className="px-4">#</CTableHeaderCell>
+
+                    <CTableHeaderCell>Staff</CTableHeaderCell>
+
+                    <CTableHeaderCell>Service</CTableHeaderCell>
+
+                    <CTableHeaderCell>Receipt</CTableHeaderCell>
+
+                    <CTableHeaderCell>Rate</CTableHeaderCell>
+
+                    <CTableHeaderCell className="text-end">Original</CTableHeaderCell>
+
+                    <CTableHeaderCell className="text-end">Returned</CTableHeaderCell>
+
+                    <CTableHeaderCell className="text-end">Current</CTableHeaderCell>
+
+                    <CTableHeaderCell>Date</CTableHeaderCell>
+
+                    <CTableHeaderCell>Status</CTableHeaderCell>
+
+                    <CTableHeaderCell className="text-end px-4">Action</CTableHeaderCell>
+                  </CTableRow>
+                </CTableHead>
+
+                <CTableBody>
+                  {filteredCommissions.map((item, index) => {
+                    const original = getOriginalCommission(item)
+
+                    const returned = getReturnedCommission(item)
+
+                    const current = getCurrentCommission(item)
+
+                    const returnedRecord = isReturned(item)
+                    const staffName = getStaffName(item)
+                    const serviceName = getServiceName(item)
+
+                    return (
+                      <CTableRow key={item.id}>
+                        <CTableDataCell className="px-4 text-body-secondary">
+                          {index + 1}
+                        </CTableDataCell>
+
+                        {/* STAFF */}
+
+                        <CTableDataCell>
+                          <div className="d-flex align-items-center">
+                            <div
+                              className="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center me-2 fw-bold"
+                              style={{
+                                width: 38,
+                                height: 38,
+                              }}
+                            >
+                              {staffName.charAt(0).toUpperCase()}
+                            </div>
+
+                            <div>
+                              <div className="fw-semibold">{staffName}</div>
+
+                              {returnedRecord && (
+                                <small className="text-danger">
+                                  <CIcon icon={cilLoopCircular} size="sm" className="me-1" />
+                                  Return adjustment
+                                </small>
+                              )}
+                            </div>
+                          </div>
+                        </CTableDataCell>
+
+                        {/* SERVICE */}
+
+                        <CTableDataCell>
+                          <div className="fw-semibold">{serviceName}</div>
+                          {item.SaleItem?.quantity && (
+                            <small className="text-body-secondary">
+                              Qty: {item.SaleItem.quantity}
+                            </small>
+                          )}
+                        </CTableDataCell>
+
+                        {/* RECEIPT */}
+
+                        <CTableDataCell>
+                          <span className="fw-semibold">
+                            {item.Sale?.receiptNumber || item.Sale?.ReceiptNumber || '-'}
+                          </span>
+                        </CTableDataCell>
+
+                        {/* RATE */}
+
+                        <CTableDataCell>
+                          <CBadge color="secondary" className="px-2 py-1">
+                            {Number(item.commissionRate || 0)}%
+                          </CBadge>
+                        </CTableDataCell>
+
+                        {/* ORIGINAL */}
+
+                        <CTableDataCell className="text-end">
+                          <span className="text-body-secondary">{formatCurrency(original)}</span>
+                        </CTableDataCell>
+
+                        {/* RETURNED */}
+
+                        <CTableDataCell className="text-end">
+                          {returned > 0 ? (
+                            <span className="text-danger fw-semibold">
+                              - {formatCurrency(returned)}
+                            </span>
+                          ) : (
+                            <span className="text-body-secondary">—</span>
+                          )}
+                        </CTableDataCell>
+
+                        {/* CURRENT */}
+
+                        <CTableDataCell className="text-end">
+                          <span
+                            className={`fw-bold ${
+                              current > 0 ? 'text-success' : 'text-body-secondary'
+                            }`}
+                          >
+                            {formatCurrency(current)}
+                          </span>
+                        </CTableDataCell>
+
+                        {/* DATE */}
+
+                        <CTableDataCell>
+                          <div className="d-flex align-items-center">
+                            <CIcon
+                              icon={cilCalendar}
+                              size="sm"
+                              className="me-2 text-body-secondary"
+                            />
+
+                            {item.commissionDate
+                              ? new Date(item.commissionDate).toLocaleDateString('en-NG', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })
+                              : '-'}
+                          </div>
+                        </CTableDataCell>
+
+                        {/* STATUS */}
+
+                        <CTableDataCell>{renderStatus(item.status)}</CTableDataCell>
+
+                        {/* ACTION */}
+
+                        <CTableDataCell className="text-end px-4">
+                          {item.status === 'pending' ? (
+                            <CButton
+                              size="sm"
+                              color="success"
+                              variant="outline"
+                              disabled={current <= 0}
+                              onClick={() => markPaid(item.id, current)}
+                            >
+                              <CIcon icon={cilCheckCircle} className="me-1" />
+                              Pay
+                            </CButton>
+                          ) : (
+                            <span className="text-success small fw-semibold">
+                              <CIcon icon={cilCheckCircle} size="sm" className="me-1" />
+                              Paid
+                            </span>
+                          )}
+                        </CTableDataCell>
+                      </CTableRow>
+                    )
+                  })}
+                </CTableBody>
+              </CTable>
+            </div>
+          )}
+        </CCardBody>
+      </CCard>
+
+      {/* =====================================================
+          SMALL FOOTER SUMMARY
+      ====================================================== */}
+
+      {!loading && filteredCommissions.length > 0 && (
+        <div className="d-flex justify-content-between align-items-center mt-3 px-1">
+          <small className="text-body-secondary">
+            Commission figures are based on the currently selected filters.
+          </small>
+
+          <strong className="text-primary">Total: {formatCurrency(totalCommission)}</strong>
+        </div>
+      )}
+    </div>
   )
 }
 
-export default Report
+export default Commission
