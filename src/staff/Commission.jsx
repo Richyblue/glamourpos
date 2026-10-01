@@ -25,6 +25,7 @@ import Swal from 'sweetalert2'
 import * as XLSX from 'xlsx'
 
 import CIcon from '@coreui/icons-react'
+
 import {
   cilSearch,
   cilReload,
@@ -44,6 +45,10 @@ const Commission = () => {
 
   const [commissions, setCommissions] = useState([])
   const [loading, setLoading] = useState(false)
+
+  // Bulk payment loading state
+  const [bulkPaying, setBulkPaying] = useState(false)
+
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [monthFilter, setMonthFilter] = useState('')
@@ -52,12 +57,6 @@ const Commission = () => {
   const [dateTo, setDateTo] = useState('')
   const [selectedStaff, setSelectedStaff] = useState('')
   const [staffs, setStaffs] = useState([])
-  // =========================================================
-  // STAFF TIPS
-  // =========================================================
-
-  const [staffTips, setStaffTips] = useState([])
-  const [tipsLoading, setTipsLoading] = useState(false)
 
   // =========================================================
   // FORMAT CURRENCY
@@ -126,86 +125,12 @@ const Commission = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      await Promise.all([getCommissions(), getStaffs(), getStaffTips()])
+      await Promise.all([getCommissions(), getStaffs()])
     }
 
     fetchData()
   }, [])
-  // =========================================================
-  // REFRESH TIPS WHEN STAFF / DATE FILTER CHANGES
-  // =========================================================
 
-  useEffect(() => {
-    getStaffTips()
-  }, [selectedStaff, dateFrom, dateTo])
-  // =========================================================
-  // GET STAFF TIPS
-  // =========================================================
-
-  const getStaffTips = async () => {
-    try {
-      setTipsLoading(true)
-
-      const token = localStorage.getItem('token')
-
-      const params = new URLSearchParams()
-
-      // -----------------------------------------------------
-      // STAFF FILTER
-      // -----------------------------------------------------
-
-      if (selectedStaff) {
-        params.append('staffId', selectedStaff)
-      }
-
-      // -----------------------------------------------------
-      // STATUS
-      // -----------------------------------------------------
-
-      // Don't send commission status directly because:
-      //
-      // commission:
-      // pending / paid
-      //
-      // tips:
-      // recorded / paid / voided
-      //
-      // We therefore handle tip status separately below.
-      // -----------------------------------------------------
-
-      // -----------------------------------------------------
-      // DATE FILTER
-      // -----------------------------------------------------
-
-      if (dateFrom) {
-        params.append('startDate', dateFrom)
-      }
-
-      if (dateTo) {
-        params.append('endDate', dateTo)
-      }
-
-      const query = params.toString()
-
-      const response = await axios.get(`${API_URL}api/v1/staff-tips${query ? `?${query}` : ''}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      setStaffTips(response.data.tips || [])
-    } catch (error) {
-      console.error('Staff Tips Error:', error)
-
-      Swal.fire({
-        icon: 'error',
-        title: 'Unable to Load Staff Tips',
-        text: error?.response?.data?.message || 'There was a problem loading staff tip records.',
-      })
-    } finally {
-      setTipsLoading(false)
-    }
-  }
   // =========================================================
   // COMMISSION HELPERS
   // =========================================================
@@ -228,6 +153,7 @@ const Commission = () => {
     }
 
     const original = getOriginalCommission(item)
+
     const current = getCurrentCommission(item)
 
     return Math.max(original - current, 0)
@@ -235,6 +161,7 @@ const Commission = () => {
 
   const isReturned = (item) => {
     if (item.returned === true) return true
+
     if (item.isReturned === true) return true
 
     if (Number(item.returnedServiceTotal || 0) > 0) {
@@ -251,6 +178,7 @@ const Commission = () => {
   // =========================================================
   // FILTERED COMMISSIONS
   // =========================================================
+
   const filteredCommissions = useMemo(() => {
     return commissions.filter((commission) => {
       const staffName =
@@ -276,20 +204,18 @@ const Commission = () => {
 
       const yearMatch = yearFilter === '' || (date && date.getFullYear() === Number(yearFilter))
 
-      // =====================================================
-      // DATE RANGE FILTER
-      // =====================================================
-
       let dateFromMatch = true
       let dateToMatch = true
 
       if (dateFrom) {
         const fromDate = new Date(`${dateFrom}T00:00:00`)
+
         dateFromMatch = date && date >= fromDate
       }
 
       if (dateTo) {
         const toDate = new Date(`${dateTo}T23:59:59.999`)
+
         dateToMatch = date && date <= toDate
       }
 
@@ -304,43 +230,64 @@ const Commission = () => {
       )
     })
   }, [commissions, search, selectedStaff, statusFilter, monthFilter, yearFilter, dateFrom, dateTo])
-  // =========================================================
-  // COMMISSION KPIs
-  // =========================================================
 
   // =========================================================
-  // 1. CURRENT COMMISSION
+  // PENDING COMMISSIONS FOR BULK PAYMENT
   // =========================================================
-  // Total commission currently applicable to all records
-  // after service returns have been accounted for.
   //
-  // Example:
-  // Original = ₦10,000
-  // Return adjustment = ₦3,000
-  // Current = ₦7,000
+  // IMPORTANT:
+  // This is based on the currently filtered records.
   //
-  // Current Commission = ₦7,000
+  // Therefore:
+  //
+  // Staff = John
+  // Status = Pending
+  // Month = September
+  //
+  // Pay All Pending will ONLY pay John's pending
+  // September commissions.
+  //
+  // =========================================================
+
+  const pendingFilteredCommissions = useMemo(() => {
+    return filteredCommissions.filter(
+      (item) => item.status === 'pending' && getCurrentCommission(item) > 0,
+    )
+  }, [filteredCommissions])
+
+  // =========================================================
+  // BULK PENDING TOTAL
+  // =========================================================
+
+  const bulkPendingTotal = useMemo(() => {
+    return pendingFilteredCommissions.reduce((sum, item) => sum + getCurrentCommission(item), 0)
+  }, [pendingFilteredCommissions])
+
+  // =========================================================
+  // SELECTED STAFF NAME
+  // =========================================================
+
+  const selectedStaffName = useMemo(() => {
+    if (!selectedStaff) {
+      return 'All Staff'
+    }
+
+    const staff = staffs.find((item) => String(item.id) === String(selectedStaff))
+
+    if (!staff) {
+      return 'Selected Staff'
+    }
+
+    return staff.User?.fullname || staff.User?.name || staff.name || `Staff #${staff.id}`
+  }, [selectedStaff, staffs])
+
+  // =========================================================
+  // COMMISSION KPIs
   // =========================================================
 
   const totalCommission = filteredCommissions.reduce((sum, item) => {
     return sum + Number(item.currentCommissionAmount ?? item.commissionAmount ?? 0)
   }, 0)
-
-  // =========================================================
-  // 2. CURRENT PENDING COMMISSION
-  // =========================================================
-  // Only commissions that are still pending.
-  //
-  // IMPORTANT:
-  // This uses the CURRENT amount after returns.
-  //
-  // Example:
-  // Original commission = ₦10,000
-  // Return adjustment  = ₦3,000
-  // Current pending    = ₦7,000
-  //
-  // Pending KPI = ₦7,000
-  // =========================================================
 
   const pendingCommission = filteredCommissions.reduce((sum, item) => {
     if (item.status !== 'pending') {
@@ -350,15 +297,6 @@ const Commission = () => {
     return sum + Number(item.currentCommissionAmount ?? item.commissionAmount ?? 0)
   }, 0)
 
-  // =========================================================
-  // 3. PAID COMMISSION
-  // =========================================================
-  // Only commissions whose status is paid.
-  //
-  // These are commissions that have already been paid
-  // to the service provider.
-  // =========================================================
-
   const paidCommission = filteredCommissions.reduce((sum, item) => {
     if (item.status !== 'paid') {
       return sum
@@ -367,75 +305,10 @@ const Commission = () => {
     return sum + Number(item.currentCommissionAmount ?? item.commissionAmount ?? 0)
   }, 0)
 
-  // =========================================================
-  // 4. RETURN ADJUSTMENTS
-  // =========================================================
-  // Total commission removed because services were returned.
-  //
-  // Example:
-  // Original commission = ₦10,000
-  // Current commission  = ₦7,000
-  // Return adjustment   = ₦3,000
-  //
-  // Return Adjustment KPI = ₦3,000
-  //
-  // This value comes from the backend calculation.
-  // =========================================================
-
   const returnedCommission = filteredCommissions.reduce((sum, item) => {
     return sum + Number(item.returnedCommissionAmount || 0)
   }, 0)
 
-  // =========================================================
-  // STAFF TIP TOTALS
-  // =========================================================
-
-  // Exclude voided tips from earnings.
-  const validTips = staffTips.filter((tip) => tip.status !== 'voided')
-
-  // ---------------------------------------------------------
-  // TOTAL TIPS
-  // ---------------------------------------------------------
-
-  const totalTips = validTips.reduce((sum, tip) => {
-    return sum + Number(tip.amount || 0)
-  }, 0)
-
-  // ---------------------------------------------------------
-  // PENDING TIPS
-  // ---------------------------------------------------------
-
-  const pendingTips = validTips.reduce((sum, tip) => {
-    if (tip.status !== 'recorded') {
-      return sum
-    }
-
-    return sum + Number(tip.amount || 0)
-  }, 0)
-
-  // ---------------------------------------------------------
-  // PAID TIPS
-  // ---------------------------------------------------------
-
-  const paidTips = validTips.reduce((sum, tip) => {
-    if (tip.status !== 'paid') {
-      return sum
-    }
-
-    return sum + Number(tip.amount || 0)
-  }, 0)
-
-  // ---------------------------------------------------------
-  // TOTAL STAFF EARNINGS
-  // ---------------------------------------------------------
-
-  const totalStaffEarnings = totalCommission + totalTips
-
-  // ---------------------------------------------------------
-  // TOTAL CURRENT AMOUNT PAYABLE
-  // ---------------------------------------------------------
-
-  const totalPayable = pendingCommission + pendingTips
   // =========================================================
   // RESET FILTERS
   // =========================================================
@@ -450,10 +323,11 @@ const Commission = () => {
     setDateTo('')
   }
 
-  const hasFilters = search || statusFilter || monthFilter || yearFilter || selectedStaff
+  const hasFilters =
+    search || statusFilter || monthFilter || yearFilter || selectedStaff || dateFrom || dateTo
 
   // =========================================================
-  // MARK COMMISSION AS PAID
+  // MARK SINGLE COMMISSION AS PAID
   // =========================================================
 
   const markPaid = async (id, amount) => {
@@ -500,7 +374,7 @@ const Commission = () => {
         showConfirmButton: false,
       })
 
-      getCommissions()
+      await getCommissions()
     } catch (error) {
       console.error(error)
 
@@ -513,32 +387,83 @@ const Commission = () => {
   }
 
   // =========================================================
-  // PAY STAFF TIP
+  // PAY ALL FILTERED PENDING COMMISSIONS
   // =========================================================
 
-  const payStaffTip = async (id, amount) => {
-    if (Number(amount || 0) <= 0) {
+  const payAllPending = async () => {
+    if (pendingFilteredCommissions.length === 0) {
       Swal.fire({
-        icon: 'warning',
-        title: 'Invalid Tip',
-        text: 'This tip has no valid amount.',
+        icon: 'info',
+        title: 'Nothing to Pay',
+        text: 'There are no pending commissions matching the current filters.',
       })
 
       return
     }
 
+    // -------------------------------------------------------
+    // Build IDs
+    // -------------------------------------------------------
+
+    const commissionIds = pendingFilteredCommissions.map((item) => item.id)
+
+    // -------------------------------------------------------
+    // Confirmation
+    // -------------------------------------------------------
+
     const result = await Swal.fire({
-      title: 'Pay Staff Tip?',
-      text: `You are about to pay ${formatCurrency(amount)}.`,
+      title: 'Pay All Pending Commissions?',
+      html: `
+          <div style="text-align:left">
+            <div style="margin-bottom:10px">
+              <strong>Staff:</strong>
+              ${selectedStaffName}
+            </div>
+
+            <div style="margin-bottom:10px">
+              <strong>Pending Records:</strong>
+              ${pendingFilteredCommissions.length}
+            </div>
+
+            <div style="
+              padding:14px;
+              border-radius:8px;
+              background:#f8f9fa;
+              margin-top:12px;
+            ">
+              <div style="
+                font-size:12px;
+                color:#6c757d;
+                margin-bottom:4px;
+              ">
+                TOTAL PAYMENT
+              </div>
+
+              <div style="
+                font-size:24px;
+                font-weight:700;
+                color:#198754;
+              ">
+                ${formatCurrency(bulkPendingTotal)}
+              </div>
+            </div>
+
+            <div style="
+              margin-top:15px;
+              font-size:13px;
+              color:#6c757d;
+            ">
+              All matching pending commission
+              records will be marked as paid.
+            </div>
+          </div>
+        `,
       icon: 'question',
-
       showCancelButton: true,
-
-      confirmButtonText: 'Yes, Pay Tip',
-
+      confirmButtonText: 'Yes, Pay All',
       cancelButtonText: 'Cancel',
-
       confirmButtonColor: '#198754',
+      reverseButtons: true,
     })
 
     if (!result.isConfirmed) {
@@ -546,35 +471,75 @@ const Commission = () => {
     }
 
     try {
+      setBulkPaying(true)
+
       const token = localStorage.getItem('token')
 
-      await axios.put(
-        `${API_URL}api/v1/staff-tips/${id}/pay`,
-        {},
+      // -----------------------------------------------------
+      // IMPORTANT
+      //
+      // Backend endpoint:
+      //
+      // PUT /api/v1/commissions/pay-bulk
+      //
+      // Body:
+      //
+      // {
+      //   commissionIds: [...]
+      // }
+      // -----------------------------------------------------
+
+      const response = await axios.put(
+        `${API_URL}api/v1/commissions/pay-bulk`,
+        {
+          commissionIds,
+        },
         {
           headers: {
             Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
           },
         },
       )
 
+      const paidCount = response.data?.paidCount ?? commissionIds.length
+
+      const paidAmount = response.data?.paidAmount ?? bulkPendingTotal
+
+      await getCommissions()
+
       await Swal.fire({
         icon: 'success',
-        title: 'Tip Paid',
-        text: 'Staff tip has been marked as paid.',
-        timer: 1800,
-        showConfirmButton: false,
-      })
+        title: 'Payment Completed',
+        html: `
+          <div>
+            <p class="mb-2">
+              <strong>${paidCount}</strong>
+              commission record${paidCount !== 1 ? 's' : ''} marked as paid.
+            </p>
 
-      await getStaffTips()
+            <div style="
+              font-size:24px;
+              font-weight:700;
+              color:#198754;
+              margin-top:10px;
+            ">
+              ${formatCurrency(paidAmount)}
+            </div>
+          </div>
+        `,
+        confirmButtonColor: '#198754',
+      })
     } catch (error) {
-      console.error('Pay Staff Tip Error:', error)
+      console.error('Bulk Commission Payment Error:', error)
 
       Swal.fire({
         icon: 'error',
-        title: 'Payment Failed',
-        text: error?.response?.data?.message || 'Unable to pay staff tip.',
+        title: 'Bulk Payment Failed',
+        text: error?.response?.data?.message || 'Unable to process the bulk commission payment.',
       })
+    } finally {
+      setBulkPaying(false)
     }
   }
 
@@ -684,13 +649,17 @@ const Commission = () => {
                 color="light"
                 className="me-2 border"
                 onClick={getCommissions}
-                disabled={loading}
+                disabled={loading || bulkPaying}
               >
                 <CIcon icon={cilReload} className="me-2" />
                 Refresh
               </CButton>
 
-              <CButton color="primary" onClick={exportExcel} disabled={!filteredCommissions.length}>
+              <CButton
+                color="primary"
+                onClick={exportExcel}
+                disabled={!filteredCommissions.length || bulkPaying}
+              >
                 <CIcon icon={cilCloudDownload} className="me-2" />
                 Export Excel
               </CButton>
@@ -825,95 +794,6 @@ const Commission = () => {
       </CRow>
 
       {/* =====================================================
-    STAFF EARNINGS SUMMARY
-====================================================== */}
-
-      <CRow className="mb-4">
-        <CCol xs={12}>
-          <CCard className="border-0 shadow-sm">
-            <CCardBody className="p-4">
-              <CRow className="align-items-center">
-                {/* TITLE */}
-
-                <CCol md={4} className="mb-3 mb-md-0">
-                  <div className="d-flex align-items-center">
-                    <div
-                      className="rounded-circle d-flex align-items-center justify-content-center me-3"
-                      style={{
-                        width: 48,
-                        height: 48,
-                        background: 'rgba(232,189,53,.12)',
-                      }}
-                    >
-                      <CIcon
-                        icon={cilMoney}
-                        style={{
-                          color: '#e8bd35',
-                        }}
-                      />
-                    </div>
-
-                    <div>
-                      <h5 className="fw-bold mb-1">Staff Earnings</h5>
-
-                      <small className="text-body-secondary">Commission and customer tips</small>
-                    </div>
-                  </div>
-                </CCol>
-
-                {/* COMMISSION */}
-
-                <CCol sm={4} md={2}>
-                  <div className="text-body-secondary small fw-semibold">COMMISSION</div>
-
-                  <div className="fw-bold mt-1">{formatCurrency(totalCommission)}</div>
-                </CCol>
-
-                {/* TIPS */}
-
-                <CCol sm={4} md={2}>
-                  <div className="text-body-secondary small fw-semibold">TIPS</div>
-
-                  <div
-                    className="fw-bold mt-1"
-                    style={{
-                      color: '#e8bd35',
-                    }}
-                  >
-                    {formatCurrency(totalTips)}
-                  </div>
-                </CCol>
-
-                {/* PAYABLE */}
-
-                <CCol sm={4} md={2}>
-                  <div className="text-body-secondary small fw-semibold">PAYABLE</div>
-
-                  <div className="fw-bold text-warning mt-1">{formatCurrency(totalPayable)}</div>
-                </CCol>
-
-                {/* TOTAL */}
-
-                <CCol sm={12} md={2}>
-                  <div className="text-body-secondary small fw-semibold">TOTAL EARNINGS</div>
-
-                  <div
-                    className="fw-bold mt-1"
-                    style={{
-                      fontSize: '18px',
-                      color: '#198754',
-                    }}
-                  >
-                    {formatCurrency(totalStaffEarnings)}
-                  </div>
-                </CCol>
-              </CRow>
-            </CCardBody>
-          </CCard>
-        </CCol>
-      </CRow>
-
-      {/* =====================================================
           FILTERS
       ====================================================== */}
 
@@ -984,6 +864,7 @@ const Commission = () => {
                 <option value="paid">Paid</option>
               </CFormSelect>
             </CCol>
+
             {/* FROM DATE */}
 
             <CCol xs={12} sm={6} lg={2}>
@@ -1061,252 +942,107 @@ const Commission = () => {
           </CRow>
         </CCardBody>
       </CCard>
+
       {/* =====================================================
-    STAFF TIPS
-====================================================== */}
+          BULK PAYMENT PANEL
+      ====================================================== */}
 
-      <CCard className="border-0 shadow-sm mt-4">
-        <CCardHeader className="bg-white border-0 p-4">
-          <CRow className="align-items-center">
-            <CCol md={7}>
-              <div className="d-flex align-items-center">
-                <div
-                  className="rounded-circle d-flex align-items-center justify-content-center me-3"
-                  style={{
-                    width: 42,
-                    height: 42,
-                    background: 'rgba(232,189,53,.12)',
-                  }}
-                >
-                  <CIcon
-                    icon={cilMoney}
+      {statusFilter === 'pending' && pendingFilteredCommissions.length > 0 && (
+        <CCard
+          className="border-0 shadow-sm mb-4"
+          style={{
+            borderLeft: '4px solid #198754',
+          }}
+        >
+          <CCardBody className="p-4">
+            <CRow className="align-items-center">
+              <CCol md={7}>
+                <div className="d-flex align-items-center">
+                  <div
+                    className="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center me-3"
                     style={{
-                      color: '#e8bd35',
+                      width: 52,
+                      height: 52,
                     }}
-                  />
-                </div>
+                  >
+                    <CIcon icon={cilCheckCircle} size="xl" className="text-success" />
+                  </div>
 
-                <div>
-                  <h5 className="fw-bold mb-1">Staff Tips</h5>
+                  <div>
+                    <h5 className="fw-bold mb-1">Pending Commission Payments</h5>
 
-                  <div className="text-body-secondary small">
-                    Customer tips recorded for staff members
+                    <div className="text-body-secondary">
+                      <strong>{pendingFilteredCommissions.length}</strong> pending record
+                      {pendingFilteredCommissions.length !== 1 ? 's' : ''} for{' '}
+                      <strong>{selectedStaffName}</strong>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CCol>
+              </CCol>
 
-            <CCol md={5} className="text-md-end mt-3 mt-md-0">
-              <span className="me-3">
-                <small className="text-body-secondary">Total Tips</small>
+              <CCol md={5} className="text-md-end mt-3 mt-md-0">
+                <div className="mb-2">
+                  <small className="text-body-secondary d-block">TOTAL TO PAY</small>
 
-                <strong
-                  className="ms-2"
-                  style={{
-                    color: '#e8bd35',
-                  }}
+                  <span
+                    className="fw-bold text-success"
+                    style={{
+                      fontSize: '24px',
+                    }}
+                  >
+                    {formatCurrency(bulkPendingTotal)}
+                  </span>
+                </div>
+
+                <CButton
+                  color="success"
+                  size="lg"
+                  disabled={bulkPaying || pendingFilteredCommissions.length === 0}
+                  onClick={payAllPending}
                 >
-                  {formatCurrency(totalTips)}
-                </strong>
-              </span>
+                  {bulkPaying ? (
+                    <>
+                      <CSpinner size="sm" className="me-2" />
+                      Processing Payment...
+                    </>
+                  ) : (
+                    <>
+                      <CIcon icon={cilCheckCircle} className="me-2" />
+                      Pay All Pending
+                    </>
+                  )}
+                </CButton>
+              </CCol>
+            </CRow>
 
-              <CBadge color="warning" className="px-3 py-2">
-                Pending: {formatCurrency(pendingTips)}
-              </CBadge>
-            </CCol>
-          </CRow>
-        </CCardHeader>
+            {/* FILTER SUMMARY */}
 
-        <CCardBody className="p-0">
-          {tipsLoading ? (
-            <div className="text-center py-5">
-              <CSpinner color="primary" />
-
-              <div className="text-body-secondary mt-3">Loading staff tips...</div>
+            <div className="mt-3 pt-3 border-top">
+              <small className="text-body-secondary">
+                Payment includes all pending commission records currently matching your filters.
+                {selectedStaff && (
+                  <>
+                    {' '}
+                    Staff: <strong>{selectedStaffName}</strong>.
+                  </>
+                )}
+                {dateFrom && (
+                  <>
+                    {' '}
+                    From: <strong>{dateFrom}</strong>.
+                  </>
+                )}
+                {dateTo && (
+                  <>
+                    {' '}
+                    To: <strong>{dateTo}</strong>.
+                  </>
+                )}
+              </small>
             </div>
-          ) : staffTips.length === 0 ? (
-            <div className="text-center py-5 px-3">
-              <div
-                className="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto mb-3"
-                style={{
-                  width: 65,
-                  height: 65,
-                }}
-              >
-                <CIcon icon={cilMoney} size="xl" className="text-body-secondary" />
-              </div>
-
-              <h5 className="fw-bold">No Staff Tips</h5>
-
-              <p className="text-body-secondary mb-0">
-                No tips have been recorded for the selected filters.
-              </p>
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <CTable hover align="middle" className="mb-0">
-                <CTableHead>
-                  <CTableRow>
-                    <CTableHeaderCell className="px-4">#</CTableHeaderCell>
-
-                    <CTableHeaderCell>Staff</CTableHeaderCell>
-
-                    <CTableHeaderCell>Customer</CTableHeaderCell>
-
-                    <CTableHeaderCell>Payment</CTableHeaderCell>
-
-                    <CTableHeaderCell className="text-end">Amount</CTableHeaderCell>
-
-                    <CTableHeaderCell>Date</CTableHeaderCell>
-
-                    <CTableHeaderCell>Status</CTableHeaderCell>
-
-                    <CTableHeaderCell className="text-end px-4">Action</CTableHeaderCell>
-                  </CTableRow>
-                </CTableHead>
-
-                <CTableBody>
-                  {staffTips.map((tip, index) => {
-                    const staffName =
-                      tip.Staff?.User?.fullname ||
-                      tip.Staff?.User?.name ||
-                      tip.Staff?.name ||
-                      'Unknown Staff'
-
-                    const customerName = tip.Customer?.fullname || 'Walk-in Customer'
-
-                    return (
-                      <CTableRow key={tip.id}>
-                        {/* NUMBER */}
-
-                        <CTableDataCell className="px-4 text-body-secondary">
-                          {index + 1}
-                        </CTableDataCell>
-
-                        {/* STAFF */}
-
-                        <CTableDataCell>
-                          <div className="d-flex align-items-center">
-                            <div
-                              className="rounded-circle d-flex align-items-center justify-content-center me-2 fw-bold"
-                              style={{
-                                width: 36,
-                                height: 36,
-                                background: 'rgba(13,110,253,.1)',
-                                color: '#0d6efd',
-                              }}
-                            >
-                              {staffName.charAt(0).toUpperCase()}
-                            </div>
-
-                            <div>
-                              <div className="fw-semibold">{staffName}</div>
-
-                              {tip.note && (
-                                <small className="text-body-secondary">{tip.note}</small>
-                              )}
-                            </div>
-                          </div>
-                        </CTableDataCell>
-
-                        {/* CUSTOMER */}
-
-                        <CTableDataCell>
-                          <div className="fw-semibold">{customerName}</div>
-
-                          {tip.Customer?.phone && (
-                            <small className="text-body-secondary">{tip.Customer.phone}</small>
-                          )}
-                        </CTableDataCell>
-
-                        {/* PAYMENT METHOD */}
-
-                        <CTableDataCell>
-                          <CBadge color="secondary" className="px-2 py-1">
-                            {String(tip.paymentMethod || '').toUpperCase()}
-                          </CBadge>
-                        </CTableDataCell>
-
-                        {/* AMOUNT */}
-
-                        <CTableDataCell className="text-end">
-                          <span
-                            className="fw-bold"
-                            style={{
-                              color: tip.status === 'voided' ? '#dc3545' : '#e8bd35',
-                            }}
-                          >
-                            {formatCurrency(tip.amount)}
-                          </span>
-                        </CTableDataCell>
-
-                        {/* DATE */}
-
-                        <CTableDataCell>
-                          {tip.createdAt
-                            ? new Date(tip.createdAt).toLocaleDateString('en-NG', {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric',
-                              })
-                            : '-'}
-                        </CTableDataCell>
-
-                        {/* STATUS */}
-
-                        <CTableDataCell>
-                          {tip.status === 'paid' && (
-                            <CBadge color="success" className="px-3 py-2">
-                              <CIcon icon={cilCheckCircle} size="sm" className="me-1" />
-                              PAID
-                            </CBadge>
-                          )}
-
-                          {tip.status === 'recorded' && (
-                            <CBadge color="warning" className="px-3 py-2">
-                              <CIcon icon={cilClock} size="sm" className="me-1" />
-                              PENDING
-                            </CBadge>
-                          )}
-
-                          {tip.status === 'voided' && (
-                            <CBadge color="danger" className="px-3 py-2">
-                              VOIDED
-                            </CBadge>
-                          )}
-                        </CTableDataCell>
-
-                        {/* ACTION */}
-
-                        <CTableDataCell className="text-end px-4">
-                          {tip.status === 'recorded' ? (
-                            <CButton
-                              size="sm"
-                              color="success"
-                              variant="outline"
-                              onClick={() => payStaffTip(tip.id, tip.amount)}
-                            >
-                              <CIcon icon={cilCheckCircle} className="me-1" />
-                              Pay
-                            </CButton>
-                          ) : tip.status === 'paid' ? (
-                            <span className="text-success small fw-semibold">
-                              <CIcon icon={cilCheckCircle} size="sm" className="me-1" />
-                              Paid
-                            </span>
-                          ) : (
-                            <span className="text-danger small fw-semibold">Voided</span>
-                          )}
-                        </CTableDataCell>
-                      </CTableRow>
-                    )
-                  })}
-                </CTableBody>
-              </CTable>
-            </div>
-          )}
-        </CCardBody>
-      </CCard>
+          </CCardBody>
+        </CCard>
+      )}
 
       {/* =====================================================
           TABLE
@@ -1521,7 +1257,7 @@ const Commission = () => {
                               size="sm"
                               color="success"
                               variant="outline"
-                              disabled={current <= 0}
+                              disabled={current <= 0 || bulkPaying}
                               onClick={() => markPaid(item.id, current)}
                             >
                               <CIcon icon={cilCheckCircle} className="me-1" />
@@ -1545,7 +1281,7 @@ const Commission = () => {
       </CCard>
 
       {/* =====================================================
-          SMALL FOOTER SUMMARY
+          FOOTER SUMMARY
       ====================================================== */}
 
       {!loading && filteredCommissions.length > 0 && (
