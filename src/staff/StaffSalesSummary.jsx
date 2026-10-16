@@ -112,11 +112,12 @@ export default function StaffSalesSummary() {
       if (endDate) params.append('endDate', endDate)
 
       const query = params.toString()
+      const token = localStorage.getItem('token')
 
       const response = await fetch(`${API_URL}api/v1/summary${query ? `?${query}` : ''}`, {
         method: 'GET',
         headers: {
-          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
         },
         credentials: 'include',
       })
