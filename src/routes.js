@@ -50,6 +50,7 @@ const returnSales = React.lazy(() => import('./pos/Returns'))
 const attendanceDashboard = React.lazy(() => import('./staff/AttendanceDashboard'))
 const businessHours = React.lazy(() => import('./staff/BusinessHours'))
 const staffPenalties = React.lazy(() => import('./staff/StaffPenalties'))
+const staffSummary = React.lazy(() => import('./staff/StaffSalesSummary'))
 const serviceCommission = React.lazy(() => import('./staff/ServiceCommission'))
 const ProductConsumption = React.lazy(() => import('./product/productConsuption'))
 const Layout = React.lazy(() => import('./views/forms/layout/Layout'))
@@ -228,6 +229,13 @@ export const routes = [
     path: '/productConsumption',
     name: 'Product Consumption Management',
     element: ProductConsumption,
+    roles: ['admin', 'manager'],
+  },
+
+  {
+    path: '/staffSummary',
+    name: 'Staff Summary',
+    element: staffSummary,
     roles: ['admin', 'manager'],
   },
   // { path: '/pos', name: 'Pos', element: Pos },
