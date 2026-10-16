@@ -128,7 +128,7 @@ export default function StaffSalesSummary() {
         throw new Error(payload?.message || 'Unable to load the staff sales report.')
       }
 
-      const result = payload?.data ?? payload
+      const result = Array.isArray(payload?.data) ? payload : (payload?.data ?? payload)
 
       setReport({
         data: Array.isArray(result.data) ? result.data : [],
