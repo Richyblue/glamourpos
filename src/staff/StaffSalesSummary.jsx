@@ -1,9 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import './StaffSalesSummary.css'
 
-// Change this import path to match the API instance used in your project.
-import api from '../../api/axios'
-
 const formatMoney = (value) =>
   new Intl.NumberFormat('en-NG', {
     style: 'currency',
