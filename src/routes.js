@@ -93,7 +93,7 @@ export const routes = [
     path: '/dashboard',
     name: 'Dashboard',
     element: Dashboard,
-    roles: ['admin', 'manager'],
+    roles: ['admin'],
   },
 
   { path: '/charts', name: 'Charts', element: Charts },
@@ -110,7 +110,7 @@ export const routes = [
     path: '/commission',
     name: 'Commission',
     element: Commission,
-    roles: ['admin', 'manager'],
+    roles: ['admin'],
   },
   {
     path: '/loyaltycard',
@@ -223,7 +223,7 @@ export const routes = [
     path: '/serviceCommission',
     name: 'Service Commission Settings',
     element: serviceCommission,
-    roles: ['admin', 'manager'],
+    roles: ['admin'],
   },
   {
     path: '/productConsumption',

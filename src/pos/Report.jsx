@@ -703,10 +703,11 @@ const Report = () => {
       })
     })
 
-    const totalReturns = Number(report.totalReturns || 0)
+    // Calculate returns from the sales currently displayed.
+    // This keeps totals consistent with the provider/search filters.
+    const totalReturns = filteredSales.reduce((total, sale) => total + getSaleReturnTotal(sale), 0)
 
-    const netSales = grossSales - totalReturns
-
+    const netSales = Math.max(grossSales - totalReturns, 0)
     if (productProfit === 0 && Number(report.productProfit || 0) > 0) {
       productProfit = Number(report.productProfit || 0)
     }
