@@ -36,6 +36,11 @@ import {
   CInputGroup,
   CInputGroupText,
   CSpinner,
+  CModal,
+  CModalHeader,
+  CModalTitle,
+  CModalBody,
+  CModalFooter,
 } from '@coreui/react'
 
 import {
@@ -71,6 +76,8 @@ const Report = () => {
 
   const [showReturnModal, setShowReturnModal] = useState(false)
   const [selectedSaleId, setSelectedSaleId] = useState(null)
+  const [showSaleDetails, setShowSaleDetails] = useState(false)
+  const [selectedSale, setSelectedSale] = useState(null)
 
   const [sales, setSales] = useState([])
   const [report, setReport] = useState({})
@@ -879,6 +886,12 @@ const Report = () => {
     setShowReturnModal(true)
   }
 
+  // Presentation-only transaction details. Existing sale actions remain unchanged.
+  const handleViewSale = (sale) => {
+    setSelectedSale(sale)
+    setShowSaleDetails(true)
+  }
+
   // =========================================================
   // EXCEL EXPORT
   // =========================================================
@@ -1389,21 +1402,18 @@ const Report = () => {
       )}
 
       {/* =====================================================
-          SALES TABLE
+          SALES TABLE — COMPACT TRANSACTION OVERVIEW
       ====================================================== */}
 
       <CCard className="border-0 shadow-sm">
-        <CCardHeader className="bg-transparent">
-          <div className="d-flex justify-content-between align-items-center">
+        <CCardHeader className="bg-transparent py-3">
+          <div className="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
               <h5 className="mb-1 fw-bold">Sales Transactions</h5>
-
               <small className="text-medium-emphasis">
-                Showing {filteredSales.length} transaction
-                {filteredSales.length !== 1 ? 's' : ''}
+                {filteredSales.length} transaction{filteredSales.length !== 1 ? 's' : ''} · Select View for the full transaction breakdown
               </small>
             </div>
-
             <CBadge color="primary" className="px-3 py-2">
               Staff Share: {money(kpis.staffShare)}
             </CBadge>
@@ -1411,34 +1421,18 @@ const Report = () => {
         </CCardHeader>
 
         <CCardBody className="p-0">
-          <CTable hover responsive className="mb-0 align-middle">
-            <CTableHead>
+          <CTable hover responsive className="mb-0 align-middle report-transactions-table">
+            <CTableHead color="light">
               <CTableRow>
-                <CTableHeaderCell>Invoice</CTableHeaderCell>
-
+                <CTableHeaderCell className="ps-3">Transaction</CTableHeaderCell>
                 <CTableHeaderCell>Customer</CTableHeaderCell>
-
-                <CTableHeaderCell>Sales By</CTableHeaderCell>
-
-                <CTableHeaderCell>Service Provider</CTableHeaderCell>
-
-                <CTableHeaderCell>Service Rendered</CTableHeaderCell>
-
-                <CTableHeaderCell>Service Type</CTableHeaderCell>
-
-                <CTableHeaderCell>Revenue</CTableHeaderCell>
-
-                <CTableHeaderCell>Staff Share</CTableHeaderCell>
-
-                <CTableHeaderCell>Owner Profit</CTableHeaderCell>
-
-                <CTableHeaderCell>Card / Stand</CTableHeaderCell>
-
+                <CTableHeaderCell>Assigned Staff</CTableHeaderCell>
+                <CTableHeaderCell>Sale Type</CTableHeaderCell>
+                <CTableHeaderCell>Net Revenue</CTableHeaderCell>
+                <CTableHeaderCell>Staff Commission</CTableHeaderCell>
                 <CTableHeaderCell>Status</CTableHeaderCell>
-
                 <CTableHeaderCell>Date</CTableHeaderCell>
-
-                <CTableHeaderCell>Action</CTableHeaderCell>
+                <CTableHeaderCell className="text-end pe-3">Actions</CTableHeaderCell>
               </CTableRow>
             </CTableHead>
 
@@ -1446,336 +1440,95 @@ const Report = () => {
               {filteredSales.length > 0 ? (
                 filteredSales.map((sale) => {
                   const services = getServiceItems(sale)
-
+                  const products = getProductItems(sale)
                   const returnAmount = getSaleReturnTotal(sale)
-
-                  const serviceTotal = getRemainingServiceTotal(sale)
-
-                  const productTotal = getRemainingProductTotal(sale)
-
-                  const staffShare = getStaffShare(sale)
-
+                  const netAmount = Math.max(Number(sale.totalAmount || 0) - returnAmount, 0)
                   const currentCommission = getCurrentCommission(sale)
-
                   const paidCommission = getPaidCommission(sale)
-
-                  const returnedCommission = getReturnedCommission(sale)
-
-                  const outstandingCommission = getOutstandingCommission(sale)
-
-                  const commissionStatus = getCommissionStatus(sale)
-
-                  const commissionRate = getCommissionRate(sale)
-
-                  const serviceType = getServiceType(sale)
-
-                  const isHomeService = serviceType === 'home_service'
-
-                  const ownerServiceProfit = getOwnerServiceProfit(sale)
-
-                  const saleNetAmount = Math.max(Number(sale.totalAmount || 0) - returnAmount, 0)
-
-                  const hasReturnedProduct = getReturnedProductItems(sale).length > 0
-
-                  const commissionIsPending = commissionStatus === 'pending'
-
-                  const commissionIsPaid = commissionStatus === 'paid'
-
-                  const commissionIsPartial = commissionStatus === 'partial'
-
-                  /*
-                   * All staff on this sale.
-                   */
-                  const saleProviders = [
-                    ...new Set(
-                      services
-                        .map((item) => getServiceItemProvider(sale, item))
-                        .filter((name) => name && name !== '-'),
-                    ),
-                  ]
+                  const pendingCommission = getStaffShare(sale)
+                  const providers = [...new Set([
+                    ...services.map((item) => getServiceItemProvider(sale, item)),
+                    ...getCommissions(sale).map((commission) => getStaffName(commission?.Staff || commission?.staff)),
+                  ].filter((name) => name && name !== '-'))]
+                  const saleType = services.length && products.length
+                    ? 'Mixed sale'
+                    : services.length ? 'Service' : products.length ? 'Product' : 'Sale'
+                  const status = String(sale.approvalStatus || 'pending').toLowerCase()
 
                   return (
                     <CTableRow key={sale.id}>
-                      {/* INVOICE */}
-
-                      <CTableDataCell>
-                        <strong>{sale.invoiceNumber || sale.receiptNumber || '-'}</strong>
-
-                        {returnAmount > 0 && (
-                          <div className="mt-1">
-                            <CBadge color="danger">RETURNED: {money(returnAmount)}</CBadge>
-                          </div>
-                        )}
+                      <CTableDataCell className="ps-3">
+                        <div className="fw-semibold text-primary">{sale.invoiceNumber || sale.receiptNumber || `#${sale.id}`}</div>
+                        <small className="text-medium-emphasis">{saleType}</small>
+                        {returnAmount > 0 && <div><CBadge color="danger" className="mt-1">Returned {money(returnAmount)}</CBadge></div>}
                       </CTableDataCell>
 
-                      {/* CUSTOMER */}
-
-                      <CTableDataCell>{getCustomerName(sale)}</CTableDataCell>
-
-                      {/* CASHIER */}
-
-                      <CTableDataCell>{getCashierName(sale)}</CTableDataCell>
-
-                      {/* PROVIDERS */}
-
                       <CTableDataCell>
-                        {saleProviders.length > 0 ? (
-                          <div className="d-flex flex-column gap-1">
-                            {saleProviders.map((provider) => (
-                              <CBadge key={provider} color="info">
-                                {provider}
-                              </CBadge>
-                            ))}
-                          </div>
-                        ) : (
-                          '-'
-                        )}
+                        <div className="fw-semibold">{getCustomerName(sale)}</div>
+                        <small className="text-medium-emphasis">Cashier: {getCashierName(sale)}</small>
                       </CTableDataCell>
 
-                      {/* SERVICES */}
-
                       <CTableDataCell>
-                        {services.length > 0 ? (
-                          services.map((item, index) => {
-                            const serviceName =
-                              item?.Service?.name ||
-                              item?.service?.name ||
-                              item?.serviceName ||
-                              item?.name ||
-                              'Service'
-
-                            const provider = getServiceItemProvider(sale, item)
-
-                            const returnStatus = getServiceReturnStatus(sale, item)
-
-                            return (
-                              <div key={item.id || index} className="mb-3">
-                                <div className="fw-semibold">{serviceName}</div>
-
-                                <div className="small text-primary fw-semibold">
-                                  Staff: {provider}
-                                </div>
-
-                                <small className="text-medium-emphasis">
-                                  {returnStatus.returned
-                                    ? returnStatus.partial
-                                      ? `${returnStatus.returnedQuantity} returned / ${returnStatus.remainingQuantity} remaining`
-                                      : `${returnStatus.returnedQuantity} returned`
-                                    : `Qty: ${item.quantity || 1} • ${money(item.subtotal)}`}
-                                </small>
-
-                                {returnStatus.returned && !returnStatus.partial && (
-                                  <div>
-                                    <CBadge color="danger" className="mt-1">
-                                      RETURNED
-                                    </CBadge>
-                                  </div>
-                                )}
-
-                                {returnStatus.partial && (
-                                  <div>
-                                    <CBadge color="warning" textColor="dark" className="mt-1">
-                                      PARTIALLY RETURNED
-                                    </CBadge>
-                                  </div>
-                                )}
-                              </div>
-                            )
-                          })
-                        ) : (
-                          <span className="text-medium-emphasis">No service</span>
-                        )}
-
-                        {hasReturnedProduct && (
-                          <CBadge color="secondary" className="mt-1">
-                            Product return
-                          </CBadge>
-                        )}
-                      </CTableDataCell>
-
-                      {/* SERVICE TYPE */}
-
-                      <CTableDataCell>
-                        {services.length > 0 ? (
-                          <CBadge color={isHomeService ? 'dark' : 'primary'}>
-                            {isHomeService ? 'Home Service' : 'In-Salon'}
-                          </CBadge>
-                        ) : (
-                          '-'
-                        )}
-
-                        {commissionRate > 0 && (
-                          <div className="small text-medium-emphasis mt-1">{commissionRate}%</div>
-                        )}
-                      </CTableDataCell>
-
-                      {/* REVENUE */}
-
-                      <CTableDataCell>
-                        <div className="fw-bold">{money(saleNetAmount)}</div>
-
-                        {serviceTotal > 0 && (
-                          <small className="text-info d-block">
-                            Service: {money(serviceTotal)}
-                          </small>
-                        )}
-
-                        {productTotal > 0 && (
-                          <small className="text-secondary d-block">
-                            Product: {money(productTotal)}
-                          </small>
-                        )}
-
-                        {returnAmount > 0 && (
-                          <small className="text-danger d-block">
-                            Return: -{money(returnAmount)}
-                          </small>
-                        )}
-                      </CTableDataCell>
-
-                      {/* STAFF SHARE */}
-
-                      <CTableDataCell>
-                        {commissionIsPending && staffShare > 0 ? (
-                          <>
-                            <div className="fw-bold text-warning">{money(staffShare)}</div>
-
-                            <small className="text-medium-emphasis">Pending</small>
-
-                            {outstandingCommission > 0 && (
-                              <small className="text-muted d-block">
-                                Outstanding: {money(outstandingCommission)}
-                              </small>
-                            )}
-                          </>
-                        ) : commissionIsPartial ? (
-                          <>
-                            {staffShare > 0 && (
-                              <div className="fw-bold text-warning">{money(staffShare)}</div>
-                            )}
-
-                            {paidCommission > 0 && (
-                              <small className="text-success d-block">
-                                Paid: {money(paidCommission)}
-                              </small>
-                            )}
-
-                            {outstandingCommission > 0 && (
-                              <small className="text-warning d-block">
-                                Outstanding: {money(outstandingCommission)}
-                              </small>
-                            )}
-
-                            <CBadge color="warning" textColor="dark" className="mt-1">
-                              Partially Paid
-                            </CBadge>
-                          </>
-                        ) : commissionIsPaid && paidCommission > 0 ? (
-                          <>
-                            <div className="text-medium-emphasis">{money(paidCommission)}</div>
-
-                            <CBadge color="secondary" className="mt-1">
-                              Paid
-                            </CBadge>
-                          </>
-                        ) : currentCommission > 0 ? (
-                          <>
-                            <div className="text-medium-emphasis">{money(currentCommission)}</div>
-
-                            <small className="text-muted d-block">Current commission</small>
-                          </>
-                        ) : (
-                          '-'
-                        )}
-
-                        {returnedCommission > 0 && (
-                          <small className="text-danger d-block mt-1">
-                            Returned: -{money(returnedCommission)}
-                          </small>
-                        )}
-                      </CTableDataCell>
-
-                      {/* OWNER PROFIT */}
-
-                      <CTableDataCell>
-                        {serviceTotal > 0 ? (
-                          <div className="fw-bold text-success">{money(ownerServiceProfit)}</div>
-                        ) : (
-                          '-'
-                        )}
-                      </CTableDataCell>
-
-                      {/* CARD / STAND */}
-
-                      <CTableDataCell>
-                        {isHomeService ? (
-                          <CBadge color="dark">Home Service</CBadge>
-                        ) : (
-                          <>
+                        {providers.length ? (
+                          <div className="d-flex align-items-center gap-2">
+                            <span className="report-staff-count">{providers.length}</span>
                             <div>
-                              <strong>Card:</strong> {sale.CardNumber || '-'}
+                              <div className="fw-semibold">{providers.length} staff assigned</div>
+                              <small className="text-medium-emphasis">View names & allocation</small>
                             </div>
-
-                            <small className="text-medium-emphasis">
-                              Stand: {sale.StandTag || '-'}
-                            </small>
-                          </>
-                        )}
+                          </div>
+                        ) : <span className="text-medium-emphasis">Not assigned</span>}
                       </CTableDataCell>
 
-                      {/* STATUS */}
+                      <CTableDataCell>
+                        {services.length > 0 && <CBadge color="info" className="me-1">Service</CBadge>}
+                        {products.length > 0 && <CBadge color="secondary">Product</CBadge>}
+                        {!services.length && !products.length && '-'}
+                      </CTableDataCell>
 
                       <CTableDataCell>
-                        <CBadge
-                          color={
-                            sale.approvalStatus === 'approved'
-                              ? 'success'
-                              : sale.approvalStatus === 'cancelled'
-                                ? 'danger'
-                                : 'warning'
-                          }
-                        >
+                        <div className="fw-bold">{money(netAmount)}</div>
+                        {returnAmount > 0 && <small className="text-danger">Less {money(returnAmount)} return</small>}
+                      </CTableDataCell>
+
+                      <CTableDataCell>
+                        <div className="fw-semibold">{money(currentCommission)}</div>
+                        <small className="text-medium-emphasis">
+                          {paidCommission > 0 ? `Paid ${money(paidCommission)}` : pendingCommission > 0 ? 'Awaiting payment' : 'No commission'}
+                        </small>
+                      </CTableDataCell>
+
+                      <CTableDataCell>
+                        <CBadge color={status === 'approved' ? 'success' : status === 'cancelled' ? 'danger' : 'warning'}>
                           {sale.approvalStatus || 'pending'}
                         </CBadge>
-
-                        {returnAmount > 0 && (
-                          <div className="mt-1">
-                            <CBadge color="danger">RETURN</CBadge>
-                          </div>
-                        )}
+                        {returnAmount > 0 && <div><CBadge color="danger" className="mt-1">RETURN</CBadge></div>}
                       </CTableDataCell>
 
-                      {/* DATE */}
-
                       <CTableDataCell>
-                        {sale.createdAt ? new Date(sale.createdAt).toLocaleDateString() : '-'}
+                        <div>{sale.createdAt ? new Date(sale.createdAt).toLocaleDateString('en-NG') : '-'}</div>
+                        <small className="text-medium-emphasis">{sale.createdAt ? new Date(sale.createdAt).toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' }) : ''}</small>
                       </CTableDataCell>
 
-                      {/* ACTION */}
-
-                      <CTableDataCell>
-                        <CButton
-                          color="warning"
-                          size="sm"
-                          disabled={sale.status === 'refunded'}
-                          onClick={() => handleReturn(sale)}
-                        >
-                          {sale.status === 'refunded' ? 'Returned' : 'Return'}
-                        </CButton>
+                      <CTableDataCell className="text-end pe-3">
+                        <div className="d-inline-flex gap-2">
+                          <CButton color="primary" variant="outline" size="sm" onClick={() => handleViewSale(sale)}>
+                            View
+                          </CButton>
+                          <CButton color="warning" size="sm" disabled={sale.status === 'refunded'} onClick={() => handleReturn(sale)}>
+                            {sale.status === 'refunded' ? 'Returned' : 'Return'}
+                          </CButton>
+                        </div>
                       </CTableDataCell>
                     </CTableRow>
                   )
                 })
               ) : (
                 <CTableRow>
-                  <CTableDataCell colSpan="13" className="text-center py-5">
+                  <CTableDataCell colSpan="9" className="text-center py-5">
                     <CIcon icon={cilSearch} size="xl" className="text-medium-emphasis mb-3" />
-
                     <h5>No sales found</h5>
-
-                    <p className="text-medium-emphasis mb-0">
-                      Try changing your search, service provider or date filters.
-                    </p>
+                    <p className="text-medium-emphasis mb-0">Try changing your search, service provider or date filters.</p>
                   </CTableDataCell>
                 </CTableRow>
               )}
@@ -1783,6 +1536,239 @@ const Report = () => {
           </CTable>
         </CCardBody>
       </CCard>
+
+      {/* =====================================================
+          TRANSACTION DETAILS — READ-ONLY PRESENTATION
+      ====================================================== */}
+      <CModal
+        alignment="center"
+        size="xl"
+        scrollable
+        visible={showSaleDetails}
+        onClose={() => setShowSaleDetails(false)}
+        className="report-detail-modal"
+        backdrop="static"
+      >
+        <CModalHeader className="report-detail-header">
+          <div className="w-100 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <div className="small text-white-50 text-uppercase fw-semibold mb-1">Transaction record</div>
+              <CModalTitle className="text-white fw-bold">
+                {selectedSale?.invoiceNumber || selectedSale?.receiptNumber || (selectedSale ? `Transaction #${selectedSale.id}` : 'Transaction details')}
+              </CModalTitle>
+              <small className="text-white-50">Complete sales, service, staff and commission breakdown</small>
+            </div>
+            {selectedSale && (
+              <CBadge color={String(selectedSale.approvalStatus || 'pending').toLowerCase() === 'approved' ? 'success' : String(selectedSale.approvalStatus || '').toLowerCase() === 'cancelled' ? 'danger' : 'warning'} className="px-3 py-2">
+                {selectedSale.approvalStatus || 'pending'}
+              </CBadge>
+            )}
+          </div>
+        </CModalHeader>
+
+        <CModalBody className="p-3 p-lg-4">
+          {selectedSale && (() => {
+            const sale = selectedSale
+            const services = getServiceItems(sale)
+            const products = getProductItems(sale)
+            const commissions = getCommissions(sale)
+            const returns = getSaleReturns(sale)
+            const returnAmount = getSaleReturnTotal(sale)
+            const serviceRevenue = getRemainingServiceTotal(sale)
+            const productRevenue = getRemainingProductTotal(sale)
+            const grossAmount = Number(sale.totalAmount || 0)
+            const netAmount = Math.max(grossAmount - returnAmount, 0)
+            const earnedCommission = getCurrentCommission(sale)
+            const paidCommission = getPaidCommission(sale)
+            const outstandingCommission = getOutstandingCommission(sale)
+            const reversedCommission = getReturnedCommission(sale)
+            const ownerServiceProfit = getOwnerServiceProfit(sale)
+            const providers = [...new Set([
+              ...services.map((item) => getServiceItemProvider(sale, item)),
+              ...commissions.map((commission) => getStaffName(commission?.Staff || commission?.staff)),
+            ].filter((name) => name && name !== '-'))]
+            const paymentMethod = sale.paymentMethod || sale.PaymentMethod || sale.payment_method || sale.paymentType || '-'
+            const serviceTypeLabel = (value) => value === 'home_service' ? 'Home service' : value === 'in_salon' ? 'In-salon' : value || '-'
+            const itemName = (item, type) => type === 'service'
+              ? item?.Service?.name || item?.service?.name || item?.serviceName || item?.name || 'Service'
+              : item?.Product?.name || item?.product?.name || item?.productName || item?.name || 'Product'
+
+            return (
+              <div className="report-detail-content">
+                {/* TOP SUMMARY */}
+                <div className="report-detail-summary mb-4">
+                  <div>
+                    <span className="report-detail-eyebrow">Net transaction value</span>
+                    <div className="report-detail-total">{money(netAmount)}</div>
+                    <small>{sale.createdAt ? new Date(sale.createdAt).toLocaleString('en-NG') : 'Date not available'}</small>
+                  </div>
+                  <div className="report-detail-summary-stats">
+                    <div><span>Gross amount</span><strong>{money(grossAmount)}</strong></div>
+                    <div><span>Returns</span><strong className={returnAmount > 0 ? 'text-danger' : ''}>{money(returnAmount)}</strong></div>
+                    <div><span>Items</span><strong>{services.length + products.length}</strong></div>
+                  </div>
+                </div>
+
+                {/* TRANSACTION INFORMATION */}
+                <section className="report-detail-section mb-4">
+                  <div className="report-section-heading"><span className="report-section-icon">01</span><div><h6>Transaction information</h6><small>Customer, operator and payment details</small></div></div>
+                  <CRow className="g-3">
+                    {[
+                      ['Customer', getCustomerName(sale)],
+                      ['Recorded by / Cashier', getCashierName(sale)],
+                      ['Payment method', paymentMethod],
+                      ['Service mode', serviceTypeLabel(getServiceType(sale))],
+                      ['Card number', sale.CardNumber || sale.cardNumber || '—'],
+                      ['Stand tag', sale.StandTag || sale.standTag || '—'],
+                    ].map(([label, value]) => (
+                      <CCol xs={12} sm={6} md={4} key={label}>
+                        <div className="report-detail-field"><span>{label}</span><strong>{value || '—'}</strong></div>
+                      </CCol>
+                    ))}
+                  </CRow>
+                </section>
+
+                {/* SERVICE LINES */}
+                <section className="report-detail-section mb-4">
+                  <div className="report-section-heading"><span className="report-section-icon">02</span><div><h6>Services rendered</h6><small>Service-level staff assignment, quantities and returns</small></div><CBadge color="info" className="ms-auto">{services.length} service{services.length !== 1 ? 's' : ''}</CBadge></div>
+                  {services.length ? (
+                    <div className="table-responsive"><table className="table report-detail-lines mb-0">
+                      <thead><tr><th>Service</th><th>Assigned staff</th><th>Service mode</th><th>Qty</th><th>Amount</th><th>Return status</th></tr></thead>
+                      <tbody>{services.map((item, index) => {
+                        const returned = getServiceReturnStatus(sale, item)
+                        const type = item?.serviceType || item?.ServiceType || getServiceType(sale)
+                        return <tr key={item.id || index}>
+                          <td><strong>{itemName(item, 'service')}</strong></td>
+                          <td>{getServiceItemProvider(sale, item)}</td>
+                          <td><span className="report-mode-pill">{serviceTypeLabel(type)}</span></td>
+                          <td>{item.quantity || 1}</td>
+                          <td className="fw-semibold">{money(item.subtotal)}</td>
+                          <td>{returned.returned ? <CBadge color={returned.partial ? 'warning' : 'danger'}>{returned.partial ? `${returned.returnedQuantity} returned · ${returned.remainingQuantity} left` : 'Returned'}</CBadge> : <CBadge color="success">Active</CBadge>}</td>
+                        </tr>
+                      })}</tbody>
+                    </table></div>
+                  ) : <div className="report-detail-empty">No service items recorded for this transaction.</div>}
+                </section>
+
+                {/* PRODUCT LINES */}
+                <section className="report-detail-section mb-4">
+                  <div className="report-section-heading"><span className="report-section-icon">03</span><div><h6>Products sold</h6><small>Product quantities, values and return status</small></div><CBadge color="secondary" className="ms-auto">{products.length} product{products.length !== 1 ? 's' : ''}</CBadge></div>
+                  {products.length ? (
+                    <div className="table-responsive"><table className="table report-detail-lines mb-0">
+                      <thead><tr><th>Product</th><th>Quantity</th><th>Unit price</th><th>Line total</th><th>Return status</th></tr></thead>
+                      <tbody>{products.map((item, index) => {
+                        const returned = getProductReturnStatus(sale, item)
+                        const qty = Number(item.quantity || 1)
+                        const unitPrice = qty > 0 ? Number(item.subtotal || 0) / qty : 0
+                        return <tr key={item.id || index}>
+                          <td><strong>{itemName(item, 'product')}</strong></td><td>{qty}</td><td>{money(unitPrice)}</td><td className="fw-semibold">{money(item.subtotal)}</td>
+                          <td>{returned.returned ? <CBadge color={returned.partial ? 'warning' : 'danger'}>{returned.partial ? `${returned.returnedQuantity} returned · ${returned.remainingQuantity} left` : 'Returned'}</CBadge> : <CBadge color="success">Active</CBadge>}</td>
+                        </tr>
+                      })}</tbody>
+                    </table></div>
+                  ) : <div className="report-detail-empty">No product items recorded for this transaction.</div>}
+                </section>
+
+                {/* COMMISSION */}
+                <section className="report-detail-section mb-4">
+                  <div className="report-section-heading"><span className="report-section-icon">04</span><div><h6>Staff commission breakdown</h6><small>Commission records and payment status by staff member</small></div><CBadge color="primary" className="ms-auto">{commissions.length} record{commissions.length !== 1 ? 's' : ''}</CBadge></div>
+                  {commissions.length ? (
+                    <div className="table-responsive"><table className="table report-detail-lines mb-0">
+                      <thead><tr><th>Staff member</th><th>Commission rate</th><th>Commission</th><th>Paid</th><th>Outstanding</th><th>Reversed</th><th>Status</th></tr></thead>
+                      <tbody>{commissions.map((commission, index) => {
+                        const staff = getStaffName(commission?.Staff || commission?.staff)
+                        const amount = Number(commission?.currentCommissionAmount ?? commission?.commissionAmount ?? 0)
+                        const status = String(commission?.status || '—').toLowerCase()
+                        return <tr key={commission.id || index}>
+                          <td><strong>{staff !== '-' ? staff : commission.staffName || 'Staff not linked'}</strong></td>
+                          <td>{Number(commission?.commissionRate || 0)}%</td>
+                          <td className="fw-semibold">{money(amount)}</td>
+                          <td className="text-success">{money(commission?.paidAmount)}</td>
+                          <td className="text-warning">{money(commission?.outstandingCommission)}</td>
+                          <td className="text-danger">{money(commission?.returnedCommissionAmount)}</td>
+                          <td><CBadge color={status === 'paid' ? 'success' : status === 'pending' ? 'warning' : 'secondary'}>{commission?.status || 'Not specified'}</CBadge></td>
+                        </tr>
+                      })}</tbody>
+                    </table></div>
+                  ) : <div className="report-detail-empty">No commission records are attached to this transaction.</div>}
+                  {providers.length > 0 && <div className="report-assigned-staff mt-3"><span className="small text-medium-emphasis me-2">Assigned team</span>{providers.map((name) => <CBadge color="light" textColor="dark" className="me-1 mb-1" key={name}>{name}</CBadge>)}</div>}
+                </section>
+
+                {/* RETURNS HISTORY */}
+                <section className="report-detail-section mb-4">
+                  <div className="report-section-heading"><span className="report-section-icon">05</span><div><h6>Returns & adjustments</h6><small>Refund records associated with this sale</small></div><CBadge color={returns.length ? 'danger' : 'success'} className="ms-auto">{returns.length} return{returns.length !== 1 ? 's' : ''}</CBadge></div>
+                  {returns.length ? <div className="table-responsive"><table className="table report-detail-lines mb-0"><thead><tr><th>Return date</th><th>Reference</th><th>Reason</th><th>Refund amount</th></tr></thead><tbody>{returns.map((record, index) => <tr key={record.id || index}><td>{record.createdAt ? new Date(record.createdAt).toLocaleString('en-NG') : '—'}</td><td>{record.returnNumber || record.reference || record.id || '—'}</td><td>{record.reason || record.notes || '—'}</td><td className="fw-semibold text-danger">-{money(record.totalRefund)}</td></tr>)}</tbody></table></div> : <div className="report-detail-empty">There are no returns or refunds for this transaction.</div>}
+                </section>
+
+                {/* FINANCIAL SUMMARY */}
+                <section className="report-detail-section report-financial-section">
+                  <div className="report-section-heading"><span className="report-section-icon">06</span><div><h6>Financial summary</h6><small>Transaction value and current commission position</small></div></div>
+                  <div className="report-financial-grid">
+                    <div><span>Gross sale</span><strong>{money(grossAmount)}</strong></div>
+                    <div><span>Service revenue after returns</span><strong>{money(serviceRevenue)}</strong></div>
+                    <div><span>Product revenue after returns</span><strong>{money(productRevenue)}</strong></div>
+                    <div><span>Refunds / returns</span><strong className="text-danger">-{money(returnAmount)}</strong></div>
+                    <div><span>Net transaction</span><strong>{money(netAmount)}</strong></div>
+                    <div><span>Commission total</span><strong>{money(earnedCommission)}</strong></div>
+                    <div><span>Commission paid</span><strong className="text-success">{money(paidCommission)}</strong></div>
+                    <div><span>Commission outstanding</span><strong className="text-warning">{money(outstandingCommission)}</strong></div>
+                    <div><span>Commission reversed</span><strong className="text-danger">{money(reversedCommission)}</strong></div>
+                    <div className="report-owner-profit"><span>Owner service profit*</span><strong>{money(ownerServiceProfit)}</strong></div>
+                  </div>
+                  <small className="text-medium-emphasis d-block mt-3">*Owner service profit follows the report's existing calculation and is displayed here without changing the underlying report logic.</small>
+                </section>
+              </div>
+            )
+          })()}
+        </CModalBody>
+        <CModalFooter className="report-detail-footer">
+          <div className="me-auto small text-medium-emphasis">Read-only transaction details · Existing report figures and actions are unchanged</div>
+          {selectedSale && <CButton color="warning" onClick={() => { setShowSaleDetails(false); handleReturn(selectedSale) }} disabled={selectedSale.status === 'refunded'}>Process Return</CButton>}
+          <CButton color="secondary" variant="outline" onClick={() => setShowSaleDetails(false)}>Close</CButton>
+        </CModalFooter>
+      </CModal>
+
+      <style>{`
+        .report-transactions-table th { white-space: nowrap; font-size: .76rem; text-transform: uppercase; letter-spacing: .045em; color: #687386; font-weight: 700; }
+        .report-transactions-table td { padding-top: .9rem; padding-bottom: .9rem; font-size: .875rem; }
+        .report-staff-count { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(50,31,219,.09); color: #321fdb; font-weight: 800; }
+        .report-detail-modal .modal-dialog { animation: reportModalIn .28s cubic-bezier(.2,.8,.2,1); }
+        .report-detail-modal .modal-content { border: 0; border-radius: 18px; overflow: hidden; box-shadow: 0 24px 80px rgba(15,23,42,.25); }
+        .report-detail-header { border: 0; padding: 1.35rem 1.6rem; color: #fff; background: linear-gradient(120deg,#172554 0%,#243b78 55%,#321fdb 100%); }
+        .report-detail-header .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
+        .report-detail-content { animation: reportContentIn .35s ease both; }
+        .report-detail-summary { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; padding: 1.35rem 1.5rem; border-radius: 15px; color: #fff; background: linear-gradient(120deg,#101b3b,#263d75); }
+        .report-detail-eyebrow { display: block; color: rgba(255,255,255,.68); font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+        .report-detail-total { font-size: clamp(1.7rem,4vw,2.35rem); font-weight: 800; letter-spacing: -.04em; line-height: 1.25; }
+        .report-detail-summary small { color: rgba(255,255,255,.68); }
+        .report-detail-summary-stats { display: flex; flex-wrap: wrap; gap: 1.4rem; }
+        .report-detail-summary-stats div { display: flex; flex-direction: column; gap: .25rem; }
+        .report-detail-summary-stats span { color: rgba(255,255,255,.65); font-size: .72rem; }
+        .report-detail-summary-stats strong { color: #fff; font-size: .98rem; }
+        .report-detail-section { padding: 1.2rem; border: 1px solid #e9edf5; border-radius: 14px; background: #fff; box-shadow: 0 4px 16px rgba(15,23,42,.035); }
+        .report-section-heading { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+        .report-section-heading h6 { margin: 0; font-weight: 800; color: #172033; }
+        .report-section-heading small { color: #8791a3; font-size: .76rem; }
+        .report-section-icon { width: 34px; height: 34px; flex: 0 0 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; background: #eef1ff; color: #321fdb; font-size: .75rem; font-weight: 800; }
+        .report-detail-field { height: 100%; padding: .75rem .85rem; border-radius: 10px; background: #f7f8fc; }
+        .report-detail-field span, .report-financial-grid span { display: block; margin-bottom: .25rem; color: #7c8799; font-size: .72rem; font-weight: 600; }
+        .report-detail-field strong { color: #202b40; font-size: .88rem; overflow-wrap: anywhere; }
+        .report-detail-lines { font-size: .82rem; vertical-align: middle; }
+        .report-detail-lines thead th { padding: .7rem .65rem; border-bottom: 1px solid #e6eaf1; color: #7b8495; background: #f8f9fc; font-size: .69rem; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+        .report-detail-lines tbody td { padding: .75rem .65rem; border-color: #edf0f5; }
+        .report-mode-pill { display: inline-block; padding: .28rem .55rem; border-radius: 20px; background: #eef1ff; color: #3546a5; font-size: .72rem; font-weight: 700; white-space: nowrap; }
+        .report-detail-empty { padding: 1rem; border: 1px dashed #dce2ec; border-radius: 10px; color: #8791a3; text-align: center; font-size: .84rem; }
+        .report-financial-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .7rem; }
+        .report-financial-grid > div { padding: .8rem .9rem; border-radius: 10px; background: #f7f8fc; }
+        .report-financial-grid strong { color: #202b40; font-size: .92rem; }
+        .report-financial-grid .report-owner-profit { background: #edf9f1; }
+        .report-financial-grid .report-owner-profit strong { color: #168348; }
+        .report-detail-footer { padding: 1rem 1.5rem; background: #fbfcfe; }
+        @keyframes reportModalIn { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes reportContentIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 575.98px) { .report-detail-summary { align-items: flex-start; flex-direction: column; } .report-detail-summary-stats { width: 100%; justify-content: space-between; gap: .65rem; } .report-financial-grid { grid-template-columns: 1fr; } .report-detail-section { padding: .9rem; } .report-detail-footer { align-items: stretch; flex-direction: column; } .report-detail-footer .me-auto { margin: 0 !important; } }
+        @media (prefers-reduced-motion: reduce) { .report-detail-modal .modal-dialog, .report-detail-content { animation: none !important; } }
+      `}</style>
 
       {/* =====================================================
           RETURN MODAL
