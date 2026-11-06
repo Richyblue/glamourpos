@@ -43,7 +43,7 @@ const ScanScreen = ({
       setNextAction(response.data.nextAction)
       await loadKioskKPIs()
 
-      setScreen('action')
+      setScreen('face')
     } catch (err) {
       console.error(err)
 

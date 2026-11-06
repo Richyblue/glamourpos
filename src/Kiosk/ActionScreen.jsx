@@ -3,8 +3,8 @@ import { useState } from 'react'
 import { CCard, CCardBody, CButton, CFormSelect, CSpinner, CAlert } from '@coreui/react'
 
 import { clockIn, goOut, returnBack, clockOut } from '../services/kioskApi'
-
-const ActionScreen = ({ staff, nextAction, setScreen, setSuccessData }) => {
+import Swal from 'sweetalert2'
+const ActionScreen = ({ staff, nextAction, verificationToken, setScreen, setSuccessData }) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -18,8 +18,13 @@ const ActionScreen = ({ staff, nextAction, setScreen, setSuccessData }) => {
       setLoading(true)
       setError('')
 
+      if (!verificationToken) {
+        throw new Error('Face verification is required before attendance can continue.')
+      }
+
       const payload = {
         qrCode: staff.qrCode,
+        verificationToken,
       }
 
       let response
@@ -32,6 +37,7 @@ const ActionScreen = ({ staff, nextAction, setScreen, setSuccessData }) => {
         case 'goout':
           response = await goOut({
             qrCode: staff.qrCode,
+            verificationToken,
             reason,
             expectedReturn,
           })
@@ -59,6 +65,54 @@ const ActionScreen = ({ staff, nextAction, setScreen, setSuccessData }) => {
       console.error('Kiosk action failed:', err)
 
       setError(err.response?.data?.message || err.message || 'Operation Failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const performEmergencyClockOut = async () => {
+    if (loading) return
+
+    const result = await Swal.fire({
+      title: 'Emergency Clock Out?',
+      text: 'This will attempt to complete your attendance for today immediately.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Clock Out',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#dc3545',
+      reverseButtons: true,
+    })
+
+    if (!result.isConfirmed) return
+
+    try {
+      setLoading(true)
+      setError('')
+
+      if (!verificationToken) {
+        throw new Error('Face verification is required before attendance can continue.')
+      }
+
+      const payload = {
+        qrCode: staff.qrCode,
+        verificationToken,
+      }
+
+      const response = await clockOut(payload)
+
+      console.log('Emergency clock-out successful:', response)
+
+      setSuccessData({
+        action: 'clockout',
+        response: response.data,
+      })
+
+      setScreen('success')
+    } catch (err) {
+      console.error('Emergency clock-out failed:', err)
+
+      setError(err.response?.data?.message || err.message || 'Emergency clock-out failed.')
     } finally {
       setLoading(false)
     }
@@ -212,7 +266,7 @@ const ActionScreen = ({ staff, nextAction, setScreen, setSuccessData }) => {
                   color: '#111827',
                 }}
               >
-                PRINCESS SALON
+                Glamour Unisex Salon
               </div>
 
               <div
@@ -469,6 +523,36 @@ const ActionScreen = ({ staff, nextAction, setScreen, setSuccessData }) => {
             >
               Cancel
             </CButton>
+
+            {/* Emergency Clock Out */}
+            <CButton
+              color="danger"
+              variant="outline"
+              size="lg"
+              disabled={loading || !verificationToken}
+              onClick={performEmergencyClockOut}
+              style={{
+                width: '100%',
+                minHeight: 52,
+                marginTop: 18,
+                borderRadius: 14,
+                fontWeight: 700,
+                borderWidth: 1.5,
+              }}
+            >
+              {loading ? (
+                <>
+                  <CSpinner size="sm" className="me-2" />
+                  Processing...
+                </>
+              ) : (
+                'EMERGENCY CLOCK OUT'
+              )}
+            </CButton>
+
+            <div className="small text-body-secondary mt-2" style={{ textAlign: 'center' }}>
+              Use only when you need to end your attendance unexpectedly.
+            </div>
           </div>
         </CCardBody>
 
@@ -484,7 +568,7 @@ const ActionScreen = ({ staff, nextAction, setScreen, setSuccessData }) => {
             color: '#9ca3af',
           }}
         >
-          <span>© {new Date().getFullYear()} Princess Salon</span>
+          <span>© {new Date().getFullYear()} Glamour Unisex Salon</span>
 
           <span>Secure Staff Attendance</span>
         </div>

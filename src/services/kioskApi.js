@@ -1,79 +1,120 @@
 import axios from 'axios'
 
-const API = import.meta.env.VITE_BACKEND_URL
+// =========================================================
+// API CONFIGURATION
+// =========================================================
 
-const token = localStorage.getItem('token')
+const API_BASE_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/+$/, '')
 
-const headers = {
-  Authorization: `Bearer ${token}`,
+const API = `${API_BASE_URL}/api/v1`
+
+// =========================================================
+// GET AUTH HEADERS
+// =========================================================
+
+const getHeaders = () => {
+  const token = localStorage.getItem('token')
+
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  }
 }
+
+// =========================================================
+// API REQUEST HELPER
+// =========================================================
+
+const post = (endpoint, data) => {
+  return axios.post(`${API}${endpoint}`, data, {
+    headers: getHeaders(),
+    timeout: 30000,
+  })
+}
+
+const get = (endpoint) => {
+  return axios.get(`${API}${endpoint}`, {
+    headers: getHeaders(),
+    timeout: 30000,
+  })
+}
+
+// =========================================================
+// SCAN QR
+// =========================================================
 
 export const scanQR = (data) => {
-  return axios.post(
-    `${API}api/v1/kiosk/scan`,
-
-    data,
-
-    { headers },
-  )
+  return post('/kiosk/scan', data)
 }
+
+// =========================================================
+// FACE VERIFICATION
+// =========================================================
+
+export const verifyStaffFace = (data) => {
+  return post('/kiosk/face/verify', {
+    staffId: data.staffId,
+    qrCode: data.qrCode,
+    descriptor: data.descriptor,
+  })
+}
+
+// =========================================================
+// FACE ENROLLMENT
+// =========================================================
+
+export const enrollStaffFace = (data) => {
+  return post('/kiosk/face/enroll', {
+    staffId: data.staffId,
+    descriptor: data.descriptor,
+  })
+}
+
+// =========================================================
+// CLOCK IN
+// =========================================================
 
 export const clockIn = (data) => {
-  return axios.post(
-    `${API}api/v1/kiosk/clock-in`,
-
-    data,
-
-    { headers },
-  )
+  return post('/kiosk/clock-in', data)
 }
+
+// =========================================================
+// GO OUT
+// =========================================================
 
 export const goOut = (data) => {
-  return axios.post(
-    `${API}api/v1/kiosk/go-out`,
-
-    data,
-
-    { headers },
-  )
+  return post('/kiosk/go-out', data)
 }
+
+// =========================================================
+// RETURN BACK
+// =========================================================
 
 export const returnBack = (data) => {
-  return axios.post(
-    `${API}api/v1/kiosk/return`,
-
-    data,
-
-    { headers },
-  )
+  return post('/kiosk/return', data)
 }
+
+// =========================================================
+// CLOCK OUT
+// =========================================================
 
 export const clockOut = (data) => {
-  return axios.post(
-    `${API}api/v1/kiosk/clock-out`,
-
-    data,
-
-    { headers },
-  )
+  return post('/kiosk/clock-out', data)
 }
 
-export const getAttendanceDashboardKPIs = async () => {
-  const token = localStorage.getItem('token')
+// =========================================================
+// ATTENDANCE DASHBOARD KPIs
+// =========================================================
 
-  return axios.get(`${API}api/v1/attendance/dashboard`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  })
+export const getAttendanceDashboardKPIs = () => {
+  return get('/attendance/dashboard')
 }
 
-export const getTodayBusinessHours = async () => {
-  const token = localStorage.getItem('token')
+// =========================================================
+// TODAY'S BUSINESS HOURS
+// =========================================================
 
-  return axios.get(`${API}api/v1/business-hours/today`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  })
+export const getTodayBusinessHours = () => {
+  return get('/business-hours/')
 }
