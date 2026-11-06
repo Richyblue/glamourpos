@@ -36,6 +36,7 @@
     "@popperjs/core": "^2.11.8",
     "@tensorflow/tfjs-backend-cpu": "^4.22.0",
     "@tensorflow/tfjs-core": "^4.22.0",
+    "@vladmandic/face-api": "^1.7.15",
     "auto-launch": "^5.0.6",
     "axios": "^1.17.0",
     "chart.js": "^4.5.1",
