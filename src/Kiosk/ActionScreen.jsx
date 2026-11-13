@@ -1,15 +1,21 @@
+
 import { useState } from 'react'
 
 import { CCard, CCardBody, CButton, CFormSelect, CSpinner, CAlert } from '@coreui/react'
 
 import { clockIn, goOut, returnBack, clockOut } from '../services/kioskApi'
 import Swal from 'sweetalert2'
+
 const ActionScreen = ({ staff, nextAction, setScreen, setSuccessData }) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const [reason, setReason] = useState('restroom')
   const [expectedReturn, setExpectedReturn] = useState(15)
+
+  // Emergency clock-out is available only after clock-in,
+  // when the staff member is inside the salon.
+  const canEmergencyClockOut = ['goout', 'clockout'].includes(nextAction)
 
   const performAction = async () => {
     if (loading) return
@@ -64,18 +70,38 @@ const ActionScreen = ({ staff, nextAction, setScreen, setSuccessData }) => {
     }
   }
 
+  // Emergency Clock Out
   const performEmergencyClockOut = async () => {
     if (loading) return
 
+    // Prevent emergency clock-out before clock-in
+    // or while the staff member is outside.
+    if (!canEmergencyClockOut) {
+      setError(
+        'Emergency clock-out is only available after clock-in when you are inside the salon.',
+      )
+      return
+    }
+
     const result = await Swal.fire({
       title: 'Emergency Clock Out?',
-      text: 'This will attempt to complete your attendance for today immediately.',
+      html: `
+        <div style="text-align: left;">
+          <p>You are about to end your attendance for today.</p>
+          <p><strong>Staff:</strong> ${staff?.fullname || 'Staff'}</p>
+          <p style="color: #dc3545;">
+            This action will record your clock-out immediately.
+          </p>
+          <p>Are you sure you want to continue?</p>
+        </div>
+      `,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Yes, Clock Out',
       cancelButtonText: 'Cancel',
       confirmButtonColor: '#dc3545',
       reverseButtons: true,
+      focusCancel: true,
     })
 
     if (!result.isConfirmed) return
@@ -101,7 +127,11 @@ const ActionScreen = ({ staff, nextAction, setScreen, setSuccessData }) => {
     } catch (err) {
       console.error('Emergency clock-out failed:', err)
 
-      setError(err.response?.data?.message || err.message || 'Emergency clock-out failed.')
+      setError(
+        err.response?.data?.message ||
+          err.message ||
+          'Emergency clock-out failed. Please try again.',
+      )
     } finally {
       setLoading(false)
     }
@@ -514,34 +544,41 @@ const ActionScreen = ({ staff, nextAction, setScreen, setSuccessData }) => {
             </CButton>
 
             {/* Emergency Clock Out */}
-            <CButton
-              color="danger"
-              variant="outline"
-              size="lg"
-              disabled={loading}
-              onClick={performEmergencyClockOut}
-              style={{
-                width: '100%',
-                minHeight: 52,
-                marginTop: 18,
-                borderRadius: 14,
-                fontWeight: 700,
-                borderWidth: 1.5,
-              }}
-            >
-              {loading ? (
-                <>
-                  <CSpinner size="sm" className="me-2" />
-                  Processing...
-                </>
-              ) : (
-                'EMERGENCY CLOCK OUT'
-              )}
-            </CButton>
+            {canEmergencyClockOut && (
+              <>
+                <CButton
+                  color="danger"
+                  variant="outline"
+                  size="lg"
+                  disabled={loading}
+                  onClick={performEmergencyClockOut}
+                  style={{
+                    width: '100%',
+                    minHeight: 52,
+                    marginTop: 18,
+                    borderRadius: 14,
+                    fontWeight: 700,
+                    borderWidth: 1.5,
+                  }}
+                >
+                  {loading ? (
+                    <>
+                      <CSpinner size="sm" className="me-2" />
+                      Processing...
+                    </>
+                  ) : (
+                    'EMERGENCY CLOCK OUT'
+                  )}
+                </CButton>
 
-            <div className="small text-body-secondary mt-2" style={{ textAlign: 'center' }}>
-              Use only when you need to end your attendance unexpectedly.
-            </div>
+                <div
+                  className="small text-body-secondary mt-2"
+                  style={{ textAlign: 'center' }}
+                >
+                  Use only when you need to end your attendance unexpectedly.
+                </div>
+              </>
+            )}
           </div>
         </CCardBody>
 
