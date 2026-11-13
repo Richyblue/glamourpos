@@ -188,6 +188,24 @@ const AppHeader = () => {
 
           <CNavItem>
             <CNavLink
+              to="/kiosk"
+              as={NavLink}
+              style={({ isActive }) => ({
+                color: isActive ? '#a07800' : '#4b5563',
+                fontWeight: isActive ? '800' : '600',
+                fontSize: '13px',
+                padding: '10px 13px',
+                borderRadius: '9px',
+                background: isActive ? '#fff8e1' : 'transparent',
+                marginRight: '3px',
+              })}
+            >
+              Kiosk
+            </CNavLink>
+          </CNavItem>
+
+          <CNavItem>
+            <CNavLink
               href="#"
               style={{
                 color: '#4b5563',
@@ -214,6 +232,8 @@ const AppHeader = () => {
             >
               Settings
             </CNavLink>
+
+            
           </CNavItem>
 
           <CNavItem
