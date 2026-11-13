@@ -861,7 +861,7 @@ const ScanScreen = ({
               <h1 className="princess-heading">
                 Welcome to
                 <br />
-                Princess Cutz
+                Glamour Unisex Salon
               </h1>
 
               <p className="princess-description">
@@ -1111,7 +1111,7 @@ const ScanScreen = ({
 
         {/* FOOTER */}
         <footer className="princess-kiosk-footer">
-          <div>Princess Cutz Terminal OS v1.0</div>
+          <div>IMVON Terminal OS v1.0</div>
 
           <div>Biometric & Optical QR Recognition</div>
 
