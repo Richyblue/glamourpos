@@ -8,12 +8,10 @@ import CIcon from '@coreui/icons-react'
 
 import { cilSearch, cilPencil, cilTrash } from '@coreui/icons'
 import StaffIDCardModal from '../components/StaffIdCardModal'
-import FaceEnrollmentModal from '../components/FaceEnrollmentModal'
 
 import {
   CCard,
   CCardBody,
-  CCardHeader,
   CRow,
   CCol,
   CFormInput,
@@ -44,8 +42,6 @@ const ViewStaff = () => {
   const [selectedStaff, setSelectedStaff] = useState(null)
 
   const [showIDCard, setShowIDCard] = useState(false)
-  const [showFaceEnrollment, setShowFaceEnrollment] = useState(false)
-  const [selectedFaceStaff, setSelectedFaceStaff] = useState(null)
 
   const getStaff = async () => {
     try {
@@ -285,31 +281,19 @@ const ViewStaff = () => {
                   {staff.User?.isActive ? 'Deactivate' : 'Activate'}
                 </CButton>
               </CTableDataCell>
-              <CTableDataCell>
-                    <CButton
-                      color="info"
-                      size="sm"
-                      className="text-white"
-                      onClick={() => {
-                        setSelectedFaceStaff(staff)
-                        setShowFaceEnrollment(true)
-                      }}
-                    >
-                      {staff.faceEnrollmentStatus === 'enrolled' ? 'Re-enroll Face' : 'Enroll Face'}
-                    </CButton>
-                  </CTableDataCell>
-              <CButton
-                color="dark"
-                size="sm"
-                onClick={() => {
-                  setSelectedStaff(staff)
-                  setShowIDCard(true)
-                }}
-              >
-                ID Card
-              </CButton>
 
               <CTableDataCell>
+                <CButton
+                  color="dark"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedStaff(staff)
+                    setShowIDCard(true)
+                  }}
+                >
+                  ID Card
+                </CButton>
+
                 <Link to={`/editStaff/${staff.id}`}>
                   <CButton color="warning" size="sm">
                     <CIcon icon={cilPencil} />
@@ -332,28 +316,6 @@ const ViewStaff = () => {
           setSelectedStaff(null)
         }}
         staff={selectedStaff}
-      />
-
-<FaceEnrollmentModal
-        visible={showFaceEnrollment}
-        staff={selectedFaceStaff}
-        onClose={() => {
-          setShowFaceEnrollment(false)
-          setSelectedFaceStaff(null)
-        }}
-        onComplete={() => {
-          setShowFaceEnrollment(false)
-          setSelectedFaceStaff(null)
-          getStaff()
-
-          Swal.fire({
-            icon: 'success',
-            title: 'Face Enrolled',
-            text: 'Staff facial enrollment was completed successfully.',
-            timer: 2500,
-            showConfirmButton: false,
-          })
-        }}
       />
     </>
   )
