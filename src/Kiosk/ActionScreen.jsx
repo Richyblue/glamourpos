@@ -4,7 +4,7 @@ import { CCard, CCardBody, CButton, CFormSelect, CSpinner, CAlert } from '@coreu
 
 import { clockIn, goOut, returnBack, clockOut } from '../services/kioskApi'
 import Swal from 'sweetalert2'
-const ActionScreen = ({ staff, nextAction, verificationToken, setScreen, setSuccessData }) => {
+const ActionScreen = ({ staff, nextAction, setScreen, setSuccessData }) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -18,13 +18,8 @@ const ActionScreen = ({ staff, nextAction, verificationToken, setScreen, setSucc
       setLoading(true)
       setError('')
 
-      if (!verificationToken) {
-        throw new Error('Face verification is required before attendance can continue.')
-      }
-
       const payload = {
         qrCode: staff.qrCode,
-        verificationToken,
       }
 
       let response
@@ -37,7 +32,6 @@ const ActionScreen = ({ staff, nextAction, verificationToken, setScreen, setSucc
         case 'goout':
           response = await goOut({
             qrCode: staff.qrCode,
-            verificationToken,
             reason,
             expectedReturn,
           })
@@ -90,13 +84,8 @@ const ActionScreen = ({ staff, nextAction, verificationToken, setScreen, setSucc
       setLoading(true)
       setError('')
 
-      if (!verificationToken) {
-        throw new Error('Face verification is required before attendance can continue.')
-      }
-
       const payload = {
         qrCode: staff.qrCode,
-        verificationToken,
       }
 
       const response = await clockOut(payload)
@@ -529,7 +518,7 @@ const ActionScreen = ({ staff, nextAction, verificationToken, setScreen, setSucc
               color="danger"
               variant="outline"
               size="lg"
-              disabled={loading || !verificationToken}
+              disabled={loading}
               onClick={performEmergencyClockOut}
               style={{
                 width: '100%',

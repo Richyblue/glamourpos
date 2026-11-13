@@ -49,29 +49,6 @@ export const scanQR = (data) => {
 }
 
 // =========================================================
-// FACE VERIFICATION
-// =========================================================
-
-export const verifyStaffFace = (data) => {
-  return post('/kiosk/face/verify', {
-    staffId: data.staffId,
-    qrCode: data.qrCode,
-    descriptor: data.descriptor,
-  })
-}
-
-// =========================================================
-// FACE ENROLLMENT
-// =========================================================
-
-export const enrollStaffFace = (data) => {
-  return post('/kiosk/face/enroll', {
-    staffId: data.staffId,
-    descriptor: data.descriptor,
-  })
-}
-
-// =========================================================
 // CLOCK IN
 // =========================================================
 
