@@ -80,25 +80,27 @@ const ScanScreen = ({
       setKpiLoading(false)
     }
   }
-  useEffect(() => {
-    loadKioskKPIs()
-
-    const interval = setInterval(() => {
-      loadKioskKPIs()
-    }, 30000)
-
-    return () => clearInterval(interval)
-  }, [])
-
+  // Display times using the kiosk device's configured local timezone.
+  // The backend remains authoritative for attendance and business-hour decisions.
   const formatActivityTime = (date) => {
     if (!date) return '--'
 
-    return new Date(date).toLocaleTimeString('en-NG', {
+    const parsedDate = new Date(date)
+    if (Number.isNaN(parsedDate.getTime())) return '--'
+
+    return parsedDate.toLocaleTimeString(undefined, {
       hour: '2-digit',
       minute: '2-digit',
       hour12: true,
-      timeZone: 'Africa/Lagos',
     })
+  }
+
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+
+    if (hour < 12) return '{getGreeting()}'
+    if (hour < 17) return 'Good Afternoon, Team'
+    return 'Good Evening, Team'
   }
 
   const getActivityInitials = (name = '') => {
@@ -124,23 +126,61 @@ const ScanScreen = ({
   }
   const [businessHours, setBusinessHours] = useState(null)
   const [businessHoursLoading, setBusinessHoursLoading] = useState(true)
+
+  // Format a database TIME value directly; do not convert it through a Date
+  // object, which could shift the configured business time.
   const formatTime12Hour = (time) => {
     if (!time) return '--'
 
-    const [hours, minutes] = String(time).substring(0, 5).split(':').map(Number)
+    const [hoursValue, minutesValue] = String(time).substring(0, 5).split(':').map(Number)
 
-    const date = new Date()
+    if (
+      !Number.isInteger(hoursValue) ||
+      !Number.isInteger(minutesValue) ||
+      hoursValue < 0 ||
+      hoursValue > 23 ||
+      minutesValue < 0 ||
+      minutesValue > 59
+    ) {
+      return '--'
+    }
 
-    date.setHours(hours)
-    date.setMinutes(minutes)
-    date.setSeconds(0)
+    const period = hoursValue >= 12 ? 'PM' : 'AM'
+    const hours = hoursValue % 12 || 12
 
-    return date.toLocaleTimeString('en-NG', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Africa/Lagos',
-    })
+    return `${hours}:${String(minutesValue).padStart(2, '0')} ${period}`
+  }
+
+  const getGracePeriodLabel = () => {
+    if (!businessHours) return 'Grace period unavailable'
+
+    const openingTime = businessHours.openingTime || businessHours.openTime
+    const gracePeriod = Number(businessHours.gracePeriod)
+
+    if (!openingTime || !Number.isFinite(gracePeriod) || gracePeriod < 0) {
+      return 'Grace period not configured'
+    }
+
+    const [hours, minutes] = String(openingTime).substring(0, 5).split(':').map(Number)
+
+    if (
+      !Number.isInteger(hours) ||
+      !Number.isInteger(minutes) ||
+      hours < 0 ||
+      hours > 23 ||
+      minutes < 0 ||
+      minutes > 59
+    ) {
+      return 'Grace period unavailable'
+    }
+
+    const graceEndMinutes = hours * 60 + minutes + gracePeriod
+    const endHours = Math.floor(graceEndMinutes / 60) % 24
+    const endMinutes = graceEndMinutes % 60
+
+    return `Grace period: ${gracePeriod} minute${gracePeriod === 1 ? '' : 's'} (until ${formatTime12Hour(
+      `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}:00`,
+    )})`
   }
 
   const loadTodayBusinessHours = async () => {
@@ -149,9 +189,13 @@ const ScanScreen = ({
 
       const response = await getTodayBusinessHours()
 
-      const data = response.data?.data || response.data
+      const data =
+        response.data?.businessHours ||
+        response.data?.data?.businessHours ||
+        response.data?.data ||
+        null
 
-      setBusinessHours(data || null)
+      setBusinessHours(data)
     } catch (error) {
       console.error('Failed to load today business hours:', error)
 
@@ -169,9 +213,7 @@ const ScanScreen = ({
       loadTodayBusinessHours()
     }, 30000)
 
-    return () => {
-      clearInterval(interval)
-    }
+    return () => clearInterval(interval)
   }, [])
 
   const getShiftTitle = () => {
@@ -189,9 +231,9 @@ const ScanScreen = ({
 
     const shiftName = businessHours.shiftName || businessHours.name || 'Today’s Grooming Shift'
 
-    const openingTime = formatTime12Hour(businessHours.openTime)
+    const openingTime = formatTime12Hour(businessHours.openingTime || businessHours.openTime)
 
-    const closingTime = formatTime12Hour(businessHours.closeTime)
+    const closingTime = formatTime12Hour(businessHours.closingTime || businessHours.closeTime)
 
     return `${shiftName}: ${openingTime} – ${closingTime}`
   }
@@ -816,7 +858,7 @@ const ScanScreen = ({
             <div className="princess-brand-logo">P</div>
 
             <div>
-              <div className="princess-brand-name">PRINCESS CUTZ</div>
+              <div className="princess-brand-name">Glamour Unisex Salon</div>
 
               <div className="princess-brand-subtitle">Premium Grooming Experience</div>
             </div>
@@ -841,9 +883,9 @@ const ScanScreen = ({
             </div>
 
             <div className="princess-system-item">
-              <div className="princess-system-label">Time Zone</div>
+              <div className="princess-system-label">Terminal</div>
 
-              <div className="princess-system-value">Africa/Lagos</div>
+              <div className="princess-system-value">Attendance Kiosk</div>
             </div>
           </div>
         </header>
@@ -855,7 +897,7 @@ const ScanScreen = ({
             <div>
               <div className="princess-pill">
                 <span>●</span>
-                Good Morning, Team
+                {getGreeting()}
               </div>
 
               <h1 className="princess-heading">
@@ -875,7 +917,7 @@ const ScanScreen = ({
                 <div>
                   <div className="princess-hours-title">{getShiftTitle()}</div>
 
-                  <div className="princess-hours-subtitle">Grace period until 08:15 AM</div>
+                  <div className="princess-hours-subtitle">{getGracePeriodLabel()}</div>
                 </div>
               </div>
             </div>
@@ -899,7 +941,7 @@ const ScanScreen = ({
                 </div>
 
                 <div className="princess-kpi-card">
-                  <div className="princess-kpi-label">Clocked In</div>
+                  <div className="princess-kpi-label">Absent Today</div>
 
                   <div className="princess-kpi-value">
                     {kpiLoading ? '—' : kioskStats2.absentToday}
@@ -953,23 +995,13 @@ const ScanScreen = ({
                 </div>
 
                 <div className="princess-kpi-card">
-                  <div className="princess-kpi-label">Late Arrivals</div>
+                  <div className="princess-kpi-label">Overtime Hours</div>
 
                   <div className="princess-kpi-value">
                     {kpiLoading ? '—' : `${kioskStats2.overtimeHours}h`}
                   </div>
 
                   <div className="princess-kpi-caption">Logged today</div>
-                </div>
-
-                <div className="princess-kpi-card">
-                  <div className="princess-kpi-label">Total Outside</div>
-
-                  <div className="princess-kpi-value">
-                    {kpiLoading ? '—' : kioskStats2.currentlyOutside}
-                  </div>
-
-                  <div className="princess-kpi-caption">Registered</div>
                 </div>
               </div>
             </div>
@@ -1056,7 +1088,7 @@ const ScanScreen = ({
                         }}
                       />
 
-                      <div className="princess-scanner-loading-title">Verifying Staff ID</div>
+                      <div className="princess-scanner-loading-title">Reading Staff QR Card</div>
 
                       <div className="princess-scanner-loading-text">
                         Please wait while we record your attendance...
@@ -1113,7 +1145,7 @@ const ScanScreen = ({
         <footer className="princess-kiosk-footer">
           <div>IMVON Terminal OS v1.0</div>
 
-          <div>Biometric & Optical QR Recognition</div>
+          <div>QR Code Attendance</div>
 
           <div>Secure Staff Attendance</div>
         </footer>
